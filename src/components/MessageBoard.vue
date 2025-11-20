@@ -84,7 +84,7 @@ async function fetchMessages() {
   info.value = ''
   const { data, error: queryError } = await supabase
     .from('messages')
-    .select('id, author_id, content, created_at, updated_at')
+    .select('id, author_id, content, created_at, updated_at, profiles(user_name)')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -176,6 +176,9 @@ async function removeMessage(id) {
 function authorLabel(item) {
   if (item.author_id && item.author_id === props.session?.user?.id) {
     return '我'
+  }
+  if (item.profiles && item.profiles.user_name) {
+    return item.profiles.user_name
   }
   if (item.author_id) {
     return `用户 ${item.author_id.slice(0, 6)}`

@@ -1,39 +1,79 @@
 <template>
-  <div class="auth-panel">
-    <h2 v-if="session" class="auth-title">欢迎 {{ session.user.email }}</h2>
+  <div class="w-full p-6">
+    <h2 v-if="session" class="text-xl font-bold text-center mb-6 text-gray-800">Welcome {{ session.user.user_metadata?.user_name || session.user.email }}</h2>
     <template v-else>
-      <div class="tabs">
-        <button type="button" :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</button>
-        <button type="button" :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</button>
+      <div class="flex bg-gray-100 p-1 rounded-xl mb-6">
+        <button 
+          type="button" 
+          class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all duration-200"
+          :class="mode === 'login' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+          @click="switchMode('login')"
+        >
+          Login
+        </button>
+        <button 
+          type="button" 
+          class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all duration-200"
+          :class="mode === 'register' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+          @click="switchMode('register')"
+        >
+          Register
+        </button>
       </div>
 
-      <form class="auth-form" @submit.prevent="handleSubmit">
-        <input v-model.trim="email" type="email" placeholder="邮箱" autocomplete="email" required />
+      <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
+        <div v-if="mode === 'register'">
+          <input
+            v-model.trim="username"
+            type="text"
+            placeholder="Username"
+            required
+            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+          />
+        </div>
+        
+        <input 
+          v-model.trim="email" 
+          type="email" 
+          placeholder="Email" 
+          autocomplete="email" 
+          required 
+          class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+        />
+        
         <input
           v-model="password"
           type="password"
-          placeholder="密码（至少 6 位）"
+          placeholder="Password (min 6 chars)"
           autocomplete="current-password"
           minlength="6"
           required
+          class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
         />
+        
         <input
           v-if="mode === 'register'"
           v-model="confirmPassword"
           type="password"
-          placeholder="确认密码"
+          placeholder="Confirm Password"
           autocomplete="new-password"
           minlength="6"
           required
+          class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
         />
-        <button type="submit" :disabled="busy">
-          {{ mode === 'login' ? '立即登录' : '发送验证邮件' }}
+        
+        <button 
+          type="submit" 
+          :disabled="busy"
+          class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+        >
+          {{ busy ? 'Processing...' : (mode === 'login' ? 'Login' : 'Register') }}
         </button>
       </form>
     </template>
 
-    <p v-if="info" class="auth-hint">{{ info }}</p>
-    <p v-if="error" class="auth-error">{{ error }}</p>
+    <p v-if="info" class="mt-4 text-sm text-center text-green-600 bg-green-50 p-3 rounded-lg">{{ info }}</p>
+    <p v-if="error" class="mt-4 text-sm text-center text-red-600 bg-red-50 p-3 rounded-lg">{{ error }}</p>
   </div>
 </template>
 
@@ -54,6 +94,7 @@ const mode = ref('login')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
+const username = ref('')
 const busy = ref(false)
 const error = ref('')
 const info = ref('')
@@ -81,6 +122,7 @@ function resetForm() {
   email.value = ''
   password.value = ''
   confirmPassword.value = ''
+  username.value = ''
 }
 
 async function handleSubmit() {
@@ -91,20 +133,26 @@ async function handleSubmit() {
   try {
     if (mode.value === 'register') {
       if (password.value !== confirmPassword.value) {
-        throw new Error('两次输入的密码不一致')
+        throw new Error('Passwords do not match')
+      }
+      if (!username.value) {
+        throw new Error('Username is required')
       }
 
       const { error: signUpError } = await supabase.auth.signUp({
         email: email.value,
         password: password.value,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: window.location.origin,
+          data: {
+            user_name: username.value
+          }
         }
       })
 
       if (signUpError) throw signUpError
 
-      info.value = '注册成功，请前往邮箱完成验证后再登录。'
+      info.value = 'Registration successful! Please check your email to confirm.'
       resetForm()
       mode.value = 'login'
       return
@@ -116,96 +164,29 @@ async function handleSubmit() {
     })
 
     if (signInError) {
+      console.error('Login error:', signInError)
       if (signInError.message?.includes('Email not confirmed')) {
-        throw new Error('邮箱尚未验证，请先完成邮箱验证。')
+        throw new Error('Email not confirmed. Please check your inbox.')
       }
       throw signInError
     }
 
+    console.log('Login successful, session:', data.session)
+
     if (data.session) {
-      emit('authenticated')
+      emit('authenticated', data.session)
       resetForm()
-      info.value = '登录成功。'
+      info.value = 'Login successful.'
+    } else {
+      console.warn('Login succeeded but no session returned')
+      throw new Error('Login failed: No session returned')
     }
   } catch (err) {
-    error.value = err.message ?? '操作失败'
+    console.error('Auth error caught:', err)
+    error.value = err.message ?? 'Operation failed'
+    if (!error.value) error.value = 'Unknown error'
   } finally {
     busy.value = false
   }
 }
 </script>
-
-<style scoped>
-.auth-panel {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 10px 30px rgba(30, 41, 59, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.auth-title {
-  margin: 0;
-  color: #1e293b;
-}
-
-.tabs {
-  display: inline-flex;
-  background: #e2e8f0;
-  border-radius: 12px;
-  padding: 4px;
-  gap: 4px;
-}
-
-.tabs button {
-  border: none;
-  background: transparent;
-  padding: 8px 16px;
-  border-radius: 10px;
-  font-weight: 600;
-  color: #475569;
-}
-
-.tabs button.active {
-  background: #1d4ed8;
-  color: #ffffff;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-input {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-}
-
-button[type='submit'] {
-  border: none;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #2563eb;
-  color: white;
-  font-weight: 600;
-}
-
-button:disabled {
-  background: #cbd5e1;
-  cursor: not-allowed;
-}
-
-.auth-error {
-  color: #dc2626;
-}
-
-.auth-hint {
-  color: #0f172a;
-  font-size: 13px;
-}
-</style>
