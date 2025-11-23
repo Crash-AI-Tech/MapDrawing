@@ -106,7 +106,7 @@
                 <input 
                     type="range" 
                     min="0.1" 
-                    max="1.5" 
+                    max="1.0" 
                     step="0.1"
                     :value="brushSize" 
                     @input="$emit('update:brushSize', parseFloat($event.target.value))"

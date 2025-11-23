@@ -116,12 +116,12 @@ const createColoredMarkerIcon = (color, size) => {
     });
 };
 
-// Core logic: Input size is pixel width at MAX_ZOOM (18).
-// Scale formula: base * 2^(currentZoom - MAX_ZOOM)
-const getPhysicalDimension = (baseSizeAtMaxZoom, currentZoom) => {
-    if (!baseSizeAtMaxZoom) return 0;
-    const scale = Math.pow(2, currentZoom - MAX_ZOOM);
-    return baseSizeAtMaxZoom * scale;
+// Core logic: Input size is pixel width at reference zoom (default MAX_ZOOM).
+// Scale formula: base * 2^(currentZoom - referenceZoom)
+const getPhysicalDimension = (baseSize, currentZoom, referenceZoom = MAX_ZOOM) => {
+    if (!baseSize) return 0;
+    const scale = Math.pow(2, currentZoom - referenceZoom);
+    return baseSize * scale;
 };
 
 const updateLayerStyles = () => {
@@ -187,8 +187,8 @@ const updateLayerStyles = () => {
         // Case 3: Dots (L.CircleMarker - Pixel based)
         else if (layer instanceof L.CircleMarker) {
             const baseWeight = d.weight || 1.0;
-            // Width at this zoom
-            const currentWeight = getPhysicalDimension(baseWeight, currentZoom);
+            // Width at this zoom - Use MAX_ZOOM as unified reference
+            const currentWeight = getPhysicalDimension(baseWeight, currentZoom, MAX_ZOOM);
             layer.setRadius(Math.max(0.01, currentWeight / 2));
             layer.setStyle({ 
                 opacity: opacity, 
@@ -198,7 +198,8 @@ const updateLayerStyles = () => {
         // Case 4: Lines (Polyline)
         else if (layer instanceof L.Polyline) {
             const baseWeight = d.weight || 1.0;
-            const currentWeight = getPhysicalDimension(baseWeight, currentZoom);
+            // Use MAX_ZOOM as unified reference
+            const currentWeight = getPhysicalDimension(baseWeight, currentZoom, MAX_ZOOM);
             layer.setStyle({ 
                 weight: Math.max(0.1, currentWeight), 
                 opacity: opacity,
@@ -209,7 +210,7 @@ const updateLayerStyles = () => {
 
     // Temp Layer Update
     if (tempLayer.value) {
-            const currentWeight = getPhysicalDimension(props.brushSize, currentZoom);
+            const currentWeight = getPhysicalDimension(props.brushSize, currentZoom, MAX_ZOOM);
             const style = { opacity: opacity, fillOpacity: opacity };
 
             if (tempLayer.value instanceof L.Circle) {
@@ -373,8 +374,8 @@ const renderDrawings = () => {
                     });
             } 
             else if (drawing.tool === DrawingTool.BRUSH) {
-                // Calculate width at current zoom
-                const currentWeight = getPhysicalDimension(drawing.weight || 1.0, currentZoom);
+                // Calculate width at current zoom - Use MAX_ZOOM as unified reference
+                const currentWeight = getPhysicalDimension(drawing.weight || 1.0, currentZoom, MAX_ZOOM);
                 const pathOptions = { 
                     color: drawing.color, 
                     // Ensure consistent visual properties
@@ -446,8 +447,8 @@ const renderTempDrawing = () => {
     if (currentPoints.value.length === 0) return;
 
     const currentZoom = mapInstance.value.getZoom();
-    // Consistent Width Calculation
-    const currentWeight = getPhysicalDimension(props.brushSize, currentZoom);
+    // Consistent Width Calculation - Use MAX_ZOOM as reference
+    const currentWeight = getPhysicalDimension(props.brushSize, currentZoom, MAX_ZOOM);
 
     const pathOptions = { 
         color: props.color, 
