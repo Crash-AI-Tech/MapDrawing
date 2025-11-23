@@ -60,6 +60,7 @@ const props = defineProps({
   color: String,
   brushSize: Number,
   user: String,
+  userEmail: String,
   isTransparent: Boolean
 });
 
@@ -357,7 +358,7 @@ const renderDrawings = () => {
                     const isLeftClickHeld = (e.originalEvent.buttons & 1) === 1;
                     if (isLeftClickHeld || e.type === 'mousedown') {
                             // Check ownership
-                            if (drawing.user_id === props.user || drawing.author === props.user) { // Support both new and old format
+                            if (drawing.user_id === props.user || drawing.author === props.user || (props.userEmail && drawing.author === props.userEmail)) { // Support both new and old format
                             emit('remove-drawing', drawing.id);
                         }
                     }
