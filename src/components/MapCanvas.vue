@@ -488,7 +488,7 @@ const finishDrawing = () => {
         color: props.color,
         weight: props.brushSize, 
         points: [...currentPoints.value],
-        createdZoom: mapInstance.value.getZoom() 
+        createdZoom: Math.round(mapInstance.value.getZoom()) 
     });
     
     currentPoints.value = [];
@@ -509,7 +509,7 @@ const confirmMarker = () => {
         weight: 0, 
         points: [pendingMarkerPos.value],
         text: markerText.value,
-        createdZoom: mapInstance.value.getZoom()
+        createdZoom: Math.round(mapInstance.value.getZoom())
     });
     cancelMarker();
 };
