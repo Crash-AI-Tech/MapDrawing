@@ -54,6 +54,10 @@ const MAP_MAX_ZOOM = MAX_ZOOM + 2;
 // Base size for markers at MAX_ZOOM (Level 18) in pixels
 const MARKER_BASE_SIZE_MAX_ZOOM = 5;
 
+// Minimum pixel size for elements to be visible.
+// Elements smaller than this will be hidden (opacity 0) to avoid "dust" artifacts at low zoom.
+const VISIBILITY_THRESHOLD_PIXELS = 0.1;
+
 const props = defineProps({
   drawings: Array,
   tool: String,
@@ -140,8 +144,9 @@ const updateLayerStyles = () => {
 
         // Case 1: Icon Markers
         if (layer instanceof L.Marker) {
-            // ...existing code...
             const currentSize = getPhysicalDimension(MARKER_BASE_SIZE_MAX_ZOOM, currentZoom);
+            const isVisible = currentSize >= VISIBILITY_THRESHOLD_PIXELS; // Threshold for visibility
+
             layer.setIcon(createColoredMarkerIcon(d.color, currentSize));
             const verticalOffset = -currentSize / 5;
 
@@ -173,37 +178,41 @@ const updateLayerStyles = () => {
             }
             
             const iconEl = layer.getElement();
-            if (iconEl) iconEl.style.opacity = opacity;
+            if (iconEl) iconEl.style.opacity = isVisible ? opacity : 0;
         } 
         // Case 2: Dots (L.Circle - Geographic)
-        // L.Circle extends L.CircleMarker, so we must check L.Circle first
         else if (layer instanceof L.Circle) {
+            const baseWeight = d.weight || 1.0;
+            const currentPixelSize = getPhysicalDimension(baseWeight, currentZoom, MAX_ZOOM);
+            const isVisible = currentPixelSize >= VISIBILITY_THRESHOLD_PIXELS;
+
              layer.setStyle({ 
-                opacity: opacity, 
-                fillOpacity: opacity 
+                opacity: isVisible ? opacity : 0, 
+                fillOpacity: isVisible ? opacity : 0 
             });
-            // Do NOT update radius manually for L.Circle, it scales geographically automatically
         }
         // Case 3: Dots (L.CircleMarker - Pixel based)
         else if (layer instanceof L.CircleMarker) {
             const baseWeight = d.weight || 1.0;
-            // Width at this zoom - Use MAX_ZOOM as unified reference
             const currentWeight = getPhysicalDimension(baseWeight, currentZoom, MAX_ZOOM);
+            const isVisible = currentWeight >= VISIBILITY_THRESHOLD_PIXELS;
+
             layer.setRadius(Math.max(0.01, currentWeight / 2));
             layer.setStyle({ 
-                opacity: opacity, 
-                fillOpacity: opacity 
+                opacity: isVisible ? opacity : 0, 
+                fillOpacity: isVisible ? opacity : 0 
             });
         }
         // Case 4: Lines (Polyline)
         else if (layer instanceof L.Polyline) {
             const baseWeight = d.weight || 1.0;
-            // Use MAX_ZOOM as unified reference
             const currentWeight = getPhysicalDimension(baseWeight, currentZoom, MAX_ZOOM);
+            const isVisible = currentWeight >= VISIBILITY_THRESHOLD_PIXELS;
+
             layer.setStyle({ 
                 weight: Math.max(0.1, currentWeight), 
-                opacity: opacity,
-                fillOpacity: opacity
+                opacity: isVisible ? opacity : 0,
+                fillOpacity: isVisible ? opacity : 0
             });
         }
     });
@@ -211,7 +220,11 @@ const updateLayerStyles = () => {
     // Temp Layer Update
     if (tempLayer.value) {
             const currentWeight = getPhysicalDimension(props.brushSize, currentZoom, MAX_ZOOM);
-            const style = { opacity: opacity, fillOpacity: opacity };
+            const isVisible = currentWeight >= VISIBILITY_THRESHOLD_PIXELS;
+            const style = { 
+                opacity: isVisible ? opacity : 0, 
+                fillOpacity: isVisible ? opacity : 0 
+            };
 
             if (tempLayer.value instanceof L.Circle) {
                  tempLayer.value.setStyle(style);
@@ -224,20 +237,6 @@ const updateLayerStyles = () => {
                 weight: Math.max(0.1, currentWeight)
             });
             }
-    }
-};
-
-// Helper to calculate meters from pixels at current view
-const calculateMetersFromPixels = (map, latlng, pixels) => {
-    if (!map || !latlng) return 0;
-    try {
-        const point = map.latLngToContainerPoint(latlng);
-        const targetPoint = L.point(point.x + pixels, point.y);
-        const targetLatLng = map.containerPointToLatLng(targetPoint);
-        return map.distance(latlng, targetLatLng);
-    } catch (e) {
-        console.warn('Error calculating meters:', e);
-        return 0;
     }
 };
 
@@ -390,11 +389,21 @@ const renderDrawings = () => {
 
                 if (drawing.points.length === 1) {
                     // Single point: Use L.Circle for smooth geographic scaling
-                    // Calculate radius in meters to match the visual width
-                    const radiusPixels = Math.max(0.01, currentWeight / 2);
-                    let radiusMeters = calculateMetersFromPixels(mapInstance.value, drawing.points[0], radiusPixels);
                     
-                    // Fallback if calculation fails (e.g. map not ready or invalid latlng)
+                    // FIX: Calculate meters directly at MAX_ZOOM to avoid low-zoom pixel clamping issues.
+                    // This ensures the physical size (meters) remains constant regardless of the zoom level at render time.
+                    const baseWeight = drawing.weight || 1.0;
+                    const lat = drawing.points[0].lat || drawing.points[0][0]; // Handle object or array format
+                    
+                    // Web Mercator resolution formula: meters/pixel = (EarthCircumference * cos(lat)) / (256 * 2^zoom)
+                    const earthCircumference = 40075016.686;
+                    const latRad = lat * (Math.PI / 180);
+                    const resolutionAtMaxZoom = (earthCircumference * Math.cos(latRad)) / (256 * Math.pow(2, MAX_ZOOM));
+                    
+                    // Radius (meters) = (Base Pixel Radius) * Resolution
+                    let radiusMeters = (baseWeight / 2) * resolutionAtMaxZoom;
+                    
+                    // Fallback purely for safety
                     if (!radiusMeters || radiusMeters <= 0) {
                         radiusMeters = 0.1; 
                     }
@@ -462,8 +471,13 @@ const renderTempDrawing = () => {
     if (props.tool === DrawingTool.BRUSH) {
         if (currentPoints.value.length === 1) {
             // Dot: Use L.Circle
-            const radiusPixels = Math.max(0.01, currentWeight / 2);
-            let radiusMeters = calculateMetersFromPixels(mapInstance.value, currentPoints.value[0], radiusPixels);
+            // FIX: Calculate meters directly at MAX_ZOOM to avoid low-zoom pixel clamping issues.
+            const lat = currentPoints.value[0].lat || currentPoints.value[0][0];
+            const earthCircumference = 40075016.686;
+            const latRad = lat * (Math.PI / 180);
+            const resolutionAtMaxZoom = (earthCircumference * Math.cos(latRad)) / (256 * Math.pow(2, MAX_ZOOM));
+            
+            let radiusMeters = (props.brushSize / 2) * resolutionAtMaxZoom;
             
             if (!radiusMeters || radiusMeters <= 0) radiusMeters = 0.1;
 
