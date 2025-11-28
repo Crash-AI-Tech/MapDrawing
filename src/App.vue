@@ -1,5 +1,13 @@
 <template>
   <div class="relative w-screen h-screen font-sans overflow-hidden">
+    <!-- Loading Indicator -->
+    <div v-if="isLoadingDrawings" class="absolute inset-0 z-[3000] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+        <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-gray-700 font-medium">正在加载历史数据...</p>
+      </div>
+    </div>
+    
     <!-- Map is always visible -->
     <MapCanvas
       ref="mapCanvasRef"
@@ -73,6 +81,8 @@ const isTransparent = ref(false);
 const showLoginModal = ref(false);
 const mapCanvasRef = ref(null);
 const userProfile = ref(null);
+const isLoadingDrawings = ref(true);
+const loadError = ref(null);
 
 const userEmail = computed(() => session.value?.user?.email);
 const user = computed(() => session.value?.user);
@@ -254,25 +264,30 @@ async function fetchUserProfile() {
 // Drawing Logic
 async function fetchDrawings() {
     console.log('App: Fetching drawings...');
+    isLoadingDrawings.value = true;
+    loadError.value = null;
     
     // 1. Try Supabase Client
     try {
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Fetch Client Timeout')), 5000)
+            setTimeout(() => reject(new Error('Fetch Client Timeout')), 30000) // Increased to 30s for large datasets
         );
         
         const fetchPromise = supabase
             .from('drawings')
-            .select('*')
-            .order('created_at', { ascending: true });
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .limit(5000); // Get latest 5000 items (descending)
             
         const result = await Promise.race([fetchPromise, timeoutPromise]);
         const { data, error } = result;
         
         if (error) throw error;
         
-        console.log('App: Fetched drawings (Client):', data?.length);
-        drawings.value = data || [];
+        console.log('App: Fetched drawings (Client):', data?.length, 'Total in DB:', result.count);
+        // Reverse to oldest-first for rendering
+        drawings.value = data ? data.reverse() : [];
+        isLoadingDrawings.value = false;
         
         // Center map on last drawing if available
         // Only center if we don't have a saved view state or if it's the first load
@@ -300,6 +315,10 @@ async function fetchDrawings() {
 
     // 2. Fallback: Raw Fetch
     try {
+        // Add a timeout for the raw fetch as well
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         const envUrl = import.meta.env.VITE_SUPABASE_URL;
         const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
         const token = session.value?.access_token;
@@ -313,18 +332,23 @@ async function fetchDrawings() {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const res = await fetch(`${envUrl}/rest/v1/drawings?select=*&order=created_at.asc`, {
+        const res = await fetch(`${envUrl}/rest/v1/drawings?select=*&order=created_at.desc&limit=5000`, {
             method: 'GET',
-            headers: headers
+            headers: headers,
+            signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+
         if (!res.ok) {
             throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
         
         const data = await res.json();
         console.log('App: Fetched drawings (Raw Fetch):', data?.length);
-        drawings.value = data || [];
+        // Reverse to oldest-first for rendering
+        drawings.value = data ? data.reverse() : [];
+        isLoadingDrawings.value = false;
 
         // Center map on last drawing (Fallback path)
         // Removed to prevent jumping, relying on MapCanvas localStorage restoration
@@ -341,6 +365,10 @@ async function fetchDrawings() {
 
     } catch (fetchErr) {
         console.error('App: All fetch attempts failed', fetchErr);
+        loadError.value = fetchErr.message || 'Failed to load drawings';
+        isLoadingDrawings.value = false;
+        // Show error to user
+        alert('无法加载历史绘制内容，请检查网络连接或刷新页面重试。\n错误信息: ' + (fetchErr.message || 'Unknown error'));
     }
 }
 
