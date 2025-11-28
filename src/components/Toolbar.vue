@@ -69,7 +69,7 @@
                             </button>
 
                             <!-- Dropdown Menu -->
-                            <div v-if="showDropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 overflow-hidden animate-fade-in origin-top-right">
+                            <div v-if="showDropdown" ref="dropdownRef" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 overflow-hidden animate-fade-in origin-top-right">
                                 <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                                     <p class="text-sm font-semibold text-gray-900 truncate">{{ displayName }}</p>
                                     <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
@@ -107,7 +107,7 @@
         </div>
 
         <!-- Secondary Toolbar (Color & Size) - Only show when drawing -->
-        <div v-if="isDrawingTool" class="px-4 py-3 bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 flex items-center gap-6 animate-fade-in-up">
+        <div v-if="isDrawingTool && showSettingsPanel" ref="settingsPanelRef" class="px-4 py-3 bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 flex items-center gap-6 animate-fade-in-up">
              <!-- Size Slider (Only for Brush) -->
              <div v-if="currentTool === 'BRUSH'" class="flex items-center gap-4">
                 <div class="flex flex-col items-center gap-1">
@@ -229,6 +229,12 @@ const handleToolClick = (tool) => {
         emit('request-login');
         return;
     }
+    
+    // If clicking the same drawing tool, toggle settings panel
+    if (tool === props.currentTool && (tool === DrawingTool.BRUSH || tool === DrawingTool.MARKER)) {
+        showSettingsPanel.value = !showSettingsPanel.value;
+    }
+    
     emit('update:currentTool', tool);
 };
 
@@ -341,17 +347,80 @@ const saveName = async () => {
     }
 };
 
-// Close dropdown when clicking outside (simple implementation)
-// In a real app, use a click-outside directive
+// Auto-close Logic (Dropdown)
+const dropdownRef = ref(null);
+let autoCloseTimer = null;
+
+const startAutoCloseTimer = () => {
+    if (autoCloseTimer) clearTimeout(autoCloseTimer);
+    autoCloseTimer = setTimeout(() => {
+        showDropdown.value = false;
+    }, 5000);
+};
+
+const handleGlobalClick = (e) => {
+    if (dropdownRef.value && dropdownRef.value.contains(e.target)) {
+        // Clicked inside: Reset timer
+        startAutoCloseTimer();
+    } else {
+        // Clicked outside: Close immediately
+        showDropdown.value = false;
+    }
+};
+
+// Close dropdown when clicking outside or after 5s of inactivity
 watch(showDropdown, (val) => {
     if (val) {
+        startAutoCloseTimer();
         setTimeout(() => {
-            const close = () => {
-                showDropdown.value = false;
-                window.removeEventListener('click', close);
-            };
-            window.addEventListener('click', close);
+            window.addEventListener('click', handleGlobalClick);
         }, 0);
+    } else {
+        if (autoCloseTimer) clearTimeout(autoCloseTimer);
+        window.removeEventListener('click', handleGlobalClick);
+    }
+});
+
+// Auto-close Logic (Settings Panel)
+const showSettingsPanel = ref(false);
+const settingsPanelRef = ref(null);
+let settingsAutoCloseTimer = null;
+
+const startSettingsAutoCloseTimer = () => {
+    if (settingsAutoCloseTimer) clearTimeout(settingsAutoCloseTimer);
+    settingsAutoCloseTimer = setTimeout(() => {
+        showSettingsPanel.value = false;
+    }, 5000);
+};
+
+const handleSettingsGlobalClick = (e) => {
+    if (settingsPanelRef.value && settingsPanelRef.value.contains(e.target)) {
+        // Clicked inside: Reset timer
+        startSettingsAutoCloseTimer();
+    } else {
+        // Clicked outside: Close immediately
+        showSettingsPanel.value = false;
+    }
+};
+
+watch(showSettingsPanel, (val) => {
+    if (val) {
+        startSettingsAutoCloseTimer();
+        setTimeout(() => {
+            window.addEventListener('click', handleSettingsGlobalClick);
+        }, 0);
+    } else {
+        if (settingsAutoCloseTimer) clearTimeout(settingsAutoCloseTimer);
+        window.removeEventListener('click', handleSettingsGlobalClick);
+    }
+});
+
+// Watch tool changes to open settings panel
+watch(() => props.currentTool, (newTool) => {
+    if (newTool === DrawingTool.BRUSH || newTool === DrawingTool.MARKER) {
+        showSettingsPanel.value = true;
+    } else {
+        showSettingsPanel.value = false;
     }
 });
 
