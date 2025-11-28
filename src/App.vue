@@ -65,7 +65,7 @@ import { supabase } from './supabaseClient';
 import MapCanvas from './components/MapCanvas.vue';
 import Toolbar from './components/Toolbar.vue';
 import AuthPanel from './components/AuthPanel.vue';
-import { DrawingTool, DRAWING_COLORS } from './constants.js';
+import { DrawingTool, DRAWING_COLORS, MAX_ZOOM } from './constants.js';
 
 const session = ref(null);
 const drawings = ref([]);
@@ -203,10 +203,38 @@ function handleAuthenticated(newSession) {
         session.value = newSession;
         // Fetch drawings immediately after login
         fetchDrawings();
+        // Locate user and zoom to max
+        locateUser();
     } else {
         refreshSession();
     }
     showLoginModal.value = false;
+}
+
+function locateUser() {
+    if (!navigator.geolocation) {
+        console.warn('Geolocation is not supported by this browser.');
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log('App: User location found:', latitude, longitude);
+            if (mapCanvasRef.value) {
+                // Zoom to MAX_ZOOM (18)
+                mapCanvasRef.value.setView([latitude, longitude], MAX_ZOOM);
+            }
+        },
+        (error) => {
+            console.warn('App: Geolocation failed:', error.message);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+        }
+    );
 }
 
 // User Profile Logic

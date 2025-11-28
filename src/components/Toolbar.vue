@@ -4,8 +4,8 @@
         <!-- Main Toolbar Wrapper -->
         <div class="relative">
             <!-- Loading Spinner Border -->
-            <div v-if="isLoading" class="absolute -inset-[4px] rounded-2xl overflow-hidden z-0">
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300%] h-[300%] bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,#2563eb_50%,transparent_100%)] animate-[spin_1s_linear_infinite]"></div>
+            <div v-if="isLoading" class="absolute -inset-[4px] rounded-2xl overflow-hidden z-0 bg-gray-100/50">
+                <div class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-blue-500 to-transparent -translate-x-full animate-scan"></div>
             </div>
 
             <!-- Main Toolbar -->
@@ -446,5 +446,14 @@ const opacityIcon = OPACITY_ICON;
 @keyframes scaleIn {
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scan {
+    animation: scan 1.5s linear infinite;
+}
+
+@keyframes scan {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 </style>
