@@ -1,7 +1,7 @@
 
 export const INITIAL_CENTER = [22.551952664769914, 113.88300643297055];
 export const INITIAL_ZOOM = 13;
-export const MAX_ZOOM = 18;
+export const MAX_ZOOM = 20;
 
 export const DRAWING_COLORS = [
   '#000000', '#3C3C3C', '#787878', '#AAAAAA', '#D2D2D2', '#FFFFFF', '#600018',

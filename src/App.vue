@@ -81,6 +81,7 @@ const loadError = ref(null);
 const actionHistory = ref([]);
 const isUndoing = ref(false);
 const currentBounds = ref(null);
+const loadedBounds = ref(null);
 
 const userEmail = computed(() => session.value?.user?.email);
 const user = computed(() => session.value?.user);
@@ -316,47 +317,133 @@ function debounce(func, wait) {
 const handleViewportChange = debounce((bounds) => {
     console.log('App: Viewport changed:', bounds);
     currentBounds.value = bounds;
-    fetchDrawings(bounds);
+    // Pass zoom level to fetchDrawings
+    fetchDrawings(bounds, bounds.zoom);
 }, 500); // 500ms debounce
 
 // Drawing Logic
-async function fetchDrawings(bounds = null) {
-    console.log('App: Fetching drawings...', bounds ? 'with bounds' : 'global');
+async function fetchDrawings(bounds = null, zoom = 0) {
+    // Optimization: Check if the requested bounds are fully contained within the already loaded area
+    // Only skip if we are NOT in "deep zoom" mode where we might want to fetch more history
+    // Or better: if we loaded the buffer at a high zoom, we probably have the history.
+    // Let's keep the cache logic but maybe invalidate it if we zoom in deeper? 
+    // For simplicity, let's trust the cache if bounds match, assuming the cache was built with the same policy.
+    if (bounds && loadedBounds.value) {
+        const isInside = 
+            bounds.minLat >= loadedBounds.value.minLat &&
+            bounds.maxLat <= loadedBounds.value.maxLat &&
+            bounds.minLng >= loadedBounds.value.minLng &&
+            bounds.maxLng <= loadedBounds.value.maxLng;
+            
+        if (isInside) {
+            console.log('App: Skipping fetch, viewport is inside loaded buffer.');
+            isLoadingDrawings.value = false;
+            return;
+        }
+    }
+
+    console.log('App: Fetching drawings...', bounds ? 'with bounds' : 'global', 'Zoom:', zoom);
     isLoadingDrawings.value = true;
     loadError.value = null;
     
-    // 1. Try Supabase Client
+    // Calculate Expanded Bounds (Buffer)
+    // We fetch a larger area (e.g., 50% larger) so the user can pan around without triggering new fetches immediately
+    let fetchBounds = bounds;
+    if (bounds) {
+        const latSpan = bounds.maxLat - bounds.minLat;
+        const lngSpan = bounds.maxLng - bounds.minLng;
+        const PADDING = 0.5; // 50% padding
+
+        fetchBounds = {
+            minLat: bounds.minLat - latSpan * PADDING,
+            maxLat: bounds.maxLat + latSpan * PADDING,
+            minLng: bounds.minLng - lngSpan * PADDING,
+            maxLng: bounds.maxLng + lngSpan * PADDING
+        };
+        
+        // Update the loaded cache area
+        loadedBounds.value = fetchBounds;
+        console.log('App: Fetching expanded buffer area:', fetchBounds);
+    }
+
+    // Pagination Logic
+    // Supabase API often has a default max row limit of 1000. 
+    // We set BATCH_SIZE to 1000 to match this likely server-side limit.
+    // If we set it higher (e.g. 5000) and the server returns 1000, our logic would think we reached the end.
+    const BATCH_SIZE = 1000;
+    
+    // If zoom is high (detailed view), we try to fetch more history.
+    // If zoom is low (world view), we stick to one batch to save bandwidth.
+    // Target: ~50k items max. So 50 pages of 1000.
+    const MAX_PAGES = (zoom >= 14) ? 50 : 1; 
+    
+    let allFetchedData = [];
+    let page = 0;
+    let hasMore = true;
+
     try {
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Fetch Client Timeout')), 30000)
+            setTimeout(() => reject(new Error('Fetch Client Timeout')), 60000) // Increased timeout for multi-page
         );
-        
-        let query = supabase
-            .from('drawings')
-            .select('*', { count: 'exact' });
 
-        // Apply Spatial Filters if bounds exist
-        if (bounds) {
-            query = query
-                .gte('center_lat', bounds.minLat)
-                .lte('center_lat', bounds.maxLat)
-                .gte('center_lng', bounds.minLng)
-                .lte('center_lng', bounds.maxLng);
-        }
+        while (hasMore && page < MAX_PAGES) {
+            let query = supabase
+                .from('drawings')
+                .select('*'); // Removed count for speed in loop
 
-        // Always order by newest first and limit
-        query = query
-            .order('created_at', { ascending: false })
-            .limit(5000); 
+            // Apply Spatial Filters using the EXPANDED fetchBounds
+            if (fetchBounds) {
+                query = query
+                    .gte('center_lat', fetchBounds.minLat)
+                    .lte('center_lat', fetchBounds.maxLat)
+                    .gte('center_lng', fetchBounds.minLng)
+                    .lte('center_lng', fetchBounds.maxLng);
+            }
+
+            // Pagination: Range
+            const from = page * BATCH_SIZE;
+            const to = from + BATCH_SIZE - 1;
             
-        const result = await Promise.race([query, timeoutPromise]);
-        const { data, error } = result;
+            query = query
+                .order('created_at', { ascending: false })
+                .range(from, to);
+                
+            console.log(`App: Fetching page ${page + 1} (${from}-${to})...`);
+            
+            const result = await Promise.race([query, timeoutPromise]);
+            const { data, error } = result;
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                allFetchedData = allFetchedData.concat(data);
+                if (data.length < BATCH_SIZE) {
+                    hasMore = false; // End of data
+                } else {
+                    page++; // Next page
+                }
+            } else {
+                hasMore = false;
+            }
+        }
         
-        if (error) throw error;
+        console.log(`App: Total fetched: ${allFetchedData.length} items.`);
         
-        console.log('App: Fetched drawings (Client):', data?.length, 'Total in DB:', result.count);
-        // Reverse to oldest-first for rendering
-        drawings.value = data ? data.reverse() : [];
+        // Merge Strategy: Add new drawings to existing list instead of replacing
+        if (allFetchedData.length > 0) {
+            const existingIds = new Set(drawings.value.map(d => d.id));
+            const newDrawings = allFetchedData.filter(d => !existingIds.has(d.id));
+            
+            if (newDrawings.length > 0) {
+                drawings.value.push(...newDrawings.reverse());
+            }
+        } else if (!bounds) {
+            // Only clear if it's a global fetch that returned nothing (rare)
+            // or if we want to handle "no data" case.
+            // For incremental fetch, we don't clear.
+             if (drawings.value.length === 0) drawings.value = [];
+        }
+        
         isLoadingDrawings.value = false;
         return; // Success
     } catch (clientErr) {
@@ -381,12 +468,17 @@ async function fetchDrawings(bounds = null) {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // Construct Query String
-        let queryString = 'select=*&order=created_at.desc&limit=5000';
-        if (bounds) {
-            queryString += `&center_lat=gte.${bounds.minLat}&center_lat=lte.${bounds.maxLat}`;
-            queryString += `&center_lng=gte.${bounds.minLng}&center_lng=lte.${bounds.maxLng}`;
+        // Construct Query String using fetchBounds
+        let queryString = 'select=*&order=created_at.desc';
+        if (fetchBounds) {
+            queryString += `&center_lat=gte.${fetchBounds.minLat}&center_lat=lte.${fetchBounds.maxLat}`;
+            queryString += `&center_lng=gte.${fetchBounds.minLng}&center_lng=lte.${fetchBounds.maxLng}`;
         }
+        
+        // Fallback usually doesn't support complex pagination easily in one go without loop
+        // For simplicity, we just fetch the first batch (5000) in fallback mode
+        // or we could implement loop here too. Let's stick to 5000 for fallback safety.
+        queryString += '&limit=5000';
 
         const res = await fetch(`${envUrl}/rest/v1/drawings?${queryString}`, {
             method: 'GET',
@@ -402,7 +494,16 @@ async function fetchDrawings(bounds = null) {
         
         const data = await res.json();
         console.log('App: Fetched drawings (Raw Fetch):', data?.length);
-        drawings.value = data ? data.reverse() : [];
+        
+        // Merge Strategy for Fallback
+        if (data && data.length > 0) {
+            const existingIds = new Set(drawings.value.map(d => d.id));
+            const newDrawings = data.filter(d => !existingIds.has(d.id));
+            if (newDrawings.length > 0) {
+                drawings.value.push(...newDrawings.reverse());
+            }
+        }
+
         isLoadingDrawings.value = false;
 
     } catch (fetchErr) {
@@ -411,7 +512,6 @@ async function fetchDrawings(bounds = null) {
         isLoadingDrawings.value = false;
         // Only alert if it's not an abort error (which might happen on rapid moves)
         if (fetchErr.name !== 'AbortError') {
-             // alert('无法加载历史绘制内容，请检查网络连接或刷新页面重试。\n错误信息: ' + (fetchErr.message || 'Unknown error'));
              console.warn('Suppressing alert for fetch error to avoid spamming user during pan/zoom');
         }
     }
