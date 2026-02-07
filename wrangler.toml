@@ -1,0 +1,24 @@
+# Cloudflare Pages 配置 (Next.js 项目根目录)
+name = "niubiagent"
+compatibility_date = "2024-12-01"
+pages_build_output_dir = ".vercel/output/static"
+
+# D1 数据库
+[[d1_databases]]
+binding = "DB"
+database_name = "niubiagent-db"
+database_id = "your-database-id"  # 创建后替换: npx wrangler d1 create niubiagent-db
+
+# R2 对象存储
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "niubiagent-storage"
+
+# KV 边缘缓存
+[[kv_namespaces]]
+binding = "CACHE"
+id = "your-kv-id"  # 创建后替换: npx wrangler kv namespace create CACHE
+
+# 环境变量
+[vars]
+NEXT_PUBLIC_DO_WEBSOCKET_URL = "ws://localhost:8787"

@@ -1,0 +1,54 @@
+name = "niubiagent-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# ========================
+# Durable Objects
+# ========================
+[durable_objects]
+bindings = [
+  { name = "DRAWING_ROOM", class_name = "DrawingRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DrawingRoom"]
+
+# ========================
+# D1 数据库
+# ========================
+[[d1_databases]]
+binding = "DB"
+database_name = "niubiagent-db"
+database_id = "your-database-id"
+
+# ========================
+# R2 存储
+# ========================
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "niubiagent-storage"
+
+# ========================
+# Queue (异步写入)
+# ========================
+[[queues.producers]]
+queue = "stroke-queue"
+binding = "STROKE_QUEUE"
+
+[[queues.consumers]]
+queue = "stroke-queue"
+max_batch_size = 100
+max_batch_timeout = 5
+
+# ========================
+# Environment Variables
+# ========================
+[vars]
+ALLOWED_ORIGINS = "http://localhost:3000,https://yourdomain.com"
+
+# ========================
+# Dev
+# ========================
+[dev]
+port = 8787

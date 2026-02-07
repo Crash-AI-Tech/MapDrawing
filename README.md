@@ -1,102 +1,144 @@
-# 基于vibecoding的简单dem
+# NiubiAgent
 
-## Overview
-这是一个最小化的 Supabase CRUD 演示项目，仅保留邮箱注册/登录与留言板增删改查，方便快速学习 Supabase 的基础用法。
+> 高性能地图绘画协作平台 — 10万用户 / 5万并发 / Cloudflare 全家桶架构
 
-### 功能点
-- 邮箱注册 / 登录：注册时输入邮箱与密码，自动发送验证邮件；邮箱验证后即可使用密码登录。
-- 留言板增删改查（直接调用 Supabase 数据表，受 RLS 保护）。
+## 🚀 技术基座
 
-## 页面结构
-- 顶部展示项目标题与当前登录邮箱、退出按钮。
-- 主页区域说明项目目标并提供邮箱注册/登录表单。
-- 留言板区域显示历史留言并支持新增、编辑、删除。
+本项目已全面迁移至 **Cloudflare 全家桶** 架构，实现边缘优先、高性能、零跨境延迟：
 
-## 环境配置
-- 本地开发使用 `.env.local` 写入 `VITE_SUPABASE_URL` 与 `VITE_SUPABASE_ANON_KEY`（仅保存在本地）。
-- `.vscode/mcp.json` 已预置 `supabase` MCP 服务器，可在 VS Code 中直接连接 Supabase。
-- 在 Supabase 控制台初始化 `messages` 表并启用 RLS，例如：
+- **前端**: Next.js 15 (App Router) @ Cloudflare Pages
+- **数据库**: Cloudflare D1 (关系型 SQLite)
+- **存储**: Cloudflare R2 (S3 兼容对象存储)
+- **实时同步**: Cloudflare Durable Objects (边缘有状态同步)
+- **异步写入**: Cloudflare Queues (削峰填谷)
+- **认证**: Lucia Auth v3 (自建认证，适配 D1)
+- **状态管理**: Zustand (轻量级本地状态)
+- **地图引擎**: MapLibre GL JS (WebGL 渲染)
 
-	```sql
-	create extension if not exists "pgcrypto";
+---
 
-	create table if not exists public.messages (
-		id uuid primary key default gen_random_uuid(),
-		author_id uuid not null references auth.users(id) on delete cascade,
-		content text not null,
-		created_at timestamptz default now(),
-		updated_at timestamptz default now()
-	);
+## 💻 本地开发调试
 
-	create or replace function public.set_updated_at()
-	returns trigger as $$
-	begin
-		new.updated_at = now();
-		return new;
-	end;
-	$$ language plpgsql;
+本地开发完全使用 `wrangler` 模拟 Cloudflare 环境，无需连接真实云端资源。
 
-	create or replace function public.set_message_owner()
-	returns trigger
-	language plpgsql
-	security definer
-	set search_path = public, auth
-	as $$
-	begin
-		new.author_id = auth.uid();
-		return new;
-	end;
-	$$;
+### 1️⃣ 前置条件
 
-	drop trigger if exists trg_messages_updated_at on public.messages;
-	create trigger trg_messages_updated_at
-		before update on public.messages
-		for each row execute function public.set_updated_at();
+- **Node.js**: v20.x 或更高版本
+- **pnpm**: `npm install -g pnpm`
+- **Cloudflare 账号**: [免费注册](https://dash.cloudflare.com/sign-up)
 
-	drop trigger if exists trg_messages_set_owner on public.messages;
-	create trigger trg_messages_set_owner
-		before insert on public.messages
-		for each row execute function public.set_message_owner();
+### 2️⃣ 快速启动
 
-	alter table public.messages enable row level security;
+#### A. 安装依赖
+```bash
+pnpm install
+```
 
-	create policy "Messages are readable by everyone"
-		on public.messages for select using (true);
+#### B. 初始化本地数据库 (D1)
+本项目使用 D1 (SQLite) 存储用户和笔画。首先运行迁移脚本初始化本地 DB 文件：
 
-	create policy "Messages are writable by owner"
-		on public.messages for all using (auth.uid() = author_id) with check (auth.uid() = author_id);
-	
-	create or replace function public.delete_current_user()
-	returns void
-	language plpgsql
-	security definer
-	set search_path = public, auth
-	as $$
-	declare
-		current_uid uuid := auth.uid();
-	begin
-		if current_uid is null then
-			raise exception 'missing auth context';
-		end if;
+```bash
+# 初始化本地 SQLite 数据库
+pnpm db:migrate
+```
 
-		delete from public.messages where author_id = current_uid;
-		delete from auth.users where id = current_uid;
-	end;
-	$$;
+#### C. 配置本地密钥
+在项目根目录创建 `.dev.vars` (这是 Cloudflare 的本地密钥文件，不提交到 Git)：
 
-	revoke all on function public.delete_current_user() from public;
-	grant execute on function public.delete_current_user() to authenticated;
-	```
+```bash
+echo 'AUTH_SECRET="your-32-char-random-string"' > .dev.vars
+```
 
-- ⚠️ 上述函数与触发器需要使用服务角色（如 Supabase SQL Editor 默认的 `postgres`）执行，以便 `security definer` 能够设置 `author_id` 并删除 `auth.users`。请确认这些对象的所有者为 `postgres`，否则注销或插入时会报无权限错误。
+同时确保 `.env.local` 存在：
+```env
+NEXT_PUBLIC_DO_WEBSOCKET_URL="ws://localhost:8787"
+```
 
-## 部署建议
-- 代码托管在 GitHub，可通过 Cloudflare Pages 或其他静态托管平台自动构建发布。
-- 将 Supabase URL 与 anon key 配置为部署平台的环境变量，并在 Supabase Auth 设置中开启“Email confirmations”。
+#### D. 启动开发环境 (并排启动)
 
-## 本地开发
-1. `npm install`
-2. `cp .env.example .env.local` 并写入 Supabase 配置。
-3. `npm run dev` 启动 Vite，本地访问 http://localhost:5173。
+**终端 1: Next.js 前端**
+```bash
+# 现在可以直接使用 next dev，已通过 next.config.ts 集成 Cloudflare 绑定
+pnpm dev
+```
 
+**终端 2: Cloudflare Workers (Durable Objects 服务器)**
+```bash
+cd cf-workers
+pnpm wrangler dev
+```
 
+### 3️⃣ 调试提示
+- **递归构建错误**: 如果遇到 `vercel build recursive invocation` 错误，是因为 `build` 脚本配置成了 `next-on-pages`。现已修正：`build` 对应 `next build`，`pages:build` 对应 Cloudflare 构建。
+- **数据库**: 本地 D1 存储在 `.wrangler/state/v3/d1` 目录下。
+- **WebSocket**: 确保终端 2 运行在 8787 端口，前端 `useSync` 会自动连接。
+- **登录**: 首次运行需先点击右上角「注册」。
+
+---
+
+## ☁️ Cloudflare 生产环境配置
+
+部署到生产环境需要先在 Cloudflare 控制台创建对应的资源。
+
+### 1️⃣ 创建 D1 数据库
+```bash
+# 创建 D1 实例
+npx wrangler d1 create niubiagent-db
+```
+复制输出中的 `database_id`，替换根目录 `wrangler.toml` 中的 `database_id`。
+
+### 2️⃣ 创建 R2 存储桶
+```bash
+# 创建用于头像和快照的存储桶
+npx wrangler r2 bucket create niubiagent-storage
+```
+
+### 3️⃣ 配置认证密钥 (Secret)
+```bash
+# 设置 Lucia Auth 加密密钥
+npx wrangler pages secret put AUTH_SECRET
+```
+
+### 4️⃣ 执行线上数据库迁移
+```bash
+# 在生产环境 D1 执行 SQL
+pnpm db:migrate:prod
+```
+
+### 5️⃣ 部署
+
+**部署 Worker (DO + Queue):**
+```bash
+pnpm deploy:workers
+```
+
+**部署 Next.js (Pages):**
+```bash
+# 该命令会自动运行 pages:build
+pnpm deploy
+```
+
+---
+
+## 📂 核心目录结构
+
+- `src/core/`: **核心引擎** (纯 TS)，框架无关，包含笔刷、渲染、视口管理。
+- `src/lib/auth/`: **Lucia Auth** 配置与 Session 验证。
+- `src/lib/db/`: **D1 (Drizzle)** 查询封装。
+- `src/app/api/`: **Edge API** 路由，处理 D1/R2 读写。
+- `cf-workers/`: **Durable Objects** 实时同步服务器代码。
+- `drizzle/`: 数据库表结构与迁移脚本。
+
+## 🛠️ 常用开发命令
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 启动标准 Next.js 开发环境 (支持 Cloudflare 绑定) |
+| `pnpm pages:build` | 构建适用于 Cloudflare Pages 的产物 |
+| `pnpm pages:preview` | 在本地预览 Pages 构建后的效果 |
+| `pnpm db:migrate` | 执行本地 D1 数据库初始化 |
+| `pnpm deploy` | 执行构建并部署到 Cloudflare Pages |
+| `cd cf-workers && pnpm wrangler dev` | 启动实时同步服务器本地调试 |
+
+## 📄 架构文档
+详细的系统设计、高并发方案与数据库方案请参考：[docs/架构设计文档.md](docs/架构设计文档.md)

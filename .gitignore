@@ -1,5 +1,7 @@
-# Nuxt dev/build outputs
-# .output
+# Build outputs
+.next
+.vercel
+.output
 .data
 .nuxt
 .nitro
@@ -8,8 +10,6 @@ dist
 
 # Node dependencies
 node_modules
-map-drawing
-
 
 # Logs
 logs
@@ -19,9 +19,13 @@ logs
 .DS_Store
 .fleet
 .idea
-supabase/.temp/
 
 # Local env files
 !.env.example
 .env
 .env.local
+.dev.vars
+
+# Wrangler
+.wrangler/
+.mf/

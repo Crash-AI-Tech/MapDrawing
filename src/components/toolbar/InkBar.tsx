@@ -1,0 +1,75 @@
+'use client';
+
+import { useInkStore } from '@/stores/inkStore';
+import { cn } from '@/lib/utils/cn';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Droplets } from 'lucide-react';
+
+/**
+ * InkBar — displays the current ink level as a compact bar in the toolbar.
+ * Shows a gradient bar (blue → red) and numeric value.
+ */
+export default function InkBar() {
+  const ink = useInkStore((s) => s.ink);
+  const maxInk = useInkStore((s) => s.maxInk);
+
+  const ratio = maxInk > 0 ? ink / maxInk : 0;
+  const percent = Math.round(ratio * 100);
+
+  // Color transitions: blue → yellow → red
+  const getBarColor = () => {
+    if (ratio > 0.5) return 'bg-blue-500';
+    if (ratio > 0.2) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex flex-col items-center gap-1 px-1 py-0.5">
+          <Droplets
+            className={cn(
+              'h-3.5 w-3.5',
+              ratio > 0.5
+                ? 'text-blue-500'
+                : ratio > 0.2
+                  ? 'text-yellow-500'
+                  : 'text-red-500'
+            )}
+          />
+          {/* Vertical bar showing ink level */}
+          <div className="relative h-16 w-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn(
+                'absolute bottom-0 left-0 w-full rounded-full transition-all duration-500 ease-out',
+                getBarColor(),
+                ratio <= 0.2 && ink > 0 && 'animate-pulse'
+              )}
+              style={{ height: `${percent}%` }}
+            />
+          </div>
+          <span
+            className={cn(
+              'text-[9px] tabular-nums font-medium',
+              ratio > 0.5
+                ? 'text-muted-foreground'
+                : ratio > 0.2
+                  ? 'text-yellow-600'
+                  : 'text-red-500'
+            )}
+          >
+            {Math.round(ink)}
+          </span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        <p>墨水 {Math.round(ink)}/{maxInk}</p>
+        <p className="text-xs text-muted-foreground">每8秒恢复1点</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
