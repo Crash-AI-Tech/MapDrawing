@@ -74,11 +74,11 @@ body {
 /* Ensure map controls are above the drawing canvas overlay (z-index: 20) */
 .maplibregl-control-container .maplibregl-ctrl {
   position: relative;
-  z-index: 25 !important;
+  z-index: 35 !important;
 }
 
 .maplibregl-control-container {
-  z-index: 25 !important;
+  z-index: 35 !important;
 }
 
 .maplibregl-ctrl-group {

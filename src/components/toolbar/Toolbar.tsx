@@ -4,6 +4,8 @@ import { useToolbar } from '@/hooks/useToolbar';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePinStore } from '@/stores/pinStore';
+import { useUIStore } from '@/stores/uiStore';
+import { MIN_PIN_ZOOM, MIN_DRAW_ZOOM } from '@/constants';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -22,6 +24,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useState } from 'react';
 
 type ToolMode = 'hand' | 'draw' | 'pin';
 
@@ -42,9 +45,17 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   const user = useAuthStore((s) => s.user);
   const placingPin = usePinStore((s) => s.placingPin);
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
+  const currentZoom = useUIStore((s) => s.currentZoom);
+  const [zoomTooltip, setZoomTooltip] = useState<string | null>(null);
 
   // Derive current tool mode
   const currentMode: ToolMode = placingPin ? 'pin' : drawingMode ? 'draw' : 'hand';
+
+  /** Show a temporary tooltip */
+  const flashTooltip = (msg: string) => {
+    setZoomTooltip(msg);
+    setTimeout(() => setZoomTooltip(null), 3000);
+  };
 
   /** Gate an action behind auth */
   const requireAuth = (action: () => void) => {
@@ -62,11 +73,19 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
       setPlacingPin(false);
     } else if (mode === 'draw') {
       requireAuth(() => {
+        if (currentZoom < MIN_DRAW_ZOOM) {
+          flashTooltip(`请放大到 ${MIN_DRAW_ZOOM} 级以上才能绘画（当前 ${Math.floor(currentZoom)} 级）`);
+          return;
+        }
         setDrawingMode(true);
         setPlacingPin(false);
       });
     } else if (mode === 'pin') {
       requireAuth(() => {
+        if (currentZoom < MIN_PIN_ZOOM) {
+          flashTooltip(`请放大到 ${MIN_PIN_ZOOM} 级以上才能放置图钉（当前 ${Math.floor(currentZoom)} 级）`);
+          return;
+        }
         setDrawingMode(false);
         setPlacingPin(true);
       });
@@ -120,6 +139,13 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
           </TooltipTrigger>
           <TooltipContent side="right">放置留言图钉</TooltipContent>
         </Tooltip>
+
+        {/* Zoom tooltip */}
+        {zoomTooltip && (
+          <div className="absolute left-full ml-3 top-0 z-50 whitespace-nowrap rounded-lg bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+            {zoomTooltip}
+          </div>
+        )}
 
         <div className="mx-auto h-px w-5 bg-border" />
 

@@ -46,7 +46,8 @@ export class WebCanvasProvider {
       width: 100%;
       height: 100%;
       z-index: 20;
-      cursor: ${pencilCursor()};
+      pointer-events: none;
+      cursor: default;
     `;
 
     container.appendChild(this.compositeCanvas);

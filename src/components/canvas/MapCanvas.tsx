@@ -84,6 +84,7 @@ export default function MapCanvas() {
   const profile = useAuthStore((s) => s.profile);
   const syncState = useUIStore((s) => s.syncState);
   const drawingMode = useDrawingStore((s) => s.drawingMode);
+  const setCurrentZoomGlobal = useUIStore((s) => s.setCurrentZoom);
   const showLowInkWarning = useInkStore((s) => s.showLowInkWarning);
   const ink = useInkStore((s) => s.ink);
 
@@ -182,7 +183,9 @@ export default function MapCanvas() {
 
     // Track zoom for UI hint
     map.on('zoom', () => {
-      setCurrentZoom(map.getZoom());
+      const z = map.getZoom();
+      setCurrentZoom(z);
+      setCurrentZoomGlobal(z);
     });
 
     map.on('load', () => {

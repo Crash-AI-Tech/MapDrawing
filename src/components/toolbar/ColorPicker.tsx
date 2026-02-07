@@ -33,9 +33,9 @@ export default function ColorPicker() {
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <button className="flex h-9 w-9 items-center justify-center rounded-md border border-border shadow-sm transition-colors hover:bg-accent">
+            <button className="flex h-9 w-9 items-center justify-center rounded-full border border-border shadow-sm transition-colors hover:bg-accent">
               <div
-                className="h-5 w-5 rounded-sm border border-border"
+                className="h-5 w-5 rounded-full border border-border"
                 style={{ backgroundColor: activeColor }}
               />
             </button>
@@ -55,7 +55,7 @@ export default function ColorPicker() {
                 setCustomColor(color);
               }}
               className={cn(
-                'h-7 w-7 rounded-md border-2 transition-all',
+                'h-7 w-7 rounded-full border-2 transition-all',
                 activeColor === color
                   ? 'border-primary scale-110 shadow-sm'
                   : 'border-transparent hover:border-muted-foreground/30'

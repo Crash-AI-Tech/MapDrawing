@@ -38,7 +38,7 @@ export default function BrushPanel() {
           <PopoverTrigger asChild>
             <button
               className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-md text-sm font-bold transition-colors',
+                'flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-colors',
                 'bg-primary text-primary-foreground shadow hover:bg-primary/90'
               )}
             >
@@ -48,7 +48,7 @@ export default function BrushPanel() {
         </TooltipTrigger>
         <TooltipContent side="right">画笔设置</TooltipContent>
       </Tooltip>
-      <PopoverContent side="right" align="start" className="w-64 space-y-4">
+      <PopoverContent side="right" align="start" className="w-64 space-y-4 border-white/50 bg-white/80 backdrop-blur-xl">
         {/* Brush type grid */}
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground">画笔类型</p>

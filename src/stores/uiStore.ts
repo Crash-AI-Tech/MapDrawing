@@ -16,6 +16,8 @@ interface UIState {
   toast: { message: string; type: 'info' | 'success' | 'error' } | null;
   /** Sync connection state */
   syncState: SyncState;
+  /** Current map zoom level (shared for toolbar gating) */
+  currentZoom: number;
 
   setToolbarExpanded: (expanded: boolean) => void;
   setBrushPanelOpen: (open: boolean) => void;
@@ -25,6 +27,7 @@ interface UIState {
   showToast: (message: string, type?: 'info' | 'success' | 'error') => void;
   clearToast: () => void;
   setSyncState: (state: SyncState) => void;
+  setCurrentZoom: (zoom: number) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -35,6 +38,7 @@ export const useUIStore = create<UIState>((set) => ({
   isLoading: false,
   toast: null,
   syncState: 'disconnected',
+  currentZoom: 14,
 
   setToolbarExpanded: (toolbarExpanded) => set({ toolbarExpanded }),
   setBrushPanelOpen: (brushPanelOpen) => set({ brushPanelOpen }),
@@ -44,4 +48,5 @@ export const useUIStore = create<UIState>((set) => ({
   showToast: (message, type = 'info') => set({ toast: { message, type } }),
   clearToast: () => set({ toast: null }),
   setSyncState: (syncState) => set({ syncState }),
+  setCurrentZoom: (currentZoom) => set({ currentZoom }),
 }));
