@@ -171,7 +171,7 @@ export default function MapCanvas() {
       antialias: true,
     });
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-left');
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
 
     mapRef.current = map;
