@@ -42,7 +42,7 @@ export const DEFAULT_SIZE = 3;
 export const DEFAULT_OPACITY = 1.0;
 
 /** Maximum brush size across all brush types */
-export const MAX_BRUSH_SIZE = 20;
+export const MAX_BRUSH_SIZE = 10;
 
 // ========================
 // Map Defaults
@@ -57,7 +57,7 @@ export const MAP_STYLE_URL =
   'https://tiles.openfreemap.org/styles/liberty';
 
 /** Minimum zoom level required to draw */
-export const MIN_DRAW_ZOOM = 16;
+export const MIN_DRAW_ZOOM = 18;
 
 /** How many zoom levels below createdZoom before a stroke is hidden */
 export const STROKE_HIDE_ZOOM_DIFF = 3;

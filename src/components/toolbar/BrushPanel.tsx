@@ -46,9 +46,9 @@ export default function BrushPanel() {
             </button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent side="right">画笔设置</TooltipContent>
+        <TooltipContent side="bottom">画笔设置</TooltipContent>
       </Tooltip>
-      <PopoverContent side="right" align="start" className="w-64 space-y-4 border-white/50 bg-white/80 backdrop-blur-xl">
+      <PopoverContent side="bottom" align="start" className="w-64 space-y-4 border-white/50 bg-white/80 backdrop-blur-xl">
         {/* Brush type grid */}
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground">画笔类型</p>
@@ -83,7 +83,7 @@ export default function BrushPanel() {
             value={[activeSize]}
             onValueChange={([v]) => changeSize(v)}
             min={0.5}
-            max={20}
+            max={10}
             step={0.5}
           />
         </div>

@@ -41,10 +41,10 @@ export default function ColorPicker() {
             </button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent side="right">颜色选择</TooltipContent>
+        <TooltipContent side="bottom">颜色选择</TooltipContent>
       </Tooltip>
 
-      <PopoverContent side="right" align="start" className="w-72 space-y-3">
+      <PopoverContent side="bottom" align="start" className="w-72 space-y-3">
         <p className="text-xs font-medium text-muted-foreground">预设颜色</p>
         <div className="grid grid-cols-6 gap-1.5">
           {colorPresets.map((color) => (

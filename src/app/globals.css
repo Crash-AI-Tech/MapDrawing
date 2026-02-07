@@ -82,9 +82,9 @@ body {
 }
 
 .maplibregl-ctrl-group {
-  border-radius: var(--radius) !important;
+  border-radius: 12px !important;
   border: 1px solid rgba(209, 213, 219, 0.6) !important;
-  background: rgba(243, 244, 246, 0.8) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
@@ -93,6 +93,11 @@ body {
 .maplibregl-ctrl-group button {
   width: 32px !important;
   height: 32px !important;
+}
+
+/* Position the top-left nav controls below the custom zoom/coords panel */
+.maplibregl-ctrl-top-left {
+  top: 48px !important;
 }
 
 /* Hide MapLibre logo */

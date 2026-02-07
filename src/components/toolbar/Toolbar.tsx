@@ -94,20 +94,20 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="absolute left-4 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-1.5 rounded-xl border border-gray-200/60 bg-gray-100/80 p-1.5 shadow-lg backdrop-blur-md">
+      <div className="absolute left-1/2 top-4 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl border border-gray-200/60 bg-gray-100/80 p-1.5 shadow-lg backdrop-blur-md">
         {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className={cn(currentMode === 'hand' && ACTIVE_BTN)}
+              className={cn('h-9 w-9 rounded-full', currentMode === 'hand' && ACTIVE_BTN)}
               onClick={() => switchMode('hand')}
             >
               <Hand className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">导航模式</TooltipContent>
+          <TooltipContent side="bottom">导航模式</TooltipContent>
         </Tooltip>
 
         {/* Draw */}
@@ -116,13 +116,13 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className={cn(currentMode === 'draw' && ACTIVE_BTN)}
+              className={cn('h-9 w-9 rounded-full', currentMode === 'draw' && ACTIVE_BTN)}
               onClick={() => switchMode('draw')}
             >
               <Pencil className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">绘画模式</TooltipContent>
+          <TooltipContent side="bottom">绘画模式</TooltipContent>
         </Tooltip>
 
         {/* Pin */}
@@ -131,23 +131,23 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className={cn(currentMode === 'pin' && ACTIVE_BTN)}
+              className={cn('h-9 w-9 rounded-full', currentMode === 'pin' && ACTIVE_BTN)}
               onClick={() => switchMode('pin')}
             >
               <MapPin className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">放置留言图钉</TooltipContent>
+          <TooltipContent side="bottom">放置留言图钉</TooltipContent>
         </Tooltip>
 
         {/* Zoom tooltip */}
         {zoomTooltip && (
-          <div className="absolute left-full ml-3 top-0 z-50 whitespace-nowrap rounded-lg bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+          <div className="absolute left-1/2 top-full mt-2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
             {zoomTooltip}
           </div>
         )}
 
-        <div className="mx-auto h-px w-5 bg-border" />
+        <div className="h-5 w-px bg-border" />
 
         {/* Brush panel */}
         <BrushPanel />
@@ -155,7 +155,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         {/* Color picker */}
         <ColorPicker />
 
-        <div className="mx-auto h-px w-5 bg-border" />
+        <div className="h-5 w-px bg-border" />
 
         {/* Undo */}
         <Tooltip>
@@ -163,13 +163,14 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
             <Button
               variant="ghost"
               size="icon"
+              className="h-9 w-9 rounded-full"
               onClick={undo}
               disabled={!canUndo}
             >
               <Undo2 className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">撤销 (Ctrl+Z)</TooltipContent>
+          <TooltipContent side="bottom">撤销 (Ctrl+Z)</TooltipContent>
         </Tooltip>
 
         {/* Redo */}
@@ -178,16 +179,17 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
             <Button
               variant="ghost"
               size="icon"
+              className="h-9 w-9 rounded-full"
               onClick={redo}
               disabled={!canRedo}
             >
               <Redo2 className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">重做 (Ctrl+Shift+Z)</TooltipContent>
+          <TooltipContent side="bottom">重做 (Ctrl+Shift+Z)</TooltipContent>
         </Tooltip>
 
-        <div className="mx-auto h-px w-5 bg-border" />
+        <div className="h-5 w-px bg-border" />
 
         {/* Ink bar */}
         <InkBar />
@@ -195,7 +197,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         {/* Stroke count */}
         {strokeCount > 0 && (
           <>
-            <div className="mx-auto h-px w-5 bg-border" />
+            <div className="h-5 w-px bg-border" />
             <div className="px-1 text-center text-[10px] tabular-nums text-muted-foreground">
               {strokeCount}
             </div>

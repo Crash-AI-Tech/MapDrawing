@@ -59,8 +59,8 @@ export class DrawingEngine {
     id: string;
     points: StrokePoint[];
     brush: BaseBrush;
-    /** Number of points already consumed ink for */
-    consumedPointCount: number;
+    /** Floating-point ink accumulator — fractional cost builds up, consumed when ≥ 1 */
+    inkAccumulator: number;
   } | null = null;
 
   /** Active canvas context for live drawing */
@@ -151,7 +151,7 @@ export class DrawingEngine {
       id,
       points: [point],
       brush,
-      consumedPointCount: 0,
+      inkAccumulator: 0,
     };
 
     const config = this.buildBrushConfig(pressure);
@@ -172,13 +172,21 @@ export class DrawingEngine {
 
     this.currentStroke.points.push(point);
 
-    // Real-time ink consumption: calculate cost for new points since last consume
-    const newPoints = this.currentStroke.points.length - this.currentStroke.consumedPointCount;
-    // Consume every 5 new points (batch to avoid excessive calls)
-    if (newPoints >= 5) {
-      const cost = this.inkManager.calculateCost(newPoints, this.activeSize);
-      const remaining = this.inkManager.forceConsume(cost);
-      this.currentStroke.consumedPointCount = this.currentStroke.points.length;
+    // Calculate pixel distance from previous point for area-based ink cost
+    const prevPoint = this.currentStroke.points[this.currentStroke.points.length - 2];
+    const dx = point.x - prevPoint.x;
+    const dy = point.y - prevPoint.y;
+    const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+
+    // Accumulate fractional ink cost based on covered area
+    const segmentCost = this.inkManager.calculateSegmentCost(this.activeSize, pixelDistance, this.viewport.zoom);
+    this.currentStroke.inkAccumulator += segmentCost;
+
+    // Consume whole ink units when accumulated enough
+    if (this.currentStroke.inkAccumulator >= 1) {
+      const toConsume = Math.floor(this.currentStroke.inkAccumulator);
+      const remaining = this.inkManager.forceConsume(toConsume);
+      this.currentStroke.inkAccumulator -= toConsume;
 
       // If ink fully depleted, auto-end the stroke
       if (remaining <= 0) {
@@ -211,13 +219,10 @@ export class DrawingEngine {
   endStroke(): StrokeData | null {
     if (!this.currentStroke || !this.activeCtx) return null;
 
-    // Consume ink for any remaining un-consumed points
-    if (this.currentStroke) {
-      const remainingPoints = this.currentStroke.points.length - this.currentStroke.consumedPointCount;
-      if (remainingPoints > 0) {
-        const cost = this.inkManager.calculateCost(remainingPoints, this.activeSize);
-        this.inkManager.forceConsume(cost);
-      }
+    // Consume any remaining fractional ink (do NOT round up, keep it exactly fair)
+    // Even tiny fraction matters for fine drawing at high zoom
+    if (this.currentStroke && this.currentStroke.inkAccumulator > 0) {
+      this.inkManager.forceConsume(this.currentStroke.inkAccumulator);
     }
 
     const { id, points, brush } = this.currentStroke;

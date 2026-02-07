@@ -82,7 +82,6 @@ export default function MapCanvas() {
 
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
-  const syncState = useUIStore((s) => s.syncState);
   const drawingMode = useDrawingStore((s) => s.drawingMode);
   const setCurrentZoomGlobal = useUIStore((s) => s.setCurrentZoom);
   const showLowInkWarning = useInkStore((s) => s.showLowInkWarning);
@@ -96,6 +95,7 @@ export default function MapCanvas() {
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const pinColor = usePinStore((s) => s.pinColor);
   const [pinClickCoords, setPinClickCoords] = useState<{ lng: number; lat: number } | null>(null);
+  const [mouseCoords, setMouseCoords] = useState<{ lng: number; lat: number } | null>(null);
   const pinMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   const userId = user?.id ?? 'anonymous';
@@ -171,7 +171,7 @@ export default function MapCanvas() {
       antialias: true,
     });
 
-    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
 
     mapRef.current = map;
@@ -186,6 +186,14 @@ export default function MapCanvas() {
       const z = map.getZoom();
       setCurrentZoom(z);
       setCurrentZoomGlobal(z);
+    });
+
+    // Track mouse position for coordinate display
+    map.on('mousemove', (e) => {
+      setMouseCoords({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+    });
+    map.on('mouseout', () => {
+      setMouseCoords(null);
     });
 
     map.on('load', () => {
@@ -363,6 +371,8 @@ export default function MapCanvas() {
     }
 
     const handleClick = (e: maplibregl.MapMouseEvent) => {
+      // Only allow placement when zoomed in enough
+      if (map.getZoom() < MIN_PIN_ZOOM) return;
       setPinClickCoords({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     };
 
@@ -378,17 +388,16 @@ export default function MapCanvas() {
     };
   }, [placingPin, pinColor]);
 
-  // 9) Pin placement cursor — override the map canvas cursor when placing pins
-  //    (Drawing pencil cursor is handled by WebCanvasProvider on the active canvas layer)
+  // 9) Pin placement cursor — only show pin cursor when zoomed in enough
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (placingPin) {
+    if (placingPin && currentZoom >= MIN_PIN_ZOOM) {
       map.getCanvas().style.cursor = pinCursorSvg(pinColor);
     } else {
       map.getCanvas().style.cursor = '';
     }
-  }, [drawingMode, placingPin, pinColor]);
+  }, [drawingMode, placingPin, pinColor, currentZoom]);
 
   // Pin confirm handler
   const handlePinConfirm = useCallback(
@@ -479,24 +488,20 @@ export default function MapCanvas() {
         />
       )}
 
-      {/* Sync status indicator */}
-      <div className="absolute bottom-4 left-4 z-30 flex items-center gap-2 rounded-full border border-gray-200/60 bg-gray-100/80 px-3 py-1 text-xs backdrop-blur-md">
-        <span
-          className={`h-2 w-2 rounded-full ${
-            syncState === 'connected'
-              ? 'bg-green-500'
-              : syncState === 'connecting'
-                ? 'bg-yellow-500 animate-pulse'
-                : 'bg-red-500'
-          }`}
-        />
-        <span className="text-muted-foreground">
-          {syncState === 'connected'
-            ? '已连接'
-            : syncState === 'connecting'
-              ? '连接中...'
-              : '离线'}
-        </span>
+      {/* Zoom level & mouse coordinates — top left, above MapLibre zoom controls */}
+      <div className="absolute top-4 left-3 z-30 flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 rounded-xl border border-gray-200/60 bg-white/90 px-3 py-2 text-[11px] tabular-nums text-muted-foreground shadow-md backdrop-blur-md">
+          <div className="flex items-center gap-1.5">
+            <svg className="h-3.5 w-3.5 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            <span className="font-semibold text-foreground">{currentZoom.toFixed(1)}</span>
+          </div>
+          {mouseCoords && (
+            <>
+              <span className="h-3 w-px bg-gray-300" />
+              <span className="text-gray-500">{mouseCoords.lat.toFixed(5)}, {mouseCoords.lng.toFixed(5)}</span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

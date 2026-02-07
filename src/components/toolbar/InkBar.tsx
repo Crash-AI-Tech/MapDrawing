@@ -30,7 +30,7 @@ export default function InkBar() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="flex flex-col items-center gap-1 px-1 py-0.5">
+        <div className="flex items-center gap-1.5 px-1 py-0.5">
           <Droplets
             className={cn(
               'h-3.5 w-3.5',
@@ -41,15 +41,15 @@ export default function InkBar() {
                   : 'text-red-500'
             )}
           />
-          {/* Vertical bar showing ink level */}
-          <div className="relative h-16 w-2 overflow-hidden rounded-full bg-muted">
+          {/* Horizontal bar showing ink level */}
+          <div className="relative h-2 w-16 overflow-hidden rounded-full bg-muted">
             <div
               className={cn(
-                'absolute bottom-0 left-0 w-full rounded-full transition-all duration-500 ease-out',
+                'absolute top-0 left-0 h-full rounded-full transition-all duration-500 ease-out',
                 getBarColor(),
                 ratio <= 0.2 && ink > 0 && 'animate-pulse'
               )}
-              style={{ height: `${percent}%` }}
+              style={{ width: `${percent}%` }}
             />
           </div>
           <span
@@ -62,13 +62,13 @@ export default function InkBar() {
                   : 'text-red-500'
             )}
           >
-            {Math.round(ink)}
+            {ink.toFixed(2)}
           </span>
         </div>
       </TooltipTrigger>
-      <TooltipContent side="right">
-        <p>墨水 {Math.round(ink)}/{maxInk}</p>
-        <p className="text-xs text-muted-foreground">每8秒恢复1点</p>
+      <TooltipContent side="bottom">
+        <p>墨水 {ink.toFixed(2)}/{maxInk}</p>
+        <p className="text-xs text-muted-foreground">每18秒恢复1点</p>
       </TooltipContent>
     </Tooltip>
   );
