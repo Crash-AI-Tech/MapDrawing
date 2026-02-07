@@ -140,7 +140,7 @@ export default function HomePage() {
         style={FONT}
       >
         {/* Logo — left edge */}
-        <span className="text-lg font-bold tracking-tight sm:text-xl">🎨 NiubiAgent</span>
+        <span className="text-lg font-bold tracking-tight sm:text-xl">🎨 Map</span>
 
         {/* Section links — center */}
         <div className="flex items-center gap-1 sm:gap-2">
@@ -337,7 +337,7 @@ export default function HomePage() {
       {/* ====== Footer ====== */}
       <footer className="bg-gray-900 px-6 py-8 text-center">
         <p className="text-sm text-gray-400" style={FONT}>
-          © {new Date().getFullYear()} NiubiAgent · {d.footer}
+          © {new Date().getFullYear()} Map · {d.footer}
         </p>
       </footer>
     </div>

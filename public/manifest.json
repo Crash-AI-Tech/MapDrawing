@@ -1,6 +1,6 @@
 {
-  "name": "NiubiAgent",
-  "short_name": "NiubiAgent",
+  "name": "Map",
+  "short_name": "Map",
   "description": "地图协作绘画应用",
   "start_url": "/canvas",
   "display": "standalone",

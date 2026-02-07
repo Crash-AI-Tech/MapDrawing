@@ -1,4 +1,4 @@
-name = "niubiagent-worker"
+name = "map-worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
@@ -19,7 +19,7 @@ new_sqlite_classes = ["DrawingRoom"]
 # ========================
 [[d1_databases]]
 binding = "DB"
-database_name = "niubiagent-db"
+database_name = "map-db"
 database_id = "your-database-id"
 
 # ========================
@@ -27,7 +27,7 @@ database_id = "your-database-id"
 # ========================
 [[r2_buckets]]
 binding = "BUCKET"
-bucket_name = "niubiagent-storage"
+bucket_name = "map-storage"
 
 # ========================
 # Queue (异步写入)

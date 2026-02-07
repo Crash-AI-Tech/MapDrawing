@@ -1,7 +1,7 @@
 import type { DrawEvent, StrokeData } from '../types';
 import { get, set, del, keys } from 'idb-keyval';
 
-const STORE_PREFIX = 'niubiagent_offline_';
+const STORE_PREFIX = 'map_offline_';
 const QUEUE_KEY = `${STORE_PREFIX}queue`;
 
 interface QueueItem {

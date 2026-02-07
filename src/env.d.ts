@@ -21,6 +21,7 @@ interface CloudflareEnv {
 
   // 环境变量
   AUTH_SECRET: string;
+  RESEND_API_KEY: string;
 }
 
 // @cloudflare/next-on-pages 类型增强

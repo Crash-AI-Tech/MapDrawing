@@ -1,4 +1,4 @@
-# NiubiAgent
+# Map
 
 > 在真实地图上画画的全球协作平台 — Cloudflare 全家桶 Edge 架构
 
@@ -72,11 +72,11 @@ cd cf-workers && pnpm install && pnpm wrangler dev
 
 ```bash
 # 创建 D1 数据库 → 输出 database_id
-npx wrangler d1 create niubiagent-db
+npx wrangler d1 create map-db
 # ⚠️ 记录输出的 database_id，后面要用
 
 # 创建 R2 存储桶 (头像上传)
-npx wrangler r2 bucket create niubiagent-storage
+npx wrangler r2 bucket create map-storage
 
 # 创建 KV 命名空间 (预留缓存) → 输出 id
 npx wrangler kv namespace create CACHE
@@ -128,7 +128,7 @@ cd cf-workers && npx wrangler secret put AUTH_SECRET
 ```bash
 # 部署 cf-workers (Durable Objects + Queue Consumer)
 pnpm deploy:workers
-# → 记录输出的 Worker URL (如 https://niubiagent-worker.你的子域名.workers.dev)
+# → 记录输出的 Worker URL (如 https://map-worker.你的子域名.workers.dev)
 
 # 部署 Next.js 到 Cloudflare Pages
 pnpm deploy
@@ -139,15 +139,15 @@ pnpm deploy
 
 部署 Workers 后，需要在 Pages 项目里配置 WebSocket 地址：
 
-1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com) → Pages → niubiagent
+1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com) → Pages → map
 2. **Settings → Environment Variables**
 3. 添加变量：
-   - `NEXT_PUBLIC_DO_WEBSOCKET_URL` = `wss://niubiagent-worker.你的子域名.workers.dev`
+   - `NEXT_PUBLIC_DO_WEBSOCKET_URL` = `wss://map-worker.你的子域名.workers.dev`
 
 或使用命令行：
 ```bash
 npx wrangler pages secret put NEXT_PUBLIC_DO_WEBSOCKET_URL
-# → 输入: wss://niubiagent-worker.你的子域名.workers.dev
+# → 输入: wss://map-worker.你的子域名.workers.dev
 ```
 
 ---
@@ -156,8 +156,8 @@ npx wrangler pages secret put NEXT_PUBLIC_DO_WEBSOCKET_URL
 
 ### 方式一：域名已在 Cloudflare DNS
 
-1. Dashboard → Pages → niubiagent → **Custom domains**
-2. 添加域名 (如 `niubiagent.com` 或 `draw.yourdomain.com`)
+1. Dashboard → Pages → map → **Custom domains**
+2. 添加域名 (如 `map.wisebamboo.fun` 或 `draw.yourdomain.com`)
 3. Cloudflare 自动配置 DNS 记录 + SSL
 
 ### 方式二：域名不在 Cloudflare
@@ -171,7 +171,7 @@ npx wrangler pages secret put NEXT_PUBLIC_DO_WEBSOCKET_URL
 
 如需给 WebSocket Worker 配自定义域名 (如 `ws.yourdomain.com`)：
 
-1. Dashboard → Workers → niubiagent-worker → **Settings → Triggers**
+1. Dashboard → Workers → map-worker → **Settings → Triggers**
 2. 添加 **Custom Domain**: `ws.yourdomain.com`
 3. 更新 Pages 环境变量：`NEXT_PUBLIC_DO_WEBSOCKET_URL=wss://ws.yourdomain.com`
 

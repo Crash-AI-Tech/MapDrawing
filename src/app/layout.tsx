@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'NiubiAgent — 地图协作绘画',
+  title: 'Map — 地图协作绘画',
   description: '在全球地图上实时协作绘画，支持多种画笔、高并发同步',
   icons: { icon: '/favicon.ico' },
 };
