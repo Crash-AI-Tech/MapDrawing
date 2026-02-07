@@ -10,8 +10,8 @@
     "pages:preview": "npx wrangler pages dev .vercel/output/static --d1=DB --r2=BUCKET --kv=CACHE",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "db:migrate": "npx wrangler d1 execute niubiagent-db --local --file=drizzle/migrations/0001_init.sql",
-    "db:migrate:prod": "npx wrangler d1 execute niubiagent-db --file=drizzle/migrations/0001_init.sql",
+    "db:migrate": "npx wrangler d1 execute niubiagent-db --local --file=drizzle/migrations/0001_init.sql && npx wrangler d1 execute niubiagent-db --local --file=drizzle/migrations/0002_map_pins.sql",
+    "db:migrate:prod": "npx wrangler d1 execute niubiagent-db --file=drizzle/migrations/0001_init.sql && npx wrangler d1 execute niubiagent-db --file=drizzle/migrations/0002_map_pins.sql",
     "deploy": "pnpm pages:build && npx wrangler pages deploy .vercel/output/static --project-name=niubiagent",
     "deploy:workers": "cd cf-workers && npx wrangler deploy"
   },

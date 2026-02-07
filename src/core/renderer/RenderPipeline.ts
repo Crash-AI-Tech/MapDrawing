@@ -1,7 +1,6 @@
 import type { StrokeData, GeoBounds } from '../types';
 import type { BrushRegistry } from '../brushes';
 import { StrokeRenderer } from './StrokeRenderer';
-import { TileCache } from './TileCache';
 import { OverlayManager } from './OverlayManager';
 import type { ViewportManager } from '../engine/ViewportManager';
 import type { StrokeManager } from '../engine/StrokeManager';
@@ -22,7 +21,6 @@ export interface RenderPipelineConfig {
  */
 export class RenderPipeline {
   readonly strokeRenderer: StrokeRenderer;
-  readonly tileCache: TileCache;
   readonly overlay: OverlayManager;
 
   private brushRegistry: BrushRegistry;
@@ -43,7 +41,6 @@ export class RenderPipeline {
     this.strokeManager = config.strokeManager;
 
     this.strokeRenderer = new StrokeRenderer(config.brushRegistry);
-    this.tileCache = new TileCache(512);
     this.overlay = new OverlayManager();
   }
 
@@ -156,7 +153,6 @@ export class RenderPipeline {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
-    this.tileCache.clear();
     this.overlay.dispose();
     this.compositeCanvas = null;
     this.compositeCtx = null;
