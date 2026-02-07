@@ -28,7 +28,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5 bg-background border-border shadow-md"
+        className="gap-1.5 border-gray-200/60 bg-gray-100/80 shadow-md backdrop-blur-md hover:bg-gray-200/80"
         onClick={onLoginClick}
       >
         <LogIn className="h-3.5 w-3.5" />
@@ -46,7 +46,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-8 w-8 rounded-full"
+          className="relative h-8 w-8 rounded-full border border-gray-200/60 bg-gray-100/80 backdrop-blur-md"
         >
           {profile?.avatarUrl ? (
             <img
@@ -61,7 +61,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 bg-background border border-border shadow-xl">
+      <DropdownMenuContent align="end" className="w-48 border-gray-200/60 bg-gray-100/90 shadow-xl backdrop-blur-md">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{displayName}</p>

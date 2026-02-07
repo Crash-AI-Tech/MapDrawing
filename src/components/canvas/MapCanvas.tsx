@@ -22,7 +22,24 @@ import { useDrawingStore } from '@/stores/drawingStore';
 import { useInkStore } from '@/stores/inkStore';
 import { usePinStore, MapPin } from '@/stores/pinStore';
 import PinPlacer from '@/components/pins/PinPlacer';
-import PinPopup from '@/components/pins/PinPopup';
+
+/** Generate an SVG pin cursor data URI — small size (14x20) */
+function pinCursorSvg(color: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="20" viewBox="0 0 28 40"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.3 21.7 0 14 0z" fill="${color}" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="5" fill="white"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 7 19, pointer`;
+}
+
+/** Format a relative time string */
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return `${mins}分钟前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}小时前`;
+  const days = Math.floor(hours / 24);
+  return `${days}天前`;
+}
 
 const VIEWPORT_STORAGE_KEY = 'niubi-map-viewport';
 
@@ -76,8 +93,7 @@ export default function MapCanvas() {
   const addPin = usePinStore((s) => s.addPin);
   const placingPin = usePinStore((s) => s.placingPin);
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
-  const selectedPin = usePinStore((s) => s.selectedPin);
-  const setSelectedPin = usePinStore((s) => s.setSelectedPin);
+  const pinColor = usePinStore((s) => s.pinColor);
   const [pinClickCoords, setPinClickCoords] = useState<{ lng: number; lat: number } | null>(null);
   const pinMarkersRef = useRef<maplibregl.Marker[]>([]);
 
@@ -217,34 +233,121 @@ export default function MapCanvas() {
     if (currentZoom < MIN_PIN_ZOOM) return;
 
     pins.forEach((pin) => {
-      // Create a pin-shaped DOM element
-      const el = document.createElement('div');
-      el.style.width = '24px';
-      el.style.height = '24px';
-      el.style.borderRadius = '50% 50% 50% 0';
-      el.style.backgroundColor = pin.color;
-      el.style.transform = 'rotate(-45deg)';
-      el.style.border = '2px solid white';
-      el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
-      el.style.cursor = 'pointer';
-      el.style.transition = 'transform 0.15s';
-      el.addEventListener('mouseenter', () => {
-        el.style.transform = 'rotate(-45deg) scale(1.2)';
-      });
-      el.addEventListener('mouseleave', () => {
-        el.style.transform = 'rotate(-45deg)';
-      });
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setSelectedPin(pin);
+      // Wrapper container — will be the marker element, anchored at bottom center
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.display = 'flex';
+      wrapper.style.flexDirection = 'column';
+      wrapper.style.alignItems = 'center';
+      wrapper.style.cursor = 'pointer';
+
+      // -- Tooltip bubble (always visible, truncated) --
+      const tooltip = document.createElement('div');
+      tooltip.style.cssText = `
+        position: relative;
+        background: white;
+        border-radius: 8px;
+        padding: 4px 8px;
+        font-size: 11px;
+        line-height: 1.4;
+        color: #333;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 120px;
+        margin-bottom: 4px;
+        transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        transform-origin: bottom center;
+        pointer-events: auto;
+      `;
+
+      // Truncated message (default view)
+      const msgPreview = pin.message.length > 10 ? pin.message.slice(0, 10) + '…' : pin.message;
+      tooltip.textContent = msgPreview;
+
+      // Tooltip arrow (tail)
+      const arrow = document.createElement('div');
+      arrow.style.cssText = `
+        position: absolute;
+        bottom: -5px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 6px solid white;
+      `;
+      tooltip.appendChild(arrow);
+
+      // -- Pin icon --
+      const pinEl = document.createElement('div');
+      pinEl.style.cssText = `
+        width: 20px;
+        height: 20px;
+        border-radius: 50% 50% 50% 0;
+        background-color: ${pin.color};
+        transform: rotate(-45deg);
+        border: 2px solid white;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+        transform-origin: center center;
+      `;
+
+      // Hover expand: show full details in tooltip
+      wrapper.addEventListener('mouseenter', () => {
+        tooltip.style.maxWidth = '200px';
+        tooltip.style.whiteSpace = 'normal';
+        tooltip.style.wordBreak = 'break-word';
+        tooltip.style.transform = 'scale(1.08)';
+        tooltip.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
+        tooltip.innerHTML = '';
+        // Full message
+        const msgEl = document.createElement('div');
+        msgEl.style.cssText = 'font-size:12px;color:#222;margin-bottom:4px;line-height:1.5;';
+        msgEl.textContent = pin.message;
+        tooltip.appendChild(msgEl);
+        // Meta line: author + time
+        const metaEl = document.createElement('div');
+        metaEl.style.cssText = 'font-size:10px;color:#999;display:flex;justify-content:space-between;gap:8px;';
+        metaEl.innerHTML = `<span>${pin.userName || '匿名'}</span><span>${timeAgo(pin.createdAt)}</span>`;
+        tooltip.appendChild(metaEl);
+        // Re-add arrow
+        const hoverArrow = document.createElement('div');
+        hoverArrow.style.cssText = arrow.style.cssText;
+        tooltip.appendChild(hoverArrow);
       });
 
-      const marker = new maplibregl.Marker({ element: el })
+      wrapper.addEventListener('mouseleave', () => {
+        tooltip.style.maxWidth = '120px';
+        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.overflow = 'hidden';
+        tooltip.style.textOverflow = 'ellipsis';
+        tooltip.style.wordBreak = 'normal';
+        tooltip.style.transform = 'scale(1)';
+        tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+        tooltip.innerHTML = '';
+        tooltip.textContent = msgPreview;
+        // Re-add arrow
+        const leaveArrow = document.createElement('div');
+        leaveArrow.style.cssText = arrow.style.cssText;
+        tooltip.appendChild(leaveArrow);
+      });
+
+      wrapper.appendChild(tooltip);
+      wrapper.appendChild(pinEl);
+
+      const marker = new maplibregl.Marker({
+        element: wrapper,
+        anchor: 'bottom',
+      })
         .setLngLat([pin.lng, pin.lat])
         .addTo(map);
       pinMarkersRef.current.push(marker);
     });
-  }, [pins, currentZoom, setSelectedPin]);
+  }, [pins, currentZoom]);
 
   // 8) Handle pin placement: listen for map clicks when in pin-placing mode
   useEffect(() => {
@@ -261,7 +364,8 @@ export default function MapCanvas() {
     };
 
     map.on('click', handleClick);
-    map.getCanvas().style.cursor = 'crosshair';
+    // Use pin-shaped SVG cursor matching selected color
+    map.getCanvas().style.cursor = pinCursorSvg(pinColor);
 
     return () => {
       map.off('click', handleClick);
@@ -269,7 +373,19 @@ export default function MapCanvas() {
         map.getCanvas().style.cursor = '';
       }
     };
-  }, [placingPin]);
+  }, [placingPin, pinColor]);
+
+  // 9) Pin placement cursor — override the map canvas cursor when placing pins
+  //    (Drawing pencil cursor is handled by WebCanvasProvider on the active canvas layer)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (placingPin) {
+      map.getCanvas().style.cursor = pinCursorSvg(pinColor);
+    } else {
+      map.getCanvas().style.cursor = '';
+    }
+  }, [drawingMode, placingPin, pinColor]);
 
   // Pin confirm handler
   const handlePinConfirm = useCallback(
@@ -360,16 +476,8 @@ export default function MapCanvas() {
         />
       )}
 
-      {/* PinPopup — shown when clicking an existing pin */}
-      {selectedPin && (
-        <PinPopup
-          pin={selectedPin}
-          onClose={() => setSelectedPin(null)}
-        />
-      )}
-
       {/* Sync status indicator */}
-      <div className="absolute bottom-4 left-4 z-30 flex items-center gap-2 rounded-full bg-background/80 px-3 py-1 text-xs backdrop-blur-sm">
+      <div className="absolute bottom-4 left-4 z-30 flex items-center gap-2 rounded-full border border-gray-200/60 bg-gray-100/80 px-3 py-1 text-xs backdrop-blur-md">
         <span
           className={`h-2 w-2 rounded-full ${
             syncState === 'connected'

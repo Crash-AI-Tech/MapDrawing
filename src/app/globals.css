@@ -83,8 +83,11 @@ body {
 
 .maplibregl-ctrl-group {
   border-radius: var(--radius) !important;
-  border: 1px solid hsl(var(--border)) !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(209, 213, 219, 0.6) !important;
+  background: rgba(243, 244, 246, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
 }
 
 .maplibregl-ctrl-group button {

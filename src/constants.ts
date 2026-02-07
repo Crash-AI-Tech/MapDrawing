@@ -17,14 +17,24 @@ export type BrushId = (typeof BRUSH_IDS)[keyof typeof BRUSH_IDS];
 // ========================
 
 export const COLOR_PRESETS = [
-  // Row 1: Neutrals
-  '#000000', '#333333', '#666666', '#999999', '#CCCCCC', '#FFFFFF',
-  // Row 2: Warm
-  '#8B0000', '#E63946', '#FF6B35', '#F4A261', '#FFD166', '#FCF6BD',
-  // Row 3: Cool
-  '#2D6A4F', '#52B788', '#48CAE4', '#0077B6', '#3A0CA3', '#7209B7',
-  // Row 4: Pastel/Vivid
-  '#FF85A1', '#FFC8DD', '#BDE0FE', '#A2D2FF', '#CDB4DB', '#CAFFBF',
+  // Row 1: Grayscale
+  '#000000', '#2C2C2C', '#555555', '#888888', '#BBBBBB', '#FFFFFF',
+  // Row 2: Red → Orange
+  '#5C0011', '#A8071A', '#E63946', '#FF4D4F', '#FF7A45', '#FFA940',
+  // Row 3: Orange → Yellow
+  '#FA8C16', '#FFC53D', '#FFD666', '#FFF1B8', '#FFFBE6', '#FCF6BD',
+  // Row 4: Green
+  '#135200', '#237804', '#389E0D', '#52C41A', '#73D13D', '#B7EB8F',
+  // Row 5: Teal → Cyan
+  '#00474F', '#006D75', '#08979C', '#36CFC9', '#5CDBD3', '#B5F5EC',
+  // Row 6: Blue
+  '#002C8C', '#0050B3', '#1677FF', '#4096FF', '#69B1FF', '#BAE0FF',
+  // Row 7: Purple
+  '#22075E', '#391085', '#722ED1', '#9254DE', '#B37FEB', '#D3ADF7',
+  // Row 8: Pink → Magenta
+  '#780650', '#9E1068', '#EB2F96', '#F759AB', '#FF85C0', '#FFD6E7',
+  // Row 9: Skin / Earth tones
+  '#613400', '#874D00', '#AD8B00', '#D48806', '#F5DEB3', '#FAEBD7',
 ] as const;
 
 export const DEFAULT_COLOR = '#000000';
@@ -63,7 +73,8 @@ export const PIN_MAX_MESSAGE_LENGTH = 50;
 
 /** Pin color presets */
 export const PIN_COLORS = [
-  '#E63946', '#F4A261', '#2D6A4F', '#0077B6', '#7209B7', '#FF85A1',
+  '#E63946', '#FF7A45', '#FFC53D', '#52C41A', '#36CFC9',
+  '#1677FF', '#722ED1', '#EB2F96', '#333333', '#F5DEB3',
 ] as const;
 
 // ========================

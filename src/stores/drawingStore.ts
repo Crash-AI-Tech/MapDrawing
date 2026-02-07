@@ -47,7 +47,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
   activeColor: '#000000',
   activeOpacity: 1.0,
   activeSize: 3,
-  drawingMode: true,
+  drawingMode: false,
   isDrawing: false,
   canUndo: false,
   canRedo: false,

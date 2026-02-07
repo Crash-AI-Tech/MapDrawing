@@ -17,11 +17,15 @@ import InkBar from './InkBar';
 import {
   Undo2,
   Redo2,
-  MousePointer2,
+  Hand,
   Pencil,
   MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+
+type ToolMode = 'hand' | 'draw' | 'pin';
+
+const ACTIVE_BTN = 'bg-violet-600 text-white hover:bg-violet-500 hover:text-white shadow-inner';
 
 interface ToolbarProps {
   /** Called when a guest tries to draw — opens AuthDialog */
@@ -32,12 +36,15 @@ interface ToolbarProps {
  * Toolbar — main floating toolbar on the left side.
  */
 export default function Toolbar({ onAuthRequired }: ToolbarProps) {
-  const { drawingMode, canUndo, canRedo, toggleDrawingMode, undo, redo } =
-    useToolbar();
+  const { drawingMode, canUndo, canRedo, undo, redo } = useToolbar();
+  const setDrawingMode = useDrawingStore((s) => s.setDrawingMode);
   const strokeCount = useDrawingStore((s) => s.strokeCount);
   const user = useAuthStore((s) => s.user);
   const placingPin = usePinStore((s) => s.placingPin);
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
+
+  // Derive current tool mode
+  const currentMode: ToolMode = placingPin ? 'pin' : drawingMode ? 'draw' : 'hand';
 
   /** Gate an action behind auth */
   const requireAuth = (action: () => void) => {
@@ -48,39 +55,70 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
     action();
   };
 
+  /** Switch to a tool mode — the three modes are mutually exclusive */
+  const switchMode = (mode: ToolMode) => {
+    if (mode === 'hand') {
+      setDrawingMode(false);
+      setPlacingPin(false);
+    } else if (mode === 'draw') {
+      requireAuth(() => {
+        setDrawingMode(true);
+        setPlacingPin(false);
+      });
+    } else if (mode === 'pin') {
+      requireAuth(() => {
+        setDrawingMode(false);
+        setPlacingPin(true);
+      });
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="absolute left-4 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-1.5 rounded-xl border bg-background/90 p-1.5 shadow-lg backdrop-blur-sm">
-        {/* Toggle drawing mode */}
+      <div className="absolute left-4 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-1.5 rounded-xl border border-gray-200/60 bg-gray-100/80 p-1.5 shadow-lg backdrop-blur-md">
+        {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant={drawingMode ? 'default' : 'ghost'}
+              variant="ghost"
               size="icon"
-              onClick={() => requireAuth(toggleDrawingMode)}
+              className={cn(currentMode === 'hand' && ACTIVE_BTN)}
+              onClick={() => switchMode('hand')}
             >
-              {drawingMode ? <Pencil className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />}
+              <Hand className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">
-            {drawingMode ? '切换到导航模式' : '切换到绘画模式'}
-          </TooltipContent>
+          <TooltipContent side="right">导航模式</TooltipContent>
         </Tooltip>
 
-        {/* Pin placement */}
+        {/* Draw */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant={placingPin ? 'default' : 'ghost'}
+              variant="ghost"
               size="icon"
-              onClick={() => requireAuth(() => setPlacingPin(!placingPin))}
+              className={cn(currentMode === 'draw' && ACTIVE_BTN)}
+              onClick={() => switchMode('draw')}
             >
-              <MapPin className={cn('h-4 w-4', placingPin && 'text-primary-foreground')} />
+              <Pencil className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">
-            {placingPin ? '取消放置图钉' : '放置留言图钉'}
-          </TooltipContent>
+          <TooltipContent side="right">绘画模式</TooltipContent>
+        </Tooltip>
+
+        {/* Pin */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(currentMode === 'pin' && ACTIVE_BTN)}
+              onClick={() => switchMode('pin')}
+            >
+              <MapPin className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">放置留言图钉</TooltipContent>
         </Tooltip>
 
         <div className="mx-auto h-px w-5 bg-border" />

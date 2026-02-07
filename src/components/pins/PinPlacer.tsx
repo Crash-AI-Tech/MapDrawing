@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
 import { PIN_COLORS, PIN_MAX_MESSAGE_LENGTH, PIN_INK_COST } from '@/constants';
+import { usePinStore } from '@/stores/pinStore';
 import { MapPin, X } from 'lucide-react';
 
 interface PinPlacerProps {
@@ -26,7 +27,14 @@ interface PinPlacerProps {
 export default function PinPlacer({ lng, lat, onConfirm, onCancel, ink }: PinPlacerProps) {
   const [message, setMessage] = useState('');
   const [color, setColor] = useState<string>(PIN_COLORS[0]);
+  const [customColor, setCustomColor] = useState('#FF6600');
+  const setPinColor = usePinStore((s) => s.setPinColor);
   const canAfford = ink >= PIN_INK_COST;
+
+  const handleColorChange = (c: string) => {
+    setColor(c);
+    setPinColor(c); // sync to store so cursor color updates
+  };
 
   return (
     <div className="absolute top-20 left-1/2 z-40 w-80 -translate-x-1/2 rounded-xl border bg-background p-4 shadow-xl">
@@ -57,18 +65,34 @@ export default function PinPlacer({ lng, lat, onConfirm, onCancel, ink }: PinPla
       {/* Color picker */}
       <div className="mb-3">
         <p className="mb-1.5 text-xs text-muted-foreground">图钉颜色</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {PIN_COLORS.map((c) => (
             <button
               key={c}
-              onClick={() => setColor(c)}
+              onClick={() => handleColorChange(c)}
               className={cn(
                 'h-6 w-6 rounded-full border-2 transition-all',
-                color === c ? 'border-primary scale-125 shadow-sm' : 'border-transparent'
+                color === c ? 'border-violet-500 scale-125 shadow-sm' : 'border-transparent'
               )}
               style={{ backgroundColor: c }}
             />
           ))}
+          {/* Custom color input */}
+          <div className="relative">
+            <input
+              type="color"
+              value={customColor}
+              onChange={(e) => {
+                setCustomColor(e.target.value);
+                handleColorChange(e.target.value);
+              }}
+              className={cn(
+                'h-6 w-6 cursor-pointer rounded-full border-2 p-0 transition-all',
+                !PIN_COLORS.includes(color as any) ? 'border-violet-500 scale-125 shadow-sm' : 'border-dashed border-gray-300'
+              )}
+              title="自定义颜色"
+            />
+          </div>
         </div>
       </div>
 

@@ -1,3 +1,9 @@
+/** Generate an SVG pencil cursor data URI */
+function pencilCursor(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" fill="%23333" stroke="%23333" stroke-width="1"/><path d="m15 5 4 4" stroke="white" stroke-width="1"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 2 22, crosshair`;
+}
+
 /**
  * WebCanvasProvider — manages DOM canvas elements for the overlay system.
  * Creates and positions the 3-layer canvas stack on top of the map.
@@ -40,7 +46,7 @@ export class WebCanvasProvider {
       width: 100%;
       height: 100%;
       z-index: 20;
-      cursor: crosshair;
+      cursor: ${pencilCursor()};
     `;
 
     container.appendChild(this.compositeCanvas);
@@ -80,7 +86,7 @@ export class WebCanvasProvider {
   setDrawingMode(enabled: boolean): void {
     if (this.activeCanvas) {
       this.activeCanvas.style.pointerEvents = enabled ? 'auto' : 'none';
-      this.activeCanvas.style.cursor = enabled ? 'crosshair' : 'default';
+      this.activeCanvas.style.cursor = enabled ? pencilCursor() : 'default';
     }
   }
 
