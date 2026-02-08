@@ -69,7 +69,8 @@ export function useAuth() {
       // ignore
     }
     clear();
-    window.location.href = '/login';
+    // 退出后保持在当前页面，刷新以重置状态
+    window.location.reload();
   }, [clear]);
 
   return {

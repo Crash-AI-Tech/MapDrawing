@@ -9,9 +9,9 @@ import { NextResponse, type NextRequest } from 'next/server';
  */
 
 /** Protected paths that require authentication */
-const PROTECTED_PATHS: string[] = []; // canvas is now guest-accessible
-/** Auth paths (redirect to /canvas if already logged in) */
-const AUTH_PATHS = ['/login', '/register'];
+const PROTECTED_PATHS: string[] = []; // Currently all accessible as guest
+/** Auth paths (no longer standalone pages, handled by dialogs) */
+const AUTH_PATHS: string[] = [];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,12 +19,11 @@ export async function middleware(request: NextRequest) {
   // 从 Cookie 读取 Session Token
   const sessionToken = request.cookies.get('session')?.value;
 
-  // Protected routes: redirect to /login if not authenticated
+  // Protected routes: redirect to canvas if not authenticated
   if (PROTECTED_PATHS.some((p) => pathname.startsWith(p))) {
     if (!sessionToken) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('next', pathname);
-      return NextResponse.redirect(loginUrl);
+      const canvasUrl = new URL('/canvas', request.url);
+      return NextResponse.redirect(canvasUrl);
     }
   }
 
