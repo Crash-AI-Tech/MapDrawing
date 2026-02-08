@@ -10,15 +10,38 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface VerifyEmailFormProps {
+  lang: 'zh' | 'en';
   email: string;
   onSuccess?: () => void;
   onBack?: () => void;
 }
 
+const t = {
+  zh: {
+    sentTo: '验证码已发送至',
+    verifying: '验证中...',
+    verify: '验证邮箱',
+    resent: '验证码已重新发送',
+    back: '返回',
+    resend: '重新发送',
+    retryIn: (s: number) => `${s}s 后重试`,
+  },
+  en: {
+    sentTo: 'Code sent to',
+    verifying: 'Verifying...',
+    verify: 'Verify Email',
+    resent: 'Code resent successfully',
+    back: 'Back',
+    resend: 'Resend Code',
+    retryIn: (s: number) => `Retry in ${s}s`,
+  },
+};
+
 /**
  * 6 位验证码输入 — 白色液态玻璃风格
  */
 export default function VerifyEmailForm({
+  lang,
   email,
   onSuccess,
   onBack,
@@ -28,6 +51,7 @@ export default function VerifyEmailForm({
     resendVerificationCode,
     null
   );
+  const d = t[lang];
 
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [cooldown, setCooldown] = useState(0);
@@ -105,7 +129,7 @@ export default function VerifyEmailForm({
     <div className="space-y-5">
       {/* 邮箱提示 */}
       <div className="rounded-xl bg-gray-50/80 px-4 py-3 text-center backdrop-blur-sm">
-        <p className="text-xs text-gray-500">验证码已发送至</p>
+        <p className="text-xs text-gray-500">{d.sentTo}</p>
         <p className="mt-0.5 text-sm font-medium text-gray-800">{email}</p>
       </div>
 
@@ -138,12 +162,12 @@ export default function VerifyEmailForm({
           {isPending ? (
             <span className="flex items-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-              验证中...
+              {d.verifying}
             </span>
           ) : (
             <span className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              验证邮箱
+              {d.verify}
             </span>
           )}
         </Button>
@@ -162,7 +186,7 @@ export default function VerifyEmailForm({
       )}
       {resendState?.success && (
         <div className="rounded-lg bg-green-50/80 px-3 py-2 text-center text-sm text-green-600 backdrop-blur-sm">
-          验证码已重新发送
+          {d.resent}
         </div>
       )}
 
@@ -174,7 +198,7 @@ export default function VerifyEmailForm({
           className="flex items-center gap-1 text-sm text-gray-400 transition-colors hover:text-gray-600"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          返回
+          {d.back}
         </button>
         <form action={resendAction}>
           <input type="hidden" name="email" value={email} />
@@ -184,7 +208,7 @@ export default function VerifyEmailForm({
             className="flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-gray-700 disabled:text-gray-300"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isResending ? 'animate-spin' : ''}`} />
-            {cooldown > 0 ? `${cooldown}s 后重试` : '重新发送'}
+            {cooldown > 0 ? d.retryIn(cooldown) : d.resend}
           </button>
         </form>
       </div>

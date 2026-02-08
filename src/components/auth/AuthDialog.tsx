@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { Globe } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -26,32 +27,44 @@ interface AuthDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const modeConfig: Record<
-  AuthMode,
-  { title: string; description: string }
-> = {
-  login: { title: '欢迎回来', description: '登录后即可在地图上涂鸦和留言' },
-  register: { title: '创建账号', description: '注册账号，开始你的创作之旅' },
-  'verify-email': {
-    title: '验证邮箱',
-    description: '我们已向你的邮箱发送了 6 位验证码',
+const t = {
+  zh: {
+    login: { title: '欢迎回来', description: '登录后即可在地图上涂鸦和留言' },
+    register: { title: '创建账号', description: '注册账号，开始你的创作之旅' },
+    'verify-email': {
+      title: '验证邮箱',
+      description: '我们已向你的邮箱发送了 6 位验证码',
+    },
+    'forgot-password': {
+      title: '找回密码',
+      description: '输入注册邮箱，我们将发送验证码',
+    },
+    'reset-password': {
+      title: '重置密码',
+      description: '输入验证码和新密码',
+    },
   },
-  'forgot-password': {
-    title: '找回密码',
-    description: '输入注册邮箱，我们将发送验证码',
-  },
-  'reset-password': {
-    title: '重置密码',
-    description: '输入验证码和新密码',
+  en: {
+    login: { title: 'Welcome Back', description: 'Log in to draw and pin on the map' },
+    register: { title: 'Create Account', description: 'Join us and start your creative journey' },
+    'verify-email': {
+      title: 'Verify Email',
+      description: 'We sent a 6-digit code to your email',
+    },
+    'forgot-password': {
+      title: 'Forgot Password',
+      description: 'Enter your email to receive a code',
+    },
+    'reset-password': {
+      title: 'Reset Password',
+      description: 'Enter code and new password',
+    },
   },
 };
 
-/**
- * AuthDialog — 白色液态玻璃质感的认证弹窗
- * 支持登录、注册、邮箱验证、忘记密码、重置密码 5 种模式
- */
 export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [mode, setMode] = useState<AuthMode>('login');
+  const [lang, setLang] = useState<'zh' | 'en'>('en');
   const [verifyEmail, setVerifyEmail] = useState('');
   const [resetEmail, setResetEmail] = useState('');
 
@@ -67,14 +80,12 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
   const handleSuccess = useCallback(() => {
     onOpenChange(false);
-    // 延迟关闭后刷新页面
     setTimeout(() => window.location.reload(), 300);
   }, [onOpenChange]);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {
-        // 关闭弹窗时重置到登录
         setTimeout(() => setMode('login'), 200);
       }
       onOpenChange(open);
@@ -82,11 +93,20 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     [onOpenChange]
   );
 
-  const { title, description } = modeConfig[mode];
+  const { title, description } = t[lang][mode];
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-[420px] border-white/40 bg-white/70 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-2xl sm:rounded-2xl">
+        {/* Language Switcher */}
+        <button
+          onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
+          className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          title={lang === 'zh' ? 'Switch to English' : '切换到中文'}
+        >
+          <Globe className="h-4 w-4" />
+        </button>
+
         <DialogHeader className="text-center">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 text-xl text-white shadow-lg">
             🎨
@@ -102,6 +122,7 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         <div className="mt-1">
           {mode === 'login' && (
             <LoginForm
+              lang={lang}
               onSwitchToRegister={() => setMode('register')}
               onForgotPassword={() => setMode('forgot-password')}
               onVerifyRequired={goToVerify}
@@ -110,12 +131,14 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           )}
           {mode === 'register' && (
             <RegisterForm
+              lang={lang}
               onSwitchToLogin={() => setMode('login')}
               onVerifyRequired={goToVerify}
             />
           )}
           {mode === 'verify-email' && (
             <VerifyEmailForm
+              lang={lang}
               email={verifyEmail}
               onSuccess={handleSuccess}
               onBack={() => setMode('login')}
@@ -123,12 +146,14 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           )}
           {mode === 'forgot-password' && (
             <ForgotPasswordForm
+              lang={lang}
               onCodeSent={goToResetPassword}
               onBack={() => setMode('login')}
             />
           )}
           {mode === 'reset-password' && (
             <ResetPasswordForm
+              lang={lang}
               email={resetEmail}
               onSuccess={() => setMode('login')}
               onBack={() => setMode('forgot-password')}

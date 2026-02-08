@@ -8,19 +8,49 @@ import { Label } from '@/components/ui/label';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 
 interface LoginFormProps {
+  lang: 'zh' | 'en';
   onSwitchToRegister?: () => void;
   onForgotPassword?: () => void;
   onVerifyRequired?: (email: string) => void;
   onSuccess?: () => void;
 }
 
+const t = {
+  zh: {
+    email: '邮箱',
+    password: '密码',
+    forgot: '忘记密码？',
+    placeholderEmail: 'your@email.com',
+    placeholderPwd: '••••••••',
+    login: '登录',
+    loggingIn: '登录中...',
+    or: '或者',
+    noAccount: '还没有账号？',
+    register: '注册',
+  },
+  en: {
+    email: 'Email',
+    password: 'Password',
+    forgot: 'Forgot?',
+    placeholderEmail: 'your@email.com',
+    placeholderPwd: '••••••••',
+    login: 'Log in',
+    loggingIn: 'Logging in...',
+    or: 'OR',
+    noAccount: 'No account yet?',
+    register: 'Sign up',
+  },
+};
+
 export default function LoginForm({
+  lang,
   onSwitchToRegister,
   onForgotPassword,
   onVerifyRequired,
   onSuccess,
 }: LoginFormProps) {
   const [state, formAction, isPending] = useActionState<LoginState | null, FormData>(login, null);
+  const d = t[lang];
 
   // 处理登录结果
   useEffect(() => {
@@ -38,7 +68,7 @@ export default function LoginForm({
       <form action={formAction} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="login-email" className="text-xs font-medium text-gray-600">
-            邮箱
+            {d.email}
           </Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -46,7 +76,7 @@ export default function LoginForm({
               id="login-email"
               name="email"
               type="email"
-              placeholder="your@email.com"
+              placeholder={d.placeholderEmail}
               required
               className="h-11 rounded-xl border-white/60 bg-white/50 pl-10 shadow-sm backdrop-blur-sm placeholder:text-gray-300 focus:border-gray-300 focus:bg-white/80 focus:ring-1 focus:ring-gray-200"
             />
@@ -56,14 +86,14 @@ export default function LoginForm({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="login-password" className="text-xs font-medium text-gray-600">
-              密码
+              {d.password}
             </Label>
             <button
               type="button"
               onClick={onForgotPassword}
               className="text-xs text-gray-400 transition-colors hover:text-gray-600"
             >
-              忘记密码？
+              {d.forgot}
             </button>
           </div>
           <div className="relative">
@@ -72,7 +102,7 @@ export default function LoginForm({
               id="login-password"
               name="password"
               type="password"
-              placeholder="••••••••"
+              placeholder={d.placeholderPwd}
               required
               minLength={6}
               className="h-11 rounded-xl border-white/60 bg-white/50 pl-10 shadow-sm backdrop-blur-sm placeholder:text-gray-300 focus:border-gray-300 focus:bg-white/80 focus:ring-1 focus:ring-gray-200"
@@ -94,11 +124,11 @@ export default function LoginForm({
           {isPending ? (
             <span className="flex items-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-              登录中...
+              {d.loggingIn}
             </span>
           ) : (
             <span className="flex items-center gap-2">
-              登录
+              {d.login}
               <ArrowRight className="h-4 w-4" />
             </span>
           )}
@@ -109,18 +139,20 @@ export default function LoginForm({
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-gray-200/60" />
         </div>
-        <div className="relative flex justify-center text-xs">
-          <span className="bg-white/70 px-3 text-gray-400">或者</span>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-white px-3 py-1 rounded-full border border-gray-200/60 text-gray-500 shadow-sm">
+            {d.or}
+          </span>
         </div>
       </div>
 
       <p className="text-center text-sm text-gray-500">
-        还没有账号？{' '}
+        {d.noAccount}{' '}
         <button
           onClick={onSwitchToRegister}
           className="font-semibold text-gray-900 transition-colors hover:text-gray-700"
         >
-          注册
+          {d.register}
         </button>
       </p>
     </div>

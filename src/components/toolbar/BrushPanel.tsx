@@ -46,12 +46,12 @@ export default function BrushPanel() {
             </button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent side="bottom">画笔设置</TooltipContent>
+        <TooltipContent side="bottom">Brush Settings</TooltipContent>
       </Tooltip>
       <PopoverContent side="bottom" align="start" className="w-64 space-y-4 border-white/50 bg-white/80 backdrop-blur-xl">
         {/* Brush type grid */}
         <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">画笔类型</p>
+          <p className="mb-2 text-xs font-medium text-muted-foreground">Brush Type</p>
           <div className="grid grid-cols-4 gap-1.5">
             {BRUSH_META.map((brush) => (
               <button
@@ -74,7 +74,7 @@ export default function BrushPanel() {
         {/* Size slider */}
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">大小</span>
+            <span className="text-xs font-medium text-muted-foreground">Size</span>
             <span className="text-xs tabular-nums text-muted-foreground">
               {activeSize.toFixed(1)}
             </span>
@@ -91,7 +91,7 @@ export default function BrushPanel() {
         {/* Opacity slider */}
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">不透明度</span>
+            <span className="text-xs font-medium text-muted-foreground">Opacity</span>
             <span className="text-xs tabular-nums text-muted-foreground">
               {Math.round(activeOpacity * 100)}%
             </span>

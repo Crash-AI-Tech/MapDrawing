@@ -107,7 +107,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Hand className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">导航模式</TooltipContent>
+          <TooltipContent side="bottom">Navigation</TooltipContent>
         </Tooltip>
 
         {/* Draw */}
@@ -122,7 +122,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Pencil className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">绘画模式</TooltipContent>
+          <TooltipContent side="bottom">Draw</TooltipContent>
         </Tooltip>
 
         {/* Pin */}
@@ -137,7 +137,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <MapPin className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">放置留言图钉</TooltipContent>
+          <TooltipContent side="bottom">Pin</TooltipContent>
         </Tooltip>
 
         {/* Zoom tooltip */}
@@ -149,11 +149,14 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
 
         <div className="h-5 w-px bg-border" />
 
-        {/* Brush panel */}
-        <BrushPanel />
+        {/* Brush & Color — Disabled if guest */}
+        <div className={cn('flex items-center gap-1.5', !user && 'opacity-50 pointer-events-none grayscale')}>
+          {/* Brush panel */}
+          <BrushPanel />
 
-        {/* Color picker */}
-        <ColorPicker />
+          {/* Color picker */}
+          <ColorPicker />
+        </div>
 
         <div className="h-5 w-px bg-border" />
 
@@ -170,7 +173,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Undo2 className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">撤销 (Ctrl+Z)</TooltipContent>
+          <TooltipContent side="bottom">Undo (Ctrl+Z)</TooltipContent>
         </Tooltip>
 
         {/* Redo */}
@@ -186,7 +189,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Redo2 className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">重做 (Ctrl+Shift+Z)</TooltipContent>
+          <TooltipContent side="bottom">Redo (Ctrl+Shift+Z)</TooltipContent>
         </Tooltip>
 
         <div className="h-5 w-px bg-border" />

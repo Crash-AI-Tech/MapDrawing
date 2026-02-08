@@ -32,12 +32,12 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
         onClick={onLoginClick}
       >
         <LogIn className="h-3.5 w-3.5" />
-        登录
+        Log in
       </Button>
     );
   }
 
-  const displayName = profile?.userName ?? user.userName ?? '用户';
+  const displayName = profile?.userName ?? user.userName ?? 'User';
   const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
@@ -73,12 +73,12 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <UserIcon className="mr-2 h-4 w-4" />
-          <span>个人资料</span>
+          <span>Profile</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} className="text-destructive">
           <LogOut className="mr-2 h-4 w-4" />
-          <span>退出登录</span>
+          <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

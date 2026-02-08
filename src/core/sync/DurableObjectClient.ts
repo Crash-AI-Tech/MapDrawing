@@ -51,7 +51,7 @@ export class DurableObjectClient {
     this.setState('connecting');
 
     try {
-      const url = `${this.config.baseUrl}/rooms/${encodeURIComponent(room)}?token=${this.config.accessToken}&userId=${this.config.userId}`;
+      const url = `${this.config.baseUrl}/ws/${encodeURIComponent(room)}?token=${this.config.accessToken}&userId=${this.config.userId}`;
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {

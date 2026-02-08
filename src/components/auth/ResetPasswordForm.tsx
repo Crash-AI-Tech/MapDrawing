@@ -8,18 +8,41 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Lock, ArrowLeft, CheckCircle2, KeyRound, Check } from 'lucide-react';
 
 interface ResetPasswordFormProps {
+  lang: 'zh' | 'en';
   email: string;
   onSuccess?: () => void;
   onBack?: () => void;
 }
 
+const t = {
+  zh: {
+    sentTo: '验证码已发送至',
+    verifyCode: '验证码',
+    newPassword: '新密码',
+    placeholderPwd: '至少6位',
+    resetting: '重置中...',
+    reset: '重置密码',
+    back: '返回',
+  },
+  en: {
+    sentTo: 'Code sent to',
+    verifyCode: 'Verification Code',
+    newPassword: 'New Password',
+    placeholderPwd: 'Min 6 chars',
+    resetting: 'Resetting...',
+    reset: 'Reset Password',
+    back: 'Back',
+  },
+};
+
 /**
  * 重置密码 — 验证码 + 新密码
  */
 export default function ResetPasswordForm({
+  lang,
   email,
   onSuccess,
   onBack,
@@ -28,6 +51,8 @@ export default function ResetPasswordForm({
     resetPassword,
     null
   );
+  const d = t[lang];
+
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -86,13 +111,13 @@ export default function ResetPasswordForm({
     <div className="space-y-5">
       {/* 邮箱提示 */}
       <div className="rounded-xl bg-gray-50/80 px-4 py-3 text-center backdrop-blur-sm">
-        <p className="text-xs text-gray-500">验证码已发送至</p>
+        <p className="text-xs text-gray-500">{d.sentTo}</p>
         <p className="mt-0.5 text-sm font-medium text-gray-800">{email}</p>
       </div>
 
       {/* 验证码输入 */}
       <div>
-        <Label className="mb-2 block text-xs font-medium text-gray-600">验证码</Label>
+        <Label className="mb-2 block text-xs font-medium text-gray-600">{d.verifyCode}</Label>
         <div className="flex justify-center gap-2.5" onPaste={handlePaste}>
           {code.map((digit, i) => (
             <input
@@ -117,7 +142,7 @@ export default function ResetPasswordForm({
 
         <div className="space-y-2">
           <Label htmlFor="new-password" className="text-xs font-medium text-gray-600">
-            新密码
+            {d.newPassword}
           </Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -125,7 +150,7 @@ export default function ResetPasswordForm({
               id="new-password"
               name="password"
               type="password"
-              placeholder="至少6位"
+              placeholder={d.placeholderPwd}
               required
               minLength={6}
               className="h-11 rounded-xl border-white/60 bg-white/50 pl-10 shadow-sm backdrop-blur-sm placeholder:text-gray-300 focus:border-gray-300 focus:bg-white/80 focus:ring-1 focus:ring-gray-200"
@@ -146,18 +171,18 @@ export default function ResetPasswordForm({
 
         <Button
           type="submit"
-          disabled={isPending || fullCode.length !== 6}
+          disabled={isPending}
           className="h-11 w-full rounded-xl bg-gradient-to-r from-gray-900 to-gray-700 font-medium text-white shadow-lg shadow-gray-900/20 transition-all hover:shadow-xl hover:shadow-gray-900/30"
         >
           {isPending ? (
             <span className="flex items-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-              重置中...
+              {d.resetting}
             </span>
           ) : (
             <span className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              重置密码
+              <Check className="h-4 w-4" />
+              {d.reset}
             </span>
           )}
         </Button>
@@ -169,7 +194,7 @@ export default function ResetPasswordForm({
         className="flex w-full items-center justify-center gap-1 text-sm text-gray-400 transition-colors hover:text-gray-600"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
-        返回
+        {d.back}
       </button>
     </div>
   );

@@ -22,7 +22,7 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
 
   // === Init sync when engine + token ready ===
   useEffect(() => {
-    if (!engine || !userId || !accessToken) return;
+    if (!engine || !userId) return;
 
     // Don't re-create if already exists with same config
     if (syncRef.current) {
