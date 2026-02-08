@@ -1,8 +1,6 @@
 import { validateSession } from '@/lib/auth/session';
 import { getUserProfile, updateUserProfile } from '@/lib/db/queries';
 
-export const runtime = 'edge';
-
 /**
  * GET /api/profile — fetch the current user's profile (D1).
  */

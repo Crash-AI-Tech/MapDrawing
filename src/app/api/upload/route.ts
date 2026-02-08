@@ -3,14 +3,12 @@
  * 支持用户头像上传
  */
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
-
-export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     const result = await validateSession();
     if (!result) {

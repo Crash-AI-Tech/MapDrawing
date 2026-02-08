@@ -29,3 +29,5 @@ logs
 # Wrangler
 .wrangler/
 .mf/
+
+.open-next

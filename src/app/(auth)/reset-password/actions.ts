@@ -5,7 +5,7 @@
  */
 'use server';
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { hashPassword } from '@/lib/auth/password';
 import { generateId } from 'lucia';
 import {
@@ -39,7 +39,7 @@ export async function requestPasswordReset(
   }
 
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     const user = await env.DB.prepare(
       'SELECT id FROM users WHERE email = ?'
@@ -127,7 +127,7 @@ export async function resetPassword(
   }
 
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     // 验证验证码
     const record = await env.DB.prepare(

@@ -1,8 +1,6 @@
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { getDrawingById, deleteDrawing } from '@/lib/db/queries';
-
-export const runtime = 'edge';
 
 /**
  * GET /api/drawings/[id] — fetch a single stroke by ID (D1).

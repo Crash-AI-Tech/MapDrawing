@@ -4,7 +4,7 @@
  */
 'use server';
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
 import { cookies } from 'next/headers';
 import { generateId } from 'lucia';
@@ -37,7 +37,7 @@ export async function verifyEmail(
   }
 
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     // 查找有效验证码
     const record = await env.DB.prepare(
@@ -103,7 +103,7 @@ export async function resendVerificationCode(
   }
 
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     const user = await env.DB.prepare(
       'SELECT id FROM users WHERE email = ? AND email_verified = 0'

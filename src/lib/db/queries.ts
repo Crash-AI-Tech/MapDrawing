@@ -3,7 +3,7 @@
  * 提供笔画和用户的 CRUD 操作
  */
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 // =====================
 // 笔画数据类型
@@ -53,7 +53,7 @@ export async function getDrawingsInViewport(
   maxLng: number,
   limit = 5000
 ): Promise<DrawingRow[]> {
-  const { env } = getRequestContext();
+  const { env } = getCloudflareContext();
 
   const { results } = await env.DB.prepare(
     `SELECT * FROM drawings 
@@ -72,7 +72,7 @@ export async function getDrawingsInViewport(
  * 根据 ID 查询单条笔画
  */
 export async function getDrawingById(id: string): Promise<DrawingRow | null> {
-  const { env } = getRequestContext();
+  const { env } = getCloudflareContext();
 
   return env.DB.prepare('SELECT * FROM drawings WHERE id = ?')
     .bind(id)
@@ -98,7 +98,7 @@ export async function insertDrawing(drawing: {
   createdZoom: number;
   meta?: string | null;
 }): Promise<void> {
-  const { env } = getRequestContext();
+  const { env } = getCloudflareContext();
 
   const centerLat = (drawing.minLat + drawing.maxLat) / 2;
   const centerLng = (drawing.minLng + drawing.maxLng) / 2;
@@ -192,7 +192,7 @@ export async function deleteDrawing(
   id: string,
   userId: string
 ): Promise<boolean> {
-  const { env } = getRequestContext();
+  const { env } = getCloudflareContext();
 
   const result = await env.DB.prepare(
     'DELETE FROM drawings WHERE id = ? AND user_id = ?'
@@ -213,7 +213,7 @@ export async function deleteDrawing(
 export async function getUserByEmail(
   email: string
 ): Promise<UserRow | null> {
-  const { env } = getRequestContext();
+  const { env } = getCloudflareContext();
 
   return env.DB.prepare('SELECT * FROM users WHERE email = ?')
     .bind(email)
@@ -228,7 +228,7 @@ export async function getUserProfile(userId: string): Promise<{
   user_name: string;
   avatar_url: string | null;
 } | null> {
-  const { env } = getRequestContext();
+  const { env } = getCloudflareContext();
 
   return env.DB.prepare(
     'SELECT id, user_name, avatar_url FROM users WHERE id = ?'
@@ -244,7 +244,7 @@ export async function updateUserProfile(
   userId: string,
   updates: { userName?: string; avatarUrl?: string }
 ): Promise<void> {
-  const { env } = getRequestContext();
+  const { env } = getCloudflareContext();
 
   const sets: string[] = [];
   const values: (string | number)[] = [];

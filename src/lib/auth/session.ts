@@ -3,7 +3,7 @@
  * 提供 Server Component / Route Handler / Middleware 中的 Session 验证
  */
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from './lucia';
 import { cookies } from 'next/headers';
 
@@ -14,7 +14,7 @@ import { cookies } from 'next/headers';
  */
 export async function validateSession() {
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
     const lucia = createLucia(env.DB);
 
     const sessionId = (await cookies()).get(lucia.sessionCookieName)?.value;

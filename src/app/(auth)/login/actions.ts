@@ -4,7 +4,7 @@
  */
 'use server';
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
 import { verifyPassword } from '@/lib/auth/password';
 import { cookies } from 'next/headers';
@@ -33,7 +33,7 @@ export async function login(
   }
 
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     // 查找用户
     const user = await env.DB.prepare(

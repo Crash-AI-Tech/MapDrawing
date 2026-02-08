@@ -1,8 +1,6 @@
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { v7 as uuidv7 } from 'uuid';
-
-export const runtime = 'edge';
 
 /**
  * GET /api/pins — fetch pins within a viewport bounds.
@@ -20,7 +18,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
     const result = await env.DB.prepare(
       `SELECT id, user_id, user_name, lng, lat, message, color, created_at
        FROM map_pins
@@ -81,7 +79,7 @@ export async function POST(request: Request) {
     }
 
     const id = uuidv7();
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     await env.DB.prepare(
       `INSERT INTO map_pins (id, user_id, user_name, lng, lat, message, color)

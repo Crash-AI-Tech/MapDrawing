@@ -1,8 +1,6 @@
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { getDrawingsInViewport } from '@/lib/db/queries';
-
-export const runtime = 'edge';
 
 /**
  * GET /api/drawings — fetch strokes within a viewport bounds (D1).
@@ -56,7 +54,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     // 验证 Session
     const result = await validateSession();

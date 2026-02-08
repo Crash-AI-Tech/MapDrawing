@@ -44,7 +44,7 @@ export async function verifyPassword(
 // PBKDF2 备选方案 (Edge Runtime 兼容)
 // ==========================================
 
-const PBKDF2_ITERATIONS = 600_000; // OWASP 2024 推荐
+const PBKDF2_ITERATIONS = 100_000; // Cloudflare Workers 上限为 100,000
 
 async function hashWithPBKDF2(password: string): Promise<string> {
   const encoder = new TextEncoder();

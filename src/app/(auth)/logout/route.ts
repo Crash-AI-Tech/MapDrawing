@@ -3,15 +3,13 @@
  * 销毁 Lucia Session，清除 Cookie
  */
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
 import { cookies } from 'next/headers';
 
-export const runtime = 'edge';
-
 export async function POST() {
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
     const lucia = createLucia(env.DB);
 
     const sessionId = (await cookies()).get(lucia.sessionCookieName)?.value;

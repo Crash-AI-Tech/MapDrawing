@@ -1,24 +1,46 @@
-# Cloudflare Pages 配置 (Next.js 项目根目录)
+# Cloudflare Workers 配置 (@opennextjs/cloudflare v1.x)
 name = "map"
-compatibility_date = "2024-12-01"
-pages_build_output_dir = ".vercel/output/static"
+account_id = "97c791889a9678820bdb511581c1635b"
+main = ".open-next/worker.js"
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+# 静态资源 (由 Worker 提供服务)
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# 自引用 service binding (opennextjs-cloudflare 所需，名称须与 worker name 一致)
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "map"
 
 # D1 数据库
 [[d1_databases]]
 binding = "DB"
 database_name = "map-db"
-database_id = "your-database-id"  # 创建后替换: npx wrangler d1 create map-db
+database_id = "bf333342-1998-421a-a439-465caea85ae9"
 
-# R2 对象存储
+# R2 对象存储 (用户上传)
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "map-storage"
 
+# R2 增量缓存 (Next.js ISR/SSG 缓存, open-next.config.ts 中配置了 r2IncrementalCache)
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
+bucket_name = "map-next-cache"
+
 # KV 边缘缓存
 [[kv_namespaces]]
 binding = "CACHE"
-id = "your-kv-id"  # 创建后替换: npx wrangler kv namespace create CACHE
+id = "e2837190f44c4e2f854c39b95cea2e51"
 
 # 环境变量
 [vars]
-NEXT_PUBLIC_DO_WEBSOCKET_URL = "ws://localhost:8787"
+RESEND_API_KEY = "re_a6XTh9eh_Hg1B7hfZg7wvxBv6bLBAPEJ9"
+AUTH_SECRET = "your-32-char-random-string"
+NEXT_PUBLIC_DO_WEBSOCKET_URL = "map-worker.privacy2privacy.workers.dev"
+
+[observability]
+enabled = true

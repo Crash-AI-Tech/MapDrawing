@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, lazy, Suspense, useEffect } from 'react';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import LoadingOverlay from '@/components/shared/LoadingOverlay';
 import Toolbar from '@/components/toolbar/Toolbar';
@@ -11,14 +10,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 
-// MapCanvas uses MapLibre GL which requires window — dynamic import with no SSR
-const MapCanvas = dynamic(
-  () => import('@/components/canvas/MapCanvas'),
-  {
-    ssr: false,
-    loading: () => <LoadingOverlay visible message="加载地图引擎..." />,
-  }
-);
+// MapCanvas uses MapLibre GL which requires window — lazy import with client-only guard
+const LazyMapCanvas = lazy(() => import('@/components/canvas/MapCanvas'));
 
 /**
  * Canvas page — main drawing interface.
@@ -29,12 +22,22 @@ export default function CanvasPage() {
   const user = useAuthStore((s) => s.user);
   const syncState = useUIStore((s) => s.syncState);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Client-only guard: MapLibre GL needs window/document
+  useEffect(() => setMounted(true), []);
 
   return (
     <ErrorBoundary>
       <div className="relative h-screen w-screen overflow-hidden">
         {/* Map + Canvas */}
-        <MapCanvas />
+        {mounted ? (
+          <Suspense fallback={<LoadingOverlay visible message="加载地图引擎..." />}>
+            <LazyMapCanvas />
+          </Suspense>
+        ) : (
+          <LoadingOverlay visible message="加载地图引擎..." />
+        )}
 
         {/* Toolbar (left) — passes auth gate callback */}
         <Toolbar onAuthRequired={() => setShowAuthDialog(true)} />

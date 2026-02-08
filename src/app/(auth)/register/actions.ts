@@ -5,7 +5,7 @@
  */
 'use server';
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { hashPassword } from '@/lib/auth/password';
 import { generateId } from 'lucia';
 import {
@@ -37,7 +37,7 @@ export async function register(
   }
 
   try {
-    const { env } = getRequestContext();
+    const { env } = getCloudflareContext();
 
     // 检查邮箱是否已存在
     const existing = await env.DB.prepare(
