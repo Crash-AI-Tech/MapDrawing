@@ -5,7 +5,7 @@
 
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { drizzle } from 'drizzle-orm/d1';
-import * as schema from '../../../drizzle/schema';
+import * as schema from '../../../../drizzle/schema';
 
 /**
  * 获取 Drizzle ORM 客户端实例 (用于 Server Component / Route Handler)

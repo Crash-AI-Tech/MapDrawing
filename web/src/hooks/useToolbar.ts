@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useDrawingStore } from '@/stores/drawingStore';
+import { useUIStore } from '@/stores/uiStore';
 import { BRUSH_IDS, COLOR_PRESETS, DEFAULT_COLOR, DEFAULT_SIZE, DEFAULT_OPACITY } from '@/constants';
 
 /**
@@ -25,6 +26,8 @@ export function useToolbar() {
     undo: storeUndo,
     redo: storeRedo,
   } = useDrawingStore();
+
+  const currentZoom = useUIStore((state) => state.currentZoom);
 
   const selectBrush = useCallback(
     (brushId: string) => {
@@ -83,6 +86,7 @@ export function useToolbar() {
     drawingMode,
     canUndo,
     canRedo,
+    currentZoom,
     colorPresets: COLOR_PRESETS,
 
     // Actions
