@@ -1,110 +1,95 @@
-# iOS 兼容与开发方案计划 (Expo 版)
+# iOS 兼容与开发方案计划 (Expo 版) - v2.0
 
-## 1. 架构概览
+## 1. 架构概览 (Monorepo)
 
-我们将采用 **Monorepo (单体仓库)** 架构，将现有的 Web 端代码和新的 iOS 端 (Expo) 代码放在同一个仓库中，以便最大程度地复用代码（尤其是 WebSocket 逻辑、Zustand 状态管理和 TypeScript 类型定义）。
+已完成架构重构，采用 Monorepo 结构：
+- **`web/`**: Next.js 前端 (已验证)
+- **`ios/`**: Expo Go / Development Build 项目 (待开发)
+- **`cf-workers/`**: 后端 API + WebSocket 服务 (复用)
+- **`drizzle/`**: 数据库 Schema (共享)
 
-### 目录结构设计
-我们将现有的根目录重构为 Turborepo 或 Pnpm Workspace 结构：
+## 2. 核心技术选型：绘图引擎 (PencilKit vs Skia)
 
-```text
-/
-├── apps/
-│   ├── web/                 # 移动原有的 Next.js 项目到这里
-│   └── mobile/              # 新建 Expo 项目 (iOS/Android)
-├── packages/
-│   ├── shared/              # [新增] 共享代码库
-│   │   ├── src/
-│   │   │   ├── types/       # 共享 TS 类型 (User, Stroke, Room...)
-│   │   │   ├── constants.ts # 共享常量 (API URL, WebSocket Config)
-│   │   │   ├── utils/       # 纯 JS 工具函数
-│   │   │   └── logic/       # 核心业务逻辑 (如数据转换算法)
-│   │   └── package.json
-│   ├── api-client/          # [可选] 统一的 API 请求层
-│   └── ui/                  # [可选] 如果计划复用 UI 组件 (比较难，因为 Web 是 HTML, App 是 View)
-├── package.json             # Root package.json (Workspaces 配置)
-└── turbo.json               # Turborepo 配置 (负责构建管线)
+用户询问是否能使用 `PencilKit`。经过分析：
+- **PencilKit**: Apple 原生框架，体验极佳，但 **数据格式私有 (PKDrawing)**，很难解析出我们需要的“像素点”或“矢量路径”数据来发送给 WebSocket。且无法在 Android 上运行（如果未来考虑）。
+- **React Native Skia (`@shopify/react-native-skia`)**: 
+    - **高性能**: 直接在 GPU 上绘制，性能接近原生。
+    - **可控性强**: 我们可以完全掌控每一个笔画的坐标点 (Points)，这对于我们“基于地理位置的绘图” (Geo-Coordinate) 至关重要。
+    - **跨平台**: iOS/Android 表现一致。
+    - **现有兼容**: Web 端使用 Canvas 2D，Skia 的 API 与 Canvas 2D 非常相似，逻辑复用率高。
+
+**结论**: 推荐继续使用 **React Native Skia**，通过手势响应器 (Gesture Handler) 获取点坐标，实时渲染。
+
+## 3. 数据库与 API 改造
+
+目前 `users` 表仅支持 Email/Password。为支持 iOS App Store 审核要求的 **Sign in with Apple**，需要改造：
+
+### 3.1 数据库变更 (`drizzle/schema.ts`)
+需增加 OAuth 字段：
+```typescript
+export const users = sqliteTable('users', {
+  // ... existing fields
+  appleId: text('apple_id').unique(), // 对应 Apple User Identity
+  avatarUrl: text('avatar_url'),      // 存储头像
+});
 ```
 
-## 2. 核心技术栈 (Expo)
+### 3.2 API 接口 (Web 端新增)
+iOS 端无法直接操作 Cookie，需开发基于 Token 的 API：
+- `POST /api/auth/mobile/login`: 邮箱登录，返回 `{ token, user }`
+- `POST /api/auth/mobile/apple`: 接收 Apple Identity Token，验证并登录/注册，返回 `{ token, user }`
+- `GET /api/auth/mobile/me`: 校验 Token 获取用户信息
 
-*   **框架**: `Expo SDK 52+` (React Native 0.76+, New Architecture enabled)
-*   **开发语言**: TypeScript
-*   **路由**: `expo-router` (文件系统路由，体验接近 Next.js App Router)
-*   **地图**: `@maplibre/maplibre-react-native` (完美兼容 MapLibre GL JS 的原生版)
-*   **绘图引擎**: `@shopify/react-native-skia` (高性能 2D 图形库，用于实现画笔效果，性能远超 SVG)
-*   **状态管理**: Zustand (直接复用 Web 端代码)
-*   **网络/WebSocket**: 原生 `fetch` + `WebSocket` API (代码与 Web 端 99% 一致)
-*   **本地存储**: `expo-secure-store` (存储 Session Token)
+## 4. iOS App 交互设计 (Canvas-First)
 
-## 3. 用户注册与登录模块 (重点)
+由于 App 没有主页 (Landing Page)，打开即画布，需设计引导流程：
 
-目前的 Web 端使用的是 Lucia Auth + Cookies (`httpOnly`)。原生 App 无法像浏览器那样自动处理 Cookie，且 Apple 审核强制要求第三方登录的应用必须同时支持 **Sign in with Apple**。
+### 4.1 启动流程 (App Launch)
+1.  **Splash Screen**: Logo 展示（Expo 默认）。
+2.  **权限请求**: 
+    - **位置权限**: "我们需要您的位置来在地图上显示您的画作。" (必须，否则无法定位)
+    - **通知权限**: (可选) "当有人在您附近绘画时通知您。"
+3.  **Onboarding (首次打开)**:
+    - 半透明遮罩覆盖地图，简单的 3 步动画引导：
+        - "这里是画布" (指向地图)
+        - "这是画笔" (指向工具栏)
+        - "开始创作！"
+4.  **未登录状态**:
+    - 允许**游客浏览** (View Only)。
+    - 当用户点击“画笔”或“发布”时，弹出 **登录/注册 Sheet (半屏弹窗)**。
+    - 支持 "Sign in with Apple" 一键登录。
 
-### 改造方案
+### 4.2 核心界面布局
+- **底图**: MapLibre GL Native (全屏)。
+- **绘图层**: Skia Canvas (覆盖全屏，透明背景)。
+- **顶部栏 (Floating)**:
+    - 左侧: 个人头像 (点击滑出菜单)。
+    - 中间: 当前位置/房间信息。
+    - 右侧: 搜索/定位按钮。
+- **底部栏 (Floating Tool Bar)**:
+    - 类似 Web 端的悬浮胶囊设计。
+    - 包含：画笔选择、颜色选择、撤销/重做。
+    - 点击画笔弹出详细设置面板 (BottomSheet)。
 
-**后端 (Cloudflare Workers/Next.js API)**:
-我们需要新增一套专门给 App 使用的 API 接口，通过 JSON Body 返回 Session Token，而不是 Set-Cookie。
+## 5. 开发任务拆解
 
-1.  **数据库变更**: 修改 `drizzle/schema.ts` 的 `users` 表，增加 OAuth 字段。
-    ```typescript
-    appleId: text('apple_id').unique(), // 对应 Apple User ID
-    // 如果未来支持 Google/微信，也在这里加
-    ```
-2.  **新增 API 路由**:
-    *   `POST /api/auth/mobile/login`: 接收邮箱/密码，验证通过后返回 `{ token: "session_id", user: {...} }`。
-    *   `POST /api/auth/mobile/register`: 注册新用户，返回 Token。
-    *   `POST /api/auth/mobile/apple`: 接收 Apple 返回的 `identityToken`，后端验证后：
-        *   如果 `apple_id` 已存在 -> 登录 (返回 Token)。
-        *   如果不存在 -> 自动注册新用户 (创建 User & Session) -> 返回 Token。
+### 第一阶段：基础设施 & 认证 (Day 1-2)
+- [ ] **Schema 更新**: 添加 `appleId` 字段，运行 migration。
+- [ ] **API 开发**: 实现 `/api/auth/mobile/*` 接口。
+- [ ] **Expo 基础**: 配置 TypeScript, Alias, import 共享代码。
+- [ ] **Auth 并没有**: 集成 `expo-apple-authentication` 和 `expo-secure-store`。
 
-**前端 (Expo App)**:
-1.  **登录/注册**: 表单提交到上述 API。
-2.  **苹果登录**: 使用 `expo-apple-authentication`。
-    ```typescript
-    import * as AppleAuthentication from 'expo-apple-authentication';
-    // 调起系统原生 Apple 登录面板
-    const credential = await AppleAuthentication.signInAsync({ ... });
-    // 将 credential.identityToken 发送给我们的后端验证
-    ```
-3.  **Token 管理**: 拿到 Token 后，存储在 `SecureStore` 中。
-4.  **WebSocket 连接**: 在 `DurableObjectClient.ts` 中，连接 URL 携带 Token: `ws://.../ws/room?token=YOUR_TOKEN` (目前后端已支持 query param `token`，所以这部分逻辑完美复用！)。
+### 第二阶段：地图与绘图 (Day 3-5)
+- [ ] **地图集成**: 引入 `@maplibre/maplibre-react-native`，加载自定义 Style。
+- [ ] **定位功能**: 集成 `expo-location`，实现定位跳转。
+- [ ] **Skia 画板**: 实现全屏透明 Canvas，处理手势 (PanGesture)。
+- [ ] **笔刷逻辑**: 复用 Web 端的笔刷算法 (Need to extract to `shared/`).
 
-## 4. 开发流程与新建项目详细步骤
-
-### 第一步：环境准备 & 仓库重构 (最耗时)
-1.  将当前所有代码移动到 `apps/web` 目录。
-2.  在根目录配置 `pnpm-workspace.yaml`。
-3.  提取共享类型到 `packages/shared`。
-
-### 第二步：初始化 Expo 项目
-1.  在 `apps/` 目录下运行：
-    ```bash
-    npx create-expo-app@latest mobile -t default
-    ```
-2.  进入 `apps/mobile`，安装依赖：
-    ```bash
-    npx expo install expo-router react-native-safe-area-context react-native-screens expo-linking expo-constants expo-status-bar
-    npx expo install @shopify/react-native-skia @maplibre/maplibre-react-native expo-location expo-secure-store expo-apple-authentication
-    ```
-3.  配置 `metro.config.js` 以支持 Monorepo (允许引用 `packages/shared`)。
-
-### 第三步：移植核心逻辑
-1.  复制 `src/services` 或 `src/core/sync` 到 `packages/shared` 或直接在 App 中引用。
-2.  在 App 中重写 `DurableObjectClient` 的连接部分 (主要是获取 Token 的方式不同，从 SecureStore 取)。
-
-### 第四步：UI 开发
-1.  **登录页**: 使用 RN View/Text/TextInput 重写登录表单。
-2.  **地图页**: 使用 `<MapView />` 组件。
-3.  **绘图层**: 使用 `<SkiaCanvas />` 覆盖在地图上，根据 WebSocket 收到的点数据进行绘制。
+### 第三阶段：同步与交互 (Day 6-7)
+- [ ] **WebSocket**: 移植 `DurableObjectClient`，适配 Token 认证。
+- [ ] **UI 实现**: 使用 React Native Reanimated 重写悬浮工具栏。
+- [ ] **性能优化**: 确保 60fps 绘图体验。
 
 ---
 
-## 5. 需要确认的问题 & 风险点
-
-1.  **Apple Developer 账号**: 上架 AppStore 需要 $99/年的开发者账号。你需要注册一个。
-2.  **Mac 开发环境**: Expo 开发 iOS 应用可以在模拟器运行，但最终打包和上传需要 Mac 环境 (你目前是 Mac，没问题)。
-3.  **地图兼容性**: MapLibre Native 的样式文件通常与 Web 版通用，但图标/字体可能需要打包进 App 资源中，或者确保 Web URL 允许 App 访问。
-4.  **工作量预期**: 虽然逻辑可复用，但 **UI (视图层) 是无法复用的**。你需要用 React Native 的 Flexbox 布局系统重写所有界面（因为 Web 是 HTML/CSS）。这包括登录页、设置面板、画笔选择器等。
-
-**是否接受这个工作量？** 如果接受，我们可以开始规划目录结构重构。
+**决策点**: 是否同意采用 Skia 替代 PencilKit 以换取数据控制权和跨平台一致性？(默认推荐 Skia)

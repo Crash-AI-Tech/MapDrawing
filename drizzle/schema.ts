@@ -18,6 +18,7 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   userName: text('user_name').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  appleId: text('apple_id').unique(), // For Sign in with Apple
   avatarUrl: text('avatar_url'),
   createdAt: integer('created_at', { mode: 'number' })
     .notNull()

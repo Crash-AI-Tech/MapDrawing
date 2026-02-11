@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   // Turbopack 配置 (Next.js 16 默认使用 Turbopack)
   turbopack: {},
 
+  // Transpile shared packages
+  transpilePackages: ['@niubi/shared'],
+
   images: {
     // R2 自定义域名 (生产环境替换)
     remotePatterns: [
