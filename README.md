@@ -61,6 +61,17 @@ pnpm --filter web deploy:workers # 部署到远端用于测试 (推荐)
 cd cf-workers && pnpm wrangler dev
 ```
 
+# 6. 启动 iOS 应用 (可选)
+
+```bash
+# 查询可用设备
+xcrun xctrace list devices
+# 启动 iOS 模拟器或真机 (替换为你的设备 ID)
+pnpm --filter ios ios --device 00008140-000C2D3E1E63001C  # 16pro
+pnpm --filter ios ios --device 00008103-000E20503A8A001E  # ipad
+
+# 启动 Expo 开发服务器
+
 ---
 
 ## 生产部署

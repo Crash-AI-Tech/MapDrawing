@@ -54,7 +54,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const result = await validateSession();
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

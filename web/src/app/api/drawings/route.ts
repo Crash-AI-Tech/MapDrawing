@@ -56,8 +56,8 @@ export async function POST(request: Request) {
   try {
     const { env } = getCloudflareContext();
 
-    // 验证 Session
-    const result = await validateSession();
+    // 验证 Session (Cookie 或 Bearer token)
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

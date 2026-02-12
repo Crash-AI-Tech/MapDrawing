@@ -2,9 +2,7 @@
 import { View, StyleSheet, Text, TextInput, Button, Alert } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
-
-// Hardcoded API URL for development. In production, use env var.
-const API_URL = 'http://192.168.124.12:3000'; // Updated to local IP
+import { API_BASE_URL } from '@/lib/config';
 
 export default function Login() {
     const { signIn } = useAuth();
@@ -23,7 +21,7 @@ export default function Login() {
             });
 
             if (credential.identityToken) {
-                const response = await fetch(`${API_URL}/api/auth/mobile/apple`, {
+                const response = await fetch(`${API_BASE_URL}/api/auth/mobile/apple`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -67,7 +65,7 @@ export default function Login() {
         }
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/auth/mobile/login`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/mobile/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),

@@ -12,12 +12,22 @@ import { cookies } from 'next/headers';
  * 注意：Server Component 中不能修改 Cookie，因此不做 Session 刷新和清除操作
  * Cookie 刷新在 middleware 或 Server Action 中处理
  */
-export async function validateSession() {
+export async function validateSession(request?: Request) {
   try {
     const { env } = getCloudflareContext();
     const lucia = createLucia(env.DB);
 
-    const sessionId = (await cookies()).get(lucia.sessionCookieName)?.value;
+    // 1) Try Cookie first (web browser)
+    let sessionId = (await cookies()).get(lucia.sessionCookieName)?.value;
+
+    // 2) Fallback: Authorization Bearer token (mobile clients)
+    if (!sessionId && request) {
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        sessionId = authHeader.slice(7);
+      }
+    }
+
     if (!sessionId) {
       return null;
     }
