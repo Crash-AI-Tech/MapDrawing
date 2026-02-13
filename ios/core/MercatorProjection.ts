@@ -12,6 +12,10 @@ const TILE_SIZE = 512;
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 
+// Base zoom for world coordinates (high enough for precision)
+export const BASE_ZOOM = 14;
+const BASE_WORLD_SIZE = TILE_SIZE * Math.pow(2, BASE_ZOOM);
+
 export class MercatorProjection {
   private centerLng = 0;
   private centerLat = 0;
@@ -50,8 +54,9 @@ export class MercatorProjection {
     this.centerMercY = this.latToMercY(center[1]);
 
     const bearingRad = bearing * DEG2RAD;
-    this.cosB = Math.cos(bearingRad);
-    this.sinB = Math.sin(bearingRad);
+    // Invert bearing to match MapLibre's rotation direction
+    this.cosB = Math.cos(-bearingRad);
+    this.sinB = Math.sin(-bearingRad);
   }
 
   /** Convert geographic coordinate to screen position */
@@ -141,4 +146,21 @@ export class MercatorProjection {
     const n = Math.PI - (2 * Math.PI * mercY) / this.worldSize;
     return RAD2DEG * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
   }
+
+  // ===== World Coordinate Helpers for Matrix Transform =====
+
+  /**
+   * Convert geographic coordinate to "World Pixel" at BASE_ZOOM.
+   * This is used for caching paths that don't change.
+   */
+  geoToWorld(lng: number, lat: number): { x: number; y: number } {
+    const x = ((lng + 180) / 360) * BASE_WORLD_SIZE;
+    const latRad = lat * DEG2RAD;
+    const y =
+      ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) /
+        2) *
+      BASE_WORLD_SIZE;
+    return { x, y };
+  }
+
 }

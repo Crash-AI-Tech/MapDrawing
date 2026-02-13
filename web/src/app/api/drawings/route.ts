@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
-import { getDrawingsInViewport } from '@/lib/db/queries';
+import { getDrawingsInViewportPaginated } from '@/lib/db/queries';
 
 /**
  * GET /api/drawings — fetch strokes within a viewport bounds (D1).
@@ -12,13 +12,31 @@ export async function GET(request: Request) {
   const maxLat = parseFloat(url.searchParams.get('maxLat') ?? '0');
   const minLng = parseFloat(url.searchParams.get('minLng') ?? '0');
   const maxLng = parseFloat(url.searchParams.get('maxLng') ?? '0');
+  const limit = parseInt(url.searchParams.get('limit') ?? '300', 10);
+  const cursorCreatedAt = url.searchParams.get('cursorCreatedAt');
+  const cursorId = url.searchParams.get('cursorId');
 
   if (minLat === 0 && maxLat === 0 && minLng === 0 && maxLng === 0) {
     return Response.json([]);
   }
 
   try {
-    const rows = await getDrawingsInViewport(minLat, maxLat, minLng, maxLng);
+    const { rows, nextCursor } = await getDrawingsInViewportPaginated(
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
+      {
+        limit,
+        cursor:
+          cursorCreatedAt && cursorId
+            ? {
+                createdAt: parseInt(cursorCreatedAt, 10),
+                id: cursorId,
+              }
+            : undefined,
+      }
+    );
 
     // Transform DB rows to StrokeData format
     const strokes = rows.map((row) => ({
@@ -42,7 +60,10 @@ export async function GET(request: Request) {
       meta: row.meta ? JSON.parse(row.meta) : null,
     }));
 
-    return Response.json(strokes);
+    return Response.json({
+      items: strokes,
+      nextCursor,
+    });
   } catch (e) {
     console.error('[API /drawings] Server error:', e);
     return Response.json({ error: 'Internal server error' }, { status: 500 });

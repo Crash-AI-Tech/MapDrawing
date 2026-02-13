@@ -1,17 +1,20 @@
 /**
- * MapScreen — Core map + drawing screen.
+ * MapScreen — Core map + drawing screen (v2 — Tile-based Rendering).
  *
- * Architecture matches the web version:
- * - MapLibre GL Native (full-screen map with OpenFreeMap Liberty tiles)
- * - Skia Canvas overlay (composite + active layers)
- * - Geo-coordinate storage (screen coords → geo on endStroke, geo → screen on render)
+ * Architecture:
+ * - MapLibre GL Native (full-screen map)
+ * - Skia Canvas overlay with TileRenderer (bitmap-cached spatial tiles)
+ * - Geo-coordinate storage (screen → geo on endStroke, geo → screen on render)
  * - Zoom-dependent stroke visibility and scaling
  * - InkManager + HistoryManager for game mechanics
+ * - Pins via MapLibre ShapeSource (GPU vector layer, not N×PointAnnotation)
  *
- * Key differences from web:
- * - Uses Skia instead of Canvas2D for rendering
- * - Uses react-native-gesture-handler instead of PointerEvents
- * - Coordinate conversion via local Mercator math (sync) instead of MapLibre bridge (async)
+ * Performance over v1:
+ * - Spatial tile cache: only dirty tiles re-render, not all O(N) strokes
+ * - Incremental stroke cache: SkPath computed once per stroke
+ * - Paint reuse: no per-frame Paint construction
+ * - Spray progressive degradation
+ * - Strokes in ref (not state): no React reconciliation for large arrays
  */
 
 import React, {
@@ -27,6 +30,8 @@ import {
   Text,
   Dimensions,
   Alert,
+  TouchableOpacity,
+  Image,
   type LayoutChangeEvent,
 } from 'react-native';
 import MapLibreGL, { type CameraRef } from '@maplibre/maplibre-react-native';
@@ -36,18 +41,30 @@ import {
   Group,
   Paint,
   Skia,
+  Picture,
+  PaintStyle,
+  StrokeCap,
+  StrokeJoin,
+  BlendMode,
   type SkPath,
+  type SkPicture,
 } from '@shopify/react-native-skia';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import DrawingToolbar from '@/components/DrawingToolbar';
 import ZoomControls from '@/components/ZoomControls';
 import PinPlacer from '@/components/PinPlacer';
+import MapPinOverlay from '@/components/MapPinOverlay';
+import type { PinData } from '@/components/MapPinOverlay';
+import { useRouter } from 'expo-router';
 import {
   fetchDrawings,
   fetchPins,
   saveDrawings,
   createPin,
   type MapPin,
+  type PinCluster,
+  type PinItem,
+  type PageCursor,
 } from '@/lib/api';
 import {
   BRUSH_IDS,
@@ -67,12 +84,11 @@ import {
   MercatorProjection,
   InkManager,
   HistoryManager,
+  TileRenderer,
   buildBezierPath,
   buildLinearPath,
-  generateSprayParticles,
-  buildSprayPaths,
-  hashString,
   generateId,
+  BASE_ZOOM,
 } from '@/core';
 import type { StrokeData, StrokePoint, CameraState } from '@/core/types';
 
@@ -81,15 +97,12 @@ import type { StrokeData, StrokePoint, CameraState } from '@/core/types';
 // ========================
 
 MapLibreGL.setAccessToken(null);
-
-/** OpenFreeMap Liberty — same tiles as web version, free, no API key */
 const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
 // ========================
-// Brush Rendering Configuration
+// Active Brush Config (only used for the live stroke being drawn)
 // ========================
 
-/** SkEnum string literals (react-native-skia v2 uses Uncapitalize<keyof T>) */
 type SkStrokeCap = 'butt' | 'round' | 'square';
 type SkStrokeJoin = 'bevel' | 'miter' | 'round';
 type SkBlendMode =
@@ -101,101 +114,67 @@ type SkBlendMode =
   | 'difference' | 'exclusion' | 'multiply'
   | 'hue' | 'saturation' | 'color' | 'luminosity';
 
-interface BrushRenderConfig {
+interface ActiveBrushConfig {
   buildPath: (points: { x: number; y: number }[]) => SkPath;
   strokeWidth: (baseSize: number) => number;
   opacity: number;
   blendMode: SkBlendMode;
   strokeCap: SkStrokeCap;
   strokeJoin: SkStrokeJoin;
-  /** Marker uses a layer group for non-stacking effect */
   useLayer?: boolean;
   layerOpacity?: number;
-  /** Spray brush renders particles instead of a path */
   isSpray?: boolean;
 }
 
-function getBrushRenderConfig(brushId: string): BrushRenderConfig {
+function getActiveBrushConfig(brushId: string): ActiveBrushConfig {
   switch (brushId) {
     case BRUSH_IDS.PENCIL:
       return {
-        buildPath: buildBezierPath,
-        strokeWidth: (s) => s,
-        opacity: 1.0,
-        blendMode: 'srcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
+        buildPath: buildBezierPath, strokeWidth: (s) => s,
+        opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
       };
-
     case BRUSH_IDS.MARKER:
-      // Web: OffscreenCanvas at opacity=1, composite at globalAlpha=0.3
-      // Skia: Group layer with Paint opacity=0.3, inner path at opacity=1
       return {
-        buildPath: buildLinearPath,
-        strokeWidth: (s) => s * 3,
-        opacity: 1.0,
-        blendMode: 'srcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
-        useLayer: true,
-        layerOpacity: 0.3,
+        buildPath: buildLinearPath, strokeWidth: (s) => s * 3,
+        opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
+        useLayer: true, layerOpacity: 0.3,
       };
-
     case BRUSH_IDS.HIGHLIGHTER:
-      // Web: globalCompositeOperation='multiply', lineCap='square', size*2.5, opacity=0.4
       return {
-        buildPath: buildLinearPath,
-        strokeWidth: (s) => s * 2.5,
-        opacity: 0.4,
-        blendMode: 'multiply',
-        strokeCap: 'butt',
-        strokeJoin: 'bevel',
+        buildPath: buildLinearPath, strokeWidth: (s) => s * 2.5,
+        opacity: 0.4, blendMode: 'multiply', strokeCap: 'butt', strokeJoin: 'bevel',
       };
-
     case BRUSH_IDS.ERASER:
       return {
-        buildPath: buildLinearPath,
-        strokeWidth: (s) => s * 5,
-        opacity: 1.0,
-        blendMode: 'clear',
-        strokeCap: 'round',
-        strokeJoin: 'round',
+        buildPath: buildLinearPath, strokeWidth: (s) => s * 5,
+        opacity: 1.0, blendMode: 'clear', strokeCap: 'round', strokeJoin: 'round',
       };
-
     case BRUSH_IDS.SPRAY:
       return {
-        buildPath: buildLinearPath,
-        strokeWidth: (s) => s,
-        opacity: 0.5,
-        blendMode: 'srcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
+        buildPath: buildLinearPath, strokeWidth: (s) => s,
+        opacity: 0.5, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
         isSpray: true,
       };
-
     default:
       return {
-        buildPath: buildBezierPath,
-        strokeWidth: (s) => s,
-        opacity: 1.0,
-        blendMode: 'srcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
+        buildPath: buildBezierPath, strokeWidth: (s) => s,
+        opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
       };
   }
 }
 
 // ========================
-// Rendered stroke (with precomputed Skia paths)
+// Pagination & Interaction Constants
 // ========================
 
-interface RenderedStroke {
-  data: StrokeData;
-  path: SkPath;
-  screenSize: number;
-  config: BrushRenderConfig;
-  sprayPaths?: { path: SkPath; alpha: number }[];
-}
+const DRAWINGS_PAGE_SIZE = 250;
+const DRAWINGS_MAX_PAGES = 6;
+const DRAWINGS_MAX_CACHE = 2500;
+const PINS_PAGE_SIZE = 120;
+const PINS_MAX_PAGES = 4;
+const PINS_MAX_CACHE = 800;
+const CAMERA_UPDATE_THROTTLE_MS = 16;
+const INTERACTION_SETTLE_MS = 120;
 
 // ========================
 // Main Component
@@ -208,7 +187,7 @@ export default function MapScreen() {
     return { width, height };
   });
 
-  // ===== Camera state (tracked from MapView events) =====
+  // ===== Camera State =====
   const [cameraState, setCameraState] = useState<CameraState>({
     center: MAP_DEFAULT_CENTER as [number, number],
     zoom: MAP_DEFAULT_ZOOM,
@@ -216,10 +195,8 @@ export default function MapScreen() {
     pitch: 0,
   });
 
-  // ===== Projection (updated synchronously during render) =====
+  // ===== Projection =====
   const projectionRef = useRef(new MercatorProjection());
-
-  // Update projection synchronously — runs before useMemo
   projectionRef.current.update(
     cameraState.center,
     cameraState.zoom,
@@ -228,50 +205,68 @@ export default function MapScreen() {
     cameraState.bearing
   );
 
-  // ===== Engine managers (refs, no re-renders) =====
+  // ===== Engine Managers =====
   const inkManagerRef = useRef<InkManager | null>(null);
   const historyRef = useRef<HistoryManager | null>(null);
-
-  // ===== Camera ref for programmatic zoom =====
   const cameraRef = useRef<CameraRef | null>(null);
 
-  // ===== Reactive state =====
-  const [mode, setMode] = useState<'hand' | 'draw' | 'pin'>('draw');
-  const [strokes, setStrokes] = useState<StrokeData[]>([]);
+  // ===== Tile Renderer (core of scheme A) =====
+  const tileRendererRef = useRef(new TileRenderer());
+
+  // ===== Reactive State =====
+  const [mode, setMode] = useState<'hand' | 'draw' | 'pin'>('hand');
   const [ink, setInk] = useState(100);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
-  // ===== Pin state =====
-  const [pins, setPins] = useState<MapPin[]>([]);
+  // ===== Strokes: ref-based (no React state for big arrays) =====
+  const strokesRef = useRef<Map<string, StrokeData>>(new Map());
+  const [strokeVersion, setStrokeVersion] = useState(0);
+  const bumpStrokeVersion = useCallback(() => setStrokeVersion((v) => v + 1), []);
+
+  // ===== Pin State (flat arrays for MapPinOverlay) =====
+  const [visiblePins, setVisiblePins] = useState<PinData[]>([]);
+  const pinCacheRef = useRef<Map<string, MapPin>>(new Map());
+  const pinLruRef = useRef<Map<string, number>>(new Map());
+
   const [pinClickCoords, setPinClickCoords] = useState<{
     lng: number;
     lat: number;
   } | null>(null);
   const [pinLoading, setPinLoading] = useState(false);
 
-  // ===== Remote data loading state =====
-  const [loadedStrokeIds, setLoadedStrokeIds] = useState<Set<string>>(
-    new Set()
-  );
-  const viewportLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const router = useRouter();
 
-  // ===== Tool state =====
+  // ===== Remote Data Loading =====
+  const loadedStrokeIdsRef = useRef<Set<string>>(new Set());
+  const strokeLruRef = useRef<Map<string, number>>(new Map());
+  const lruTickRef = useRef(0);
+  const viewportLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ===== Map Interaction State =====
+  const [isMapInteracting, setIsMapInteracting] = useState(false);
+  const isMapInteractingRef = useRef(false);
+  const interactionEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCameraUpdateAtRef = useRef(0);
+
+  // ===== Stable Snapshot for Interaction =====
+  const [stableSnapshot, setStableSnapshot] = useState<SkPicture | null>(null);
+  const stableSnapshotCameraRef = useRef<CameraState | null>(null);
+
+  // ===== Tool State =====
   const [currentBrush, setCurrentBrush] = useState<BrushId>(BRUSH_IDS.PENCIL);
   const [currentColor, setCurrentColor] = useState<string>(DEFAULT_COLOR);
   const [currentSize, setCurrentSize] = useState<number>(DEFAULT_SIZE);
   const [currentOpacity, setCurrentOpacity] = useState<number>(DEFAULT_OPACITY);
 
-  // ===== Active drawing state =====
+  // ===== Active Drawing State =====
   const currentPointsRef = useRef<
     { x: number; y: number; pressure: number; timestamp: number }[]
   >([]);
   const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
   const inkAccumulatorRef = useRef(0);
 
-  // ===== Refs for gesture callbacks (avoid stale closures) =====
+  // ===== Refs for Gesture Callbacks =====
   const currentBrushRef = useRef(currentBrush);
   const currentColorRef = useRef(currentColor);
   const currentSizeRef = useRef(currentSize);
@@ -286,133 +281,249 @@ export default function MapScreen() {
   cameraZoomRef.current = cameraState.zoom;
   canDrawRef.current = mode === 'draw' && cameraState.zoom >= MIN_DRAW_ZOOM;
 
-  // ===== Initialize managers =====
+  // ===== Initialize Managers =====
   useEffect(() => {
     inkManagerRef.current = new InkManager((inkValue) => setInk(inkValue));
     historyRef.current = new HistoryManager(100, (canU, canR) => {
       setCanUndo(canU);
       setCanRedo(canR);
     });
-
     return () => {
       inkManagerRef.current?.dispose();
+      tileRendererRef.current.clear();
     };
   }, []);
 
-  // ===== Viewport loading: fetch drawings + pins from API on camera change =====
+  // ===== Viewport loading: paginated fetch + TileRenderer update =====
   const loadViewport = useCallback(async () => {
     const proj = projectionRef.current;
     const bounds = proj.getViewportBounds();
     const zoom = cameraZoomRef.current;
 
-    try {
-      const [remoteStrokes, remotePins] = await Promise.all([
-        fetchDrawings({
-          minLat: bounds.minLat,
-          maxLat: bounds.maxLat,
-          minLng: bounds.minLng,
-          maxLng: bounds.maxLng,
-          zoom,
-        }),
-        fetchPins({
-          minLat: bounds.minLat,
-          maxLat: bounds.maxLat,
-          minLng: bounds.minLng,
-          maxLng: bounds.maxLng,
-        }),
-      ]);
+    const expandedBounds = {
+      minLng: bounds.minLng - (bounds.maxLng - bounds.minLng) * 0.5,
+      maxLng: bounds.maxLng + (bounds.maxLng - bounds.minLng) * 0.5,
+      minLat: bounds.minLat - (bounds.maxLat - bounds.minLat) * 0.5,
+      maxLat: bounds.maxLat + (bounds.maxLat - bounds.minLat) * 0.5,
+    };
 
-      // Merge remote strokes (avoid duplicating locally-created ones)
-      if (remoteStrokes.length > 0) {
-        setStrokes((prev) => {
-          const existingIds = new Set(prev.map((s) => s.id));
-          const newRemote = remoteStrokes.filter(
-            (s) => !existingIds.has(s.id)
-          );
-          if (newRemote.length === 0) return prev;
-          return [...prev, ...newRemote];
+    const overlapsBounds = (
+      itemBounds: { minLng: number; maxLng: number; minLat: number; maxLat: number },
+      queryBounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }
+    ) => !(
+      itemBounds.maxLng < queryBounds.minLng ||
+      itemBounds.minLng > queryBounds.maxLng ||
+      itemBounds.maxLat < queryBounds.minLat ||
+      itemBounds.minLat > queryBounds.maxLat
+    );
+
+    const touchStroke = (id: string) => {
+      lruTickRef.current += 1;
+      strokeLruRef.current.set(id, lruTickRef.current);
+    };
+    const touchPin = (id: string) => {
+      lruTickRef.current += 1;
+      pinLruRef.current.set(id, lruTickRef.current);
+    };
+
+    try {
+      // --- Load Strokes (paginated) ---
+      let strokeCursor: PageCursor | null = null;
+      let strokePageCount = 0;
+      let newStrokesAdded = false;
+
+      do {
+        const page = await fetchDrawings({
+          minLat: bounds.minLat, maxLat: bounds.maxLat,
+          minLng: bounds.minLng, maxLng: bounds.maxLng,
+          zoom, limit: DRAWINGS_PAGE_SIZE, cursor: strokeCursor,
         });
-        setLoadedStrokeIds((prev) => {
-          const next = new Set(prev);
-          remoteStrokes.forEach((s) => next.add(s.id));
-          return next;
-        });
+        for (const stroke of page.items) {
+          if (!strokesRef.current.has(stroke.id)) newStrokesAdded = true;
+          strokesRef.current.set(stroke.id, stroke);
+          loadedStrokeIdsRef.current.add(stroke.id);
+          touchStroke(stroke.id);
+        }
+        strokeCursor = page.nextCursor;
+        strokePageCount += 1;
+      } while (strokeCursor && strokePageCount < DRAWINGS_MAX_PAGES);
+
+      // LRU Eviction
+      if (strokesRef.current.size > DRAWINGS_MAX_CACHE) {
+        const candidates = Array.from(strokeLruRef.current.entries())
+          .sort((a, b) => a[1] - b[1]);
+        for (const [strokeId] of candidates) {
+          if (strokesRef.current.size <= DRAWINGS_MAX_CACHE) break;
+          const stroke = strokesRef.current.get(strokeId);
+          if (!stroke) continue;
+          if (overlapsBounds(stroke.bounds, expandedBounds)) continue;
+          strokesRef.current.delete(strokeId);
+          strokeLruRef.current.delete(strokeId);
+          loadedStrokeIdsRef.current.delete(strokeId);
+          tileRendererRef.current.removeStroke(strokeId);
+        }
       }
 
-      // Replace pins (always full set from server)
-      setPins(remotePins);
+      // Update tile renderer incrementally
+      tileRendererRef.current.updateStrokes(
+        Array.from(strokesRef.current.values())
+      );
+      if (newStrokesAdded) bumpStrokeVersion();
+
+      // --- Load Pins (paginated/clustered) ---
+      const pinFirstPage = await fetchPins({
+        minLat: bounds.minLat, maxLat: bounds.maxLat,
+        minLng: bounds.minLng, maxLng: bounds.maxLng,
+        zoom, limit: PINS_PAGE_SIZE,
+      });
+
+      if (pinFirstPage.mode === 'clustered') {
+        // At low zoom, clustered pins — show cluster markers as pins
+        const clusters = pinFirstPage.items.filter(
+          (item): item is PinCluster => item.type === 'cluster'
+        );
+        setVisiblePins(
+          clusters.map((c) => ({
+            id: c.id,
+            userId: '',
+            userName: '',
+            lng: c.lng,
+            lat: c.lat,
+            message: `${c.count} pins`,
+            color: '#1d4ed8',
+            createdAt: 0,
+          }))
+        );
+      } else {
+        let pinCursor = pinFirstPage.nextCursor;
+        let pinPageCount = 1;
+        const rawPins: PinItem[] = pinFirstPage.items.filter(
+          (item): item is PinItem => item.type === 'pin'
+        );
+        while (pinCursor && pinPageCount < PINS_MAX_PAGES) {
+          const nextPage = await fetchPins({
+            minLat: bounds.minLat, maxLat: bounds.maxLat,
+            minLng: bounds.minLng, maxLng: bounds.maxLng,
+            zoom, limit: PINS_PAGE_SIZE, cursor: pinCursor,
+          });
+          rawPins.push(
+            ...nextPage.items.filter((i): i is PinItem => i.type === 'pin')
+          );
+          pinCursor = nextPage.nextCursor;
+          pinPageCount += 1;
+        }
+
+        rawPins.forEach((pin) => {
+          pinCacheRef.current.set(pin.id, pin);
+          touchPin(pin.id);
+        });
+
+        const filteredPins = Array.from(pinCacheRef.current.values()).filter(
+          (pin) =>
+            pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
+            pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
+        );
+
+        setVisiblePins(
+          filteredPins.map((pin) => ({
+            id: pin.id,
+            userId: pin.userId,
+            userName: pin.userName ?? '',
+            lng: pin.lng,
+            lat: pin.lat,
+            message: pin.message ?? '',
+            color: pin.color ?? '#E63946',
+            createdAt: pin.createdAt,
+          }))
+        );
+
+        // Pin LRU Eviction
+        if (pinCacheRef.current.size > PINS_MAX_CACHE) {
+          const pinCandidates = Array.from(pinLruRef.current.entries())
+            .sort((a, b) => a[1] - b[1]);
+          for (const [pinId] of pinCandidates) {
+            if (pinCacheRef.current.size <= PINS_MAX_CACHE) break;
+            const pin = pinCacheRef.current.get(pinId);
+            if (!pin) continue;
+            if (
+              pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
+              pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
+            ) continue;
+            pinCacheRef.current.delete(pinId);
+            pinLruRef.current.delete(pinId);
+          }
+        }
+      }
     } catch (e) {
       console.warn('[loadViewport] Failed:', e);
     }
-  }, []);
+  }, [bumpStrokeVersion]);
 
-  // Trigger initial load
+  // Initial load
   useEffect(() => {
-    // Small delay to let camera settle
     const timer = setTimeout(loadViewport, 500);
     return () => clearTimeout(timer);
   }, [loadViewport]);
 
-  // ===== Render historical strokes (recompute on camera or strokes change) =====
-  const renderedStrokes = useMemo<RenderedStroke[]>(() => {
+  // ===== Tile-based Picture (idle: composed from cached tile images) =====
+  const tilePicture = useMemo(() => {
+    if (isMapInteracting) return null;
+    void strokeVersion; // dependency to re-render on stroke changes
+
+    return tileRendererRef.current.renderFrame(
+      cameraState.center,
+      cameraState.zoom,
+      screenSize.width,
+      screenSize.height,
+      cameraState.bearing
+    );
+  }, [isMapInteracting, strokeVersion, cameraState.center, cameraState.zoom, cameraState.bearing, screenSize]);
+
+  // ===== Stable Snapshot for Interaction =====
+  useEffect(() => {
+    if (!isMapInteracting && tilePicture) {
+      setStableSnapshot(tilePicture);
+      stableSnapshotCameraRef.current = {
+        center: [...cameraState.center] as [number, number],
+        zoom: cameraState.zoom,
+        bearing: cameraState.bearing,
+        pitch: cameraState.pitch,
+      };
+    }
+  }, [tilePicture, isMapInteracting, cameraState]);
+
+  // ===== Interaction Transform =====
+  const interactionTransform = useMemo(() => {
+    const stableCamera = stableSnapshotCameraRef.current;
+    if (!isMapInteracting || !stableCamera || !stableSnapshot) return null;
+
+    const currentScale = Math.pow(2, cameraState.zoom - BASE_ZOOM);
+    const stableScale = Math.pow(2, stableCamera.zoom - BASE_ZOOM);
+    const zoomRatio = currentScale / Math.max(stableScale, 1e-6);
+
     const proj = projectionRef.current;
-    const currentZoom = cameraState.zoom;
+    const stableCenterW = proj.geoToWorld(stableCamera.center[0], stableCamera.center[1]);
+    const currentCenterW = proj.geoToWorld(cameraState.center[0], cameraState.center[1]);
 
-    return strokes
-      .filter((s) => {
-        // Zoom visibility rule (web: currentZoom >= createdZoom - STROKE_HIDE_ZOOM_DIFF)
-        if (currentZoom < s.createdZoom - STROKE_HIDE_ZOOM_DIFF) return false;
+    const dx = (stableCenterW.x - currentCenterW.x) * currentScale;
+    const dy = (stableCenterW.y - currentCenterW.y) * currentScale;
 
-        // Viewport bounds check
-        const bounds = proj.getViewportBounds();
-        if (
-          s.bounds.maxLng < bounds.minLng ||
-          s.bounds.minLng > bounds.maxLng
-        )
-          return false;
-        if (
-          s.bounds.maxLat < bounds.minLat ||
-          s.bounds.minLat > bounds.maxLat
-        )
-          return false;
+    return {
+      zoomScale: zoomRatio,
+      dx,
+      dy,
+      cx: screenSize.width / 2,
+      cy: screenSize.height / 2,
+    };
+  }, [isMapInteracting, stableSnapshot, cameraState, screenSize]);
 
-        return true;
-      })
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((s) => {
-        const config = getBrushRenderConfig(s.brushId);
-
-        // Zoom-scale: screenSize = storedSize * 2^(currentZoom - createdZoom)
-        const zoomScale = Math.pow(2, currentZoom - s.createdZoom);
-        const scaledSize = config.strokeWidth(s.size) * zoomScale;
-
-        // Convert geo points → screen points
-        const screenPoints = s.points.map((p) => {
-          const sp = proj.geoToScreen(p.x, p.y);
-          return { x: sp.x, y: sp.y, pressure: p.pressure };
-        });
-
-        const rendered: RenderedStroke = {
-          data: s,
-          path: config.buildPath(screenPoints),
-          screenSize: Math.max(0.5, scaledSize),
-          config,
-        };
-
-        // Generate spray particles (bucketed for efficient rendering)
-        if (config.isSpray) {
-          const radius = s.size * zoomScale * 0.75;
-          const particles = generateSprayParticles(
-            screenPoints,
-            radius,
-            hashString(s.id)
-          );
-          rendered.sprayPaths = buildSprayPaths(particles);
-        }
-
-        return rendered;
-      });
-  }, [strokes, cameraState, screenSize]);
+  useEffect(() => {
+    return () => {
+      if (interactionEndTimerRef.current) {
+        clearTimeout(interactionEndTimerRef.current);
+      }
+    };
+  }, []);
 
   // ===== Finish stroke (convert to geo + store) =====
   const finishStroke = useCallback(() => {
@@ -466,7 +577,11 @@ export default function MapScreen() {
       createdAt: Date.now(),
     };
 
-    setStrokes((prev) => [...prev, stroke]);
+    // Store in ref + tile renderer (no React state for big arrays)
+    strokesRef.current.set(stroke.id, stroke);
+    tileRendererRef.current.addStroke(stroke);
+    bumpStrokeVersion();
+
     historyRef.current?.push({ type: 'ADD_STROKE', stroke });
 
     // Persist to server (fire-and-forget, don't block UI)
@@ -477,7 +592,7 @@ export default function MapScreen() {
     currentPointsRef.current = [];
     inkAccumulatorRef.current = 0;
     setCurrentPath(null);
-  }, []);
+  }, [bumpStrokeVersion]);
 
   // ===== Gesture handler =====
   const pan = Gesture.Pan()
@@ -492,7 +607,7 @@ export default function MapScreen() {
       ];
       inkAccumulatorRef.current = 0;
 
-      const config = getBrushRenderConfig(currentBrushRef.current);
+      const config = getActiveBrushConfig(currentBrushRef.current);
       const path = config.buildPath([{ x: g.x, y: g.y }]);
       setCurrentPath(path);
     })
@@ -535,7 +650,7 @@ export default function MapScreen() {
       points.push(newPoint);
 
       // Rebuild Skia path from all points (Bézier or linear based on brush)
-      const config = getBrushRenderConfig(currentBrushRef.current);
+      const config = getActiveBrushConfig(currentBrushRef.current);
       const path = config.buildPath(points);
       setCurrentPath(path);
     })
@@ -550,22 +665,28 @@ export default function MapScreen() {
     if (!cmd) return;
 
     if (cmd.type === 'ADD_STROKE') {
-      setStrokes((prev) => prev.filter((s) => s.id !== cmd.stroke.id));
+      strokesRef.current.delete(cmd.stroke.id);
+      tileRendererRef.current.removeStroke(cmd.stroke.id);
     } else if (cmd.type === 'DELETE_STROKE') {
-      setStrokes((prev) => [...prev, cmd.stroke]);
+      strokesRef.current.set(cmd.stroke.id, cmd.stroke);
+      tileRendererRef.current.addStroke(cmd.stroke);
     }
-  }, []);
+    bumpStrokeVersion();
+  }, [bumpStrokeVersion]);
 
   const handleRedo = useCallback(() => {
     const cmd = historyRef.current?.redo();
     if (!cmd) return;
 
     if (cmd.type === 'ADD_STROKE') {
-      setStrokes((prev) => [...prev, cmd.stroke]);
+      strokesRef.current.set(cmd.stroke.id, cmd.stroke);
+      tileRendererRef.current.addStroke(cmd.stroke);
     } else if (cmd.type === 'DELETE_STROKE') {
-      setStrokes((prev) => prev.filter((s) => s.id !== cmd.stroke.id));
+      strokesRef.current.delete(cmd.stroke.id);
+      tileRendererRef.current.removeStroke(cmd.stroke.id);
     }
-  }, []);
+    bumpStrokeVersion();
+  }, [bumpStrokeVersion]);
 
   // ===== Layout =====
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
@@ -626,7 +747,24 @@ export default function MapScreen() {
           message: data.message,
           color: data.color,
         });
-        setPins((prev) => [...prev, pin]);
+        pinCacheRef.current.set(pin.id, pin);
+        lruTickRef.current += 1;
+        pinLruRef.current.set(pin.id, lruTickRef.current);
+
+        // Add pin to visible list
+        setVisiblePins((prev) => [
+          ...prev,
+          {
+            id: pin.id,
+            userId: pin.userId,
+            userName: pin.userName ?? '',
+            lng: pin.lng,
+            lat: pin.lat,
+            message: pin.message ?? '',
+            color: pin.color ?? '#E63946',
+            createdAt: pin.createdAt,
+          },
+        ]);
         setPinClickCoords(null);
       } catch (e: any) {
         // Refund ink on failure
@@ -644,8 +782,6 @@ export default function MapScreen() {
   }, []);
 
   // ===== Map camera change handler =====
-  const changingThrottleRef = useRef(false);
-
   const updateCamera = useCallback((feature: any) => {
     try {
       const coords = feature?.geometry?.coordinates;
@@ -665,11 +801,17 @@ export default function MapScreen() {
 
   const handleRegionChanging = useCallback(
     (feature: any) => {
-      if (changingThrottleRef.current) return;
-      changingThrottleRef.current = true;
-      setTimeout(() => {
-        changingThrottleRef.current = false;
-      }, 50);
+      if (!isMapInteractingRef.current) {
+        isMapInteractingRef.current = true;
+        setIsMapInteracting(true);
+      }
+
+      const now = Date.now();
+      if (now - lastCameraUpdateAtRef.current < CAMERA_UPDATE_THROTTLE_MS) {
+        return;
+      }
+      lastCameraUpdateAtRef.current = now;
+
       updateCamera(feature);
     },
     [updateCamera]
@@ -678,6 +820,14 @@ export default function MapScreen() {
   const handleRegionDidChange = useCallback(
     (feature: any) => {
       updateCamera(feature);
+
+      if (interactionEndTimerRef.current) {
+        clearTimeout(interactionEndTimerRef.current);
+      }
+      interactionEndTimerRef.current = setTimeout(() => {
+        isMapInteractingRef.current = false;
+        setIsMapInteracting(false);
+      }, INTERACTION_SETTLE_MS);
 
       // Debounced viewport loading (matches web: VIEWPORT_LOAD_DEBOUNCE = 300ms)
       if (viewportLoadTimerRef.current) {
@@ -692,7 +842,7 @@ export default function MapScreen() {
 
   // ===== Active brush config for current stroke rendering =====
   const activeBrushConfig = useMemo(
-    () => getBrushRenderConfig(currentBrush),
+    () => getActiveBrushConfig(currentBrush),
     [currentBrush]
   );
 
@@ -702,15 +852,28 @@ export default function MapScreen() {
 
   return (
     <View style={styles.page} onLayout={handleLayout}>
+      {/* ===== Top Bar Controls ===== */}
+      <View style={styles.topControls}>
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => router.push('/(app)/profile')}
+        >
+          <Image
+            source={require('@/assets/images/react-logo.png')}
+            style={styles.avatarImage}
+          />
+        </TouchableOpacity>
+      </View>
       {/* ===== MapLibre GL Native ===== */}
       <MapLibreGL.MapView
         style={styles.map}
         mapStyle={MAP_STYLE_URL}
         logoEnabled={false}
         attributionEnabled={false}
+        compassEnabled={false}
         scrollEnabled={mode === 'hand' || mode === 'pin'}
         zoomEnabled={mode === 'hand' || mode === 'pin'}
-        rotateEnabled={mode === 'hand' || mode === 'pin'}
+        rotateEnabled={false}
         pitchEnabled={false}
         onRegionIsChanging={handleRegionChanging}
         onRegionDidChange={handleRegionDidChange}
@@ -724,23 +887,7 @@ export default function MapScreen() {
           }}
         />
 
-        {/* Render pin markers */}
-        {pins.map((pin) => (
-          <MapLibreGL.PointAnnotation
-            key={pin.id}
-            id={pin.id}
-            coordinate={[pin.lng, pin.lat]}
-            title={pin.userName}
-            snippet={pin.message}
-          >
-            <View
-              style={[styles.pinMarker, { backgroundColor: pin.color }]}
-            >
-              <Text style={styles.pinEmoji}>📌</Text>
-            </View>
-            <MapLibreGL.Callout title={`${pin.userName}: ${pin.message}`} />
-          </MapLibreGL.PointAnnotation>
-        ))}
+        {/* Pins now rendered via MapPinOverlay above the Skia canvas */}
       </MapLibreGL.MapView>
 
       {/* ===== Skia Drawing Overlay ===== */}
@@ -750,72 +897,34 @@ export default function MapScreen() {
           pointerEvents={mode === 'draw' ? 'auto' : 'none'}
         >
           <Canvas style={styles.canvas}>
-            {/* Historical strokes */}
-            {renderedStrokes.map((rs) => {
-              // Spray: render particle paths grouped by alpha
-              if (rs.config.isSpray && rs.sprayPaths) {
-                return (
-                  <Group key={rs.data.id}>
-                    {rs.sprayPaths.map((sp, i) => (
-                      <Path
-                        key={i}
-                        path={sp.path}
-                        color={rs.data.color}
-                        style="fill"
-                        opacity={rs.data.opacity * sp.alpha}
-                      />
-                    ))}
-                  </Group>
-                );
-              }
+            {/* Historical strokes (tile-cached) */}
+            {!isMapInteracting && tilePicture && (
+              <Picture picture={tilePicture} />
+            )}
 
-              // Marker: layer group for non-stacking effect
-              if (rs.config.useLayer) {
-                return (
-                  <Group
-                    key={rs.data.id}
-                    layer={
-                      <Paint opacity={rs.config.layerOpacity ?? 0.3} />
-                    }
-                  >
-                    <Path
-                      path={rs.path}
-                      color={rs.data.color}
-                      style="stroke"
-                      strokeWidth={rs.screenSize}
-                      strokeCap={rs.config.strokeCap}
-                      strokeJoin={rs.config.strokeJoin}
-                      opacity={1.0}
-                      blendMode={rs.config.blendMode}
-                    />
-                  </Group>
-                );
-              }
-
-              // Regular strokes (pencil, highlighter, eraser)
-              return (
-                <Path
-                  key={rs.data.id}
-                  path={rs.path}
-                  color={rs.data.color}
-                  style="stroke"
-                  strokeWidth={rs.screenSize}
-                  strokeCap={rs.config.strokeCap}
-                  strokeJoin={rs.config.strokeJoin}
-                  opacity={rs.data.opacity * rs.config.opacity}
-                  blendMode={rs.config.blendMode}
-                />
-              );
-            })}
+            {/* Interaction snapshot transform (no per-stroke redraw while panning/zooming) */}
+            {isMapInteracting && stableSnapshot && interactionTransform && (
+              <Group
+                transform={[
+                  { translateX: interactionTransform.dx },
+                  { translateY: interactionTransform.dy },
+                  { translateX: interactionTransform.cx },
+                  { translateY: interactionTransform.cy },
+                  { scale: interactionTransform.zoomScale },
+                  { translateX: -interactionTransform.cx },
+                  { translateY: -interactionTransform.cy },
+                ]}
+              >
+                <Picture picture={stableSnapshot} />
+              </Group>
+            )}
 
             {/* Current active stroke */}
             {currentPath &&
               (activeBrushConfig.useLayer ? (
                 <Group
                   layer={
-                    <Paint
-                      opacity={activeBrushConfig.layerOpacity ?? 0.3}
-                    />
+                    <Paint opacity={activeBrushConfig.layerOpacity ?? 0.3} />
                   }
                 >
                   <Path
@@ -844,6 +953,17 @@ export default function MapScreen() {
           </Canvas>
         </View>
       </GestureDetector>
+
+      {/* ===== Pin Overlay (above Skia canvas) ===== */}
+      {cameraState.zoom >= MIN_PIN_ZOOM && visiblePins.length > 0 && (
+        <MapPinOverlay
+          pins={visiblePins}
+          projection={projectionRef.current}
+          cameraState={cameraState}
+          screenWidth={screenSize.width}
+          screenHeight={screenSize.height}
+        />
+      )}
 
       {/* ===== UI Overlays ===== */}
 
@@ -911,6 +1031,7 @@ export default function MapScreen() {
         maxInk={100}
         currentZoom={cameraState.zoom}
       />
+      {/* Pin details are now shown inline via MapPinOverlay callout */}
     </View>
   );
 }
@@ -919,6 +1040,30 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     backgroundColor: '#f0f0f0',
+  },
+  topControls: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 200,
+  },
+  profileBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
   },
   map: {
     flex: 1,
@@ -958,22 +1103,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
-  },
-  pinMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  pinEmoji: {
-    fontSize: 16,
   },
 });

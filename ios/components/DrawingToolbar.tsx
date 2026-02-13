@@ -18,8 +18,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+
   Pressable,
+  Alert,
+  Dimensions,
+  Modal,
 } from 'react-native';
+import { MIN_DRAW_ZOOM, MIN_PIN_ZOOM } from '@niubi/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FontAwesome5,
@@ -114,230 +119,267 @@ export default function DrawingToolbar({
         ? '#eab308'
         : '#ef4444';
 
+  const handleModeChange = (newMode: 'hand' | 'draw' | 'pin') => {
+    if (newMode === 'draw') {
+      if (currentZoom < MIN_DRAW_ZOOM) {
+        Alert.alert('Cannot Draw', `Please zoom in to level ${MIN_DRAW_ZOOM} or higher to draw.`);
+        return;
+      }
+    } else if (newMode === 'pin') {
+      if (currentZoom < MIN_PIN_ZOOM) {
+        Alert.alert('Cannot Place Pin', `Please zoom in to level ${MIN_PIN_ZOOM} or higher to place a pin.`);
+        return;
+      }
+    }
+    onModeChange(newMode);
+  };
+
+  const closePanels = () => {
+    setShowBrushPanel(false);
+    setShowColorPanel(false);
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
-      {/* ===== Main Toolbar ===== */}
-      <View style={styles.container}>
-        {/* Group 1: Modes */}
-        <View style={styles.group}>
-          <TouchableOpacity
-            style={[styles.btn, currentMode === 'hand' && styles.activeBtn]}
-            onPress={() => onModeChange('hand')}
-          >
-            <MaterialIcons
-              name="pan-tool"
-              size={18}
-              color={currentMode === 'hand' ? '#fff' : '#666'}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, currentMode === 'draw' && styles.activeBtn]}
-            onPress={() => onModeChange('draw')}
-          >
-            <MaterialCommunityIcons
-              name="pencil"
-              size={18}
-              color={currentMode === 'draw' ? '#fff' : '#666'}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, currentMode === 'pin' && styles.activeBtn]}
-            onPress={() => onModeChange('pin')}
-          >
-            <MaterialCommunityIcons
-              name="map-marker"
-              size={18}
-              color={currentMode === 'pin' ? '#fff' : '#666'}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <Divider />
-
-        {/* Group 2: Tools (Brush / Color) */}
-        <View style={styles.group}>
-          <TouchableOpacity
-            style={[styles.btn, showBrushPanel && styles.activePanelBtn]}
-            onPress={toggleBrushPanel}
-          >
-            <FontAwesome5
-              name={BRUSH_ICONS[currentBrush]}
-              size={14}
-              color="#333"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.btn, showColorPanel && styles.activePanelBtn]}
-            onPress={toggleColorPanel}
-          >
-            <View
-              style={[styles.colorDot, { backgroundColor: currentColor }]}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <Divider />
-
-        {/* Group 3: Undo / Redo */}
-        <View style={styles.group}>
-          <TouchableOpacity
-            style={[styles.btn, !canUndo && styles.disabledBtn]}
-            onPress={onUndo}
-            disabled={!canUndo}
-          >
-            <MaterialCommunityIcons
-              name="undo"
-              size={18}
-              color={!canUndo ? '#ccc' : '#333'}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, !canRedo && styles.disabledBtn]}
-            onPress={onRedo}
-            disabled={!canRedo}
-          >
-            <MaterialCommunityIcons
-              name="redo"
-              size={18}
-              color={!canRedo ? '#ccc' : '#333'}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ===== Ink Bar ===== */}
-      <View style={styles.inkBarContainer}>
-        <View style={styles.inkBarTrack}>
-          <View
-            style={[
-              styles.inkBarFill,
-              {
-                width: `${inkPercent * 100}%`,
-                backgroundColor: inkColor,
-              },
-            ]}
-          />
-        </View>
-        <Text style={[styles.inkBarText, { color: inkColor }]}>
-          {ink.toFixed(1)}
-        </Text>
-      </View>
-
-      {/* ===== Brush Panel (floating) ===== */}
-      {showBrushPanel && (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>画笔</Text>
-          <View style={styles.grid}>
-            {(Object.values(BRUSH_IDS) as BrushId[]).map((brush) => (
-              <TouchableOpacity
-                key={brush}
-                style={[
-                  styles.panelBtn,
-                  currentBrush === brush && styles.activePanelItem,
-                ]}
-                onPress={() => {
-                  onBrushSelect(brush);
-                  setShowBrushPanel(false);
-                }}
-              >
-                <FontAwesome5
-                  name={BRUSH_ICONS[brush]}
-                  size={18}
-                  color={currentBrush === brush ? '#7c3aed' : '#666'}
-                />
-                <Text
-                  style={[
-                    styles.panelLabel,
-                    currentBrush === brush && styles.activeLabel,
-                  ]}
-                >
-                  {brush.charAt(0).toUpperCase() + brush.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Size stepper */}
-          <View style={styles.stepperRow}>
-            <Text style={styles.stepperLabel}>大小</Text>
-            <View style={styles.stepper}>
-              <Pressable
-                style={styles.stepperBtn}
-                onPress={() => adjustSize(-0.5)}
-              >
-                <Text style={styles.stepperBtnText}>−</Text>
-              </Pressable>
-              <Text style={styles.stepperValue}>
-                {currentSize.toFixed(1)}
-              </Text>
-              <Pressable
-                style={styles.stepperBtn}
-                onPress={() => adjustSize(0.5)}
-              >
-                <Text style={styles.stepperBtnText}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Opacity stepper */}
-          <View style={styles.stepperRow}>
-            <Text style={styles.stepperLabel}>透明度</Text>
-            <View style={styles.stepper}>
-              <Pressable
-                style={styles.stepperBtn}
-                onPress={() => adjustOpacity(-0.1)}
-              >
-                <Text style={styles.stepperBtnText}>−</Text>
-              </Pressable>
-              <Text style={styles.stepperValue}>
-                {Math.round(currentOpacity * 100)}%
-              </Text>
-              <Pressable
-                style={styles.stepperBtn}
-                onPress={() => adjustOpacity(0.1)}
-              >
-                <Text style={styles.stepperBtnText}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
+    <>
+      {/* Full screen overlay to close panels */}
+      {(showBrushPanel || showColorPanel) && (
+        <Pressable style={styles.overlay} onPress={closePanels} />
       )}
 
-      {/* ===== Color Panel (floating) ===== */}
-      {showColorPanel && (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>颜色</Text>
-          <View style={styles.colorGrid}>
-            {COLOR_PRESETS.map((color) => (
-              <TouchableOpacity
-                key={color}
-                style={[
-                  styles.colorSwatch,
-                  { backgroundColor: color },
-                  currentColor === color && styles.activeSwatch,
-                ]}
-                onPress={() => {
-                  onColorSelect(color);
-                  setShowColorPanel(false);
-                }}
+      <SafeAreaView style={styles.safeArea} edges={['bottom']} pointerEvents="box-none">
+        {/* Brush Panel */}
+        <View style={styles.container}>
+          {/* Group 1: Modes */}
+          <View style={styles.group}>
+            <TouchableOpacity
+              style={[styles.btn, currentMode === 'hand' && styles.activeBtn]}
+              onPress={() => handleModeChange('hand')}
+            >
+              <MaterialIcons
+                name="pan-tool"
+                size={18}
+                color={currentMode === 'hand' ? '#fff' : '#666'}
               />
-            ))}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, currentMode === 'draw' && styles.activeBtn]}
+              onPress={() => handleModeChange('draw')}
+            >
+              <MaterialCommunityIcons
+                name="pencil"
+                size={18}
+                color={currentMode === 'draw' ? '#fff' : '#666'}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, currentMode === 'pin' && styles.activeBtn]}
+              onPress={() => handleModeChange('pin')}
+            >
+              <MaterialCommunityIcons
+                name="map-marker"
+                size={18}
+                color={currentMode === 'pin' ? '#fff' : '#666'}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <Divider />
+
+          {/* Group 2: Tools (Brush / Color) */}
+          <View style={styles.group}>
+            <TouchableOpacity
+              style={[styles.btn, showBrushPanel && styles.activePanelBtn]}
+              onPress={toggleBrushPanel}
+            >
+              <FontAwesome5
+                name={BRUSH_ICONS[currentBrush]}
+                size={14}
+                color="#333"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.btn, showColorPanel && styles.activePanelBtn]}
+              onPress={toggleColorPanel}
+            >
+              <View
+                style={[styles.colorDot, { backgroundColor: currentColor }]}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <Divider />
+
+          {/* Group 3: Undo / Redo */}
+          <View style={styles.group}>
+            <TouchableOpacity
+              style={[styles.btn, !canUndo && styles.disabledBtn]}
+              onPress={onUndo}
+              disabled={!canUndo}
+            >
+              <MaterialCommunityIcons
+                name="undo"
+                size={18}
+                color={!canUndo ? '#ccc' : '#333'}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, !canRedo && styles.disabledBtn]}
+              onPress={onRedo}
+              disabled={!canRedo}
+            >
+              <MaterialCommunityIcons
+                name="redo"
+                size={18}
+                color={!canRedo ? '#ccc' : '#333'}
+              />
+            </TouchableOpacity>
           </View>
         </View>
-      )}
-    </SafeAreaView>
+
+        {/* ===== Ink Bar ===== */}
+        <View style={styles.inkBarContainer}>
+          <View style={styles.inkBarTrack}>
+            <View
+              style={[
+                styles.inkBarFill,
+                {
+                  width: `${inkPercent * 100}%`,
+                  backgroundColor: inkColor,
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.inkBarText, { color: inkColor }]}>
+            {ink.toFixed(1)}
+          </Text>
+        </View>
+
+        {/* ===== Brush Panel (floating) ===== */}
+        {showBrushPanel && (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>画笔</Text>
+            <View style={styles.grid}>
+              {(Object.values(BRUSH_IDS) as BrushId[]).map((brush) => (
+                <TouchableOpacity
+                  key={brush}
+                  style={[
+                    styles.panelBtn,
+                    currentBrush === brush && styles.activePanelItem,
+                  ]}
+                  onPress={() => {
+                    onBrushSelect(brush);
+                    setShowBrushPanel(false);
+                  }}
+                >
+                  <FontAwesome5
+                    name={BRUSH_ICONS[brush]}
+                    size={18}
+                    color={currentBrush === brush ? '#7c3aed' : '#666'}
+                  />
+                  <Text
+                    style={[
+                      styles.panelLabel,
+                      currentBrush === brush && styles.activeLabel,
+                    ]}
+                  >
+                    {brush.charAt(0).toUpperCase() + brush.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Size stepper */}
+            <View style={styles.stepperRow}>
+              <Text style={styles.stepperLabel}>大小</Text>
+              <View style={styles.stepper}>
+                <Pressable
+                  style={styles.stepperBtn}
+                  onPress={() => adjustSize(-0.5)}
+                >
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </Pressable>
+                <Text style={styles.stepperValue}>
+                  {currentSize.toFixed(1)}
+                </Text>
+                <Pressable
+                  style={styles.stepperBtn}
+                  onPress={() => adjustSize(0.5)}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Opacity stepper */}
+            <View style={styles.stepperRow}>
+              <Text style={styles.stepperLabel}>透明度</Text>
+              <View style={styles.stepper}>
+                <Pressable
+                  style={styles.stepperBtn}
+                  onPress={() => adjustOpacity(-0.1)}
+                >
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </Pressable>
+                <Text style={styles.stepperValue}>
+                  {Math.round(currentOpacity * 100)}%
+                </Text>
+                <Pressable
+                  style={styles.stepperBtn}
+                  onPress={() => adjustOpacity(0.1)}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ===== Color Panel (floating) ===== */}
+        {showColorPanel && (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>颜色</Text>
+            <View style={styles.colorGrid}>
+              {COLOR_PRESETS.map((color) => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.colorSwatch,
+                    { backgroundColor: color },
+                    currentColor === color && styles.activeSwatch,
+                  ]}
+                  onPress={() => {
+                    onColorSelect(color);
+                    setShowColorPanel(false);
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: -Dimensions.get('window').height, // Cover entire screen
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: Dimensions.get('window').height * 2, // Ensure coverage
+    zIndex: 90, // Below toolbar zIndex (assuming toolbar is high) but above map
+    backgroundColor: 'transparent',
+  },
   safeArea: {
     position: 'absolute',
-    top: 0,
+    bottom: 20,
     left: 0,
     right: 0,
     alignItems: 'center',
-    zIndex: 100,
+    zIndex: 100, // Ensure toolbar is above overlay
   },
   container: {
     flexDirection: 'row',
@@ -421,7 +463,7 @@ const styles = StyleSheet.create({
   // Panels
   panel: {
     position: 'absolute',
-    top: 72,
+    bottom: 80,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderRadius: 16,
     padding: 14,

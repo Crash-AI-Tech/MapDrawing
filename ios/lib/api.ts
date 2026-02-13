@@ -95,6 +95,23 @@ export interface MapPin {
   createdAt: number;
 }
 
+export interface PinCluster {
+  type: 'cluster';
+  id: string;
+  lng: number;
+  lat: number;
+  count: number;
+}
+
+export interface PinItem extends MapPin {
+  type: 'pin';
+}
+
+export interface PageCursor {
+  createdAt: number;
+  id: string;
+}
+
 // ========================
 // Drawings API
 // ========================
@@ -111,17 +128,31 @@ interface ViewportParams {
  * No auth required.
  */
 export async function fetchDrawings(
-  params: ViewportParams & { zoom?: number }
-): Promise<StrokeData[]> {
+  params: ViewportParams & {
+    zoom?: number;
+    limit?: number;
+    cursor?: PageCursor | null;
+  }
+): Promise<{
+  items: StrokeData[];
+  nextCursor: PageCursor | null;
+}> {
   const qs = new URLSearchParams({
     minLat: String(params.minLat),
     maxLat: String(params.maxLat),
     minLng: String(params.minLng),
     maxLng: String(params.maxLng),
     ...(params.zoom != null ? { zoom: String(params.zoom) } : {}),
+    ...(params.limit != null ? { limit: String(params.limit) } : {}),
+    ...(params.cursor
+      ? {
+          cursorCreatedAt: String(params.cursor.createdAt),
+          cursorId: params.cursor.id,
+        }
+      : {}),
   }).toString();
 
-  return apiFetch<StrokeData[]>(`/api/drawings?${qs}`);
+  return apiFetch(`/api/drawings?${qs}`);
 }
 
 /**
@@ -146,15 +177,33 @@ export async function saveDrawings(
  * GET /api/pins — load pins within viewport bounds.
  * No auth required.
  */
-export async function fetchPins(params: ViewportParams): Promise<MapPin[]> {
+export async function fetchPins(
+  params: ViewportParams & {
+    zoom?: number;
+    limit?: number;
+    cursor?: PageCursor | null;
+  }
+): Promise<{
+  mode: 'raw' | 'clustered';
+  items: Array<PinItem | PinCluster>;
+  nextCursor: PageCursor | null;
+}> {
   const qs = new URLSearchParams({
     minLat: String(params.minLat),
     maxLat: String(params.maxLat),
     minLng: String(params.minLng),
     maxLng: String(params.maxLng),
+    ...(params.zoom != null ? { zoom: String(params.zoom) } : {}),
+    ...(params.limit != null ? { limit: String(params.limit) } : {}),
+    ...(params.cursor
+      ? {
+          cursorCreatedAt: String(params.cursor.createdAt),
+          cursorId: params.cursor.id,
+        }
+      : {}),
   }).toString();
 
-  return apiFetch<MapPin[]>(`/api/pins?${qs}`);
+  return apiFetch(`/api/pins?${qs}`);
 }
 
 /**

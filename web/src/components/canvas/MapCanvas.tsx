@@ -22,6 +22,7 @@ import { useDrawingStore } from '@/stores/drawingStore';
 import { useInkStore } from '@/stores/inkStore';
 import { usePinStore, MapPin } from '@/stores/pinStore';
 import PinPlacer from '@/components/pins/PinPlacer';
+import { Compliance } from '@/lib/compliance';
 
 /** Generate an SVG pin cursor data URI — small size (14x20) */
 function pinCursorSvg(color: string): string {
@@ -94,6 +95,7 @@ export default function MapCanvas() {
   const placingPin = usePinStore((s) => s.placingPin);
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const pinColor = usePinStore((s) => s.pinColor);
+  const refreshBlocked = usePinStore((s) => s.refreshBlocked);
   const [pinClickCoords, setPinClickCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [mouseCoords, setMouseCoords] = useState<{ lng: number; lat: number } | null>(null);
   const pinMarkersRef = useRef<maplibregl.Marker[]>([]);
@@ -130,11 +132,30 @@ export default function MapCanvas() {
       // Load pins when zoomed in enough
       if (zoom >= MIN_PIN_ZOOM) {
         try {
-          const qs = `minLat=${bounds.minLat}&maxLat=${bounds.maxLat}&minLng=${bounds.minLng}&maxLng=${bounds.maxLng}`;
+          const qs = `minLat=${bounds.minLat}&maxLat=${bounds.maxLat}&minLng=${bounds.minLng}&maxLng=${bounds.maxLng}&zoom=${Math.floor(zoom)}`;
           const res = await fetch(`/api/pins?${qs}`);
           if (res.ok) {
-            const data: MapPin[] = await res.json();
-            setPins(data);
+            const body: any = await res.json();
+            // API returns { mode, items, nextCursor } — extract pins array
+            if (Array.isArray(body)) {
+              setPins(body);
+            } else if (body && Array.isArray(body.items)) {
+              const pinItems: MapPin[] = body.items
+                .filter((i: any) => i.type === 'pin')
+                .map((i: any) => ({
+                  id: i.id,
+                  userId: i.userId,
+                  userName: i.userName,
+                  lng: i.lng,
+                  lat: i.lat,
+                  message: i.message,
+                  color: i.color,
+                  createdAt: i.createdAt,
+                }));
+              setPins(pinItems);
+            } else {
+              setPins([]);
+            }
           }
         } catch (e) {
           console.error('[MapCanvas] Failed to load pins:', e);
@@ -307,9 +328,9 @@ export default function MapCanvas() {
         transform-origin: center center;
       `;
 
-      // Hover expand: show full details in tooltip
+      // Hover expand: show full details in tooltip with Report/Block actions
       wrapper.addEventListener('mouseenter', () => {
-        tooltip.style.maxWidth = '200px';
+        tooltip.style.maxWidth = '220px';
         tooltip.style.whiteSpace = 'normal';
         tooltip.style.wordBreak = 'break-word';
         tooltip.style.transform = 'scale(1.08)';
@@ -322,9 +343,44 @@ export default function MapCanvas() {
         tooltip.appendChild(msgEl);
         // Meta line: author + time
         const metaEl = document.createElement('div');
-        metaEl.style.cssText = 'font-size:10px;color:#999;display:flex;justify-content:space-between;gap:8px;';
+        metaEl.style.cssText = 'font-size:10px;color:#999;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;';
         metaEl.innerHTML = `<span>${pin.userName || '匿名'}</span><span>${timeAgo(pin.createdAt)}</span>`;
         tooltip.appendChild(metaEl);
+        // Action buttons row (Report / Block)
+        if (user && pin.userId !== userId) {
+          const actionsRow = document.createElement('div');
+          actionsRow.style.cssText = 'display:flex;gap:6px;border-top:1px solid #eee;padding-top:5px;';
+
+          const reportBtn = document.createElement('button');
+          reportBtn.textContent = 'Report';
+          reportBtn.style.cssText = 'flex:1;font-size:10px;padding:3px 0;border-radius:4px;border:1px solid #e5e7eb;background:#fff;color:#ef4444;cursor:pointer;transition:background 0.15s;';
+          reportBtn.addEventListener('mouseenter', () => { reportBtn.style.background = '#fef2f2'; });
+          reportBtn.addEventListener('mouseleave', () => { reportBtn.style.background = '#fff'; });
+          reportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const reason = window.prompt('Report reason:');
+            if (reason) {
+              Compliance.reportContent(pin.id, 'pin', reason);
+            }
+          });
+
+          const blockBtn = document.createElement('button');
+          blockBtn.textContent = 'Block User';
+          blockBtn.style.cssText = 'flex:1;font-size:10px;padding:3px 0;border-radius:4px;border:1px solid #e5e7eb;background:#fff;color:#ef4444;cursor:pointer;transition:background 0.15s;';
+          blockBtn.addEventListener('mouseenter', () => { blockBtn.style.background = '#fef2f2'; });
+          blockBtn.addEventListener('mouseleave', () => { blockBtn.style.background = '#fff'; });
+          blockBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.confirm(`Block ${pin.userName || 'this user'}? Their pins will be hidden.`)) {
+              Compliance.blockUser(pin.userId);
+              refreshBlocked();
+            }
+          });
+
+          actionsRow.appendChild(reportBtn);
+          actionsRow.appendChild(blockBtn);
+          tooltip.appendChild(actionsRow);
+        }
         // Re-add arrow
         const hoverArrow = document.createElement('div');
         hoverArrow.style.cssText = arrow.style.cssText;

@@ -40,8 +40,8 @@ export default function ZoomControls({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 100,
-    left: 12,
+    top: 50,
+    left: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 12,
     shadowColor: '#000',

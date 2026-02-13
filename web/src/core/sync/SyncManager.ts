@@ -106,8 +106,11 @@ export class SyncManager {
       const res = await fetch(`${this.apiBaseUrl}/drawings?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      const data: any = await res.json();
+      // API now returns { items: [...], nextCursor } — extract items array
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      return [];
     } catch (e) {
       console.error('[SyncManager] Failed to load viewport:', e);
       return [];

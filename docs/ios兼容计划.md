@@ -409,3 +409,93 @@ styleURL="https://tiles.openfreemap.org/styles/liberty"
 ```
 
 > **预计总工期**: 7~9 天 (一人全职)。P0+P1 完成后即可实现"线条跟随地图"的基本效果;P2 完成后视觉一致性提升 80%;P3-P6 为渐进增强。
+
+
+
+
+iOS 上架与兼容性计划
+本文档针对你提出的三个核心疑问进行解答，并结合当前代码库的分析，提供具体的解决方案和待办清单。
+
+1. 预发布版本与线上数据库链接
+你提到的“预发布版本”在 iOS 开发中通过 TestFlight 也就是苹果官方的测试平台来实现。
+
+A. TestFlight (预发布版本)
+TestFlight 允许你将 App 上传到 App Store Connect，但暂不上架。
+
+内部测试：无需苹果审核，添加开发团队成员的 Apple ID 即可立即安装。
+外部测试：需要经过苹果简单的 Beta 审核，通过后可以生成公开链接（Public Link），发送给任何人下载安装，有效期 90 天。
+体验：用户下载的 App 和 App Store 版本几乎一致，只是图标旁边有一个黄色的小点，且 App 会定期过期（需更新构建版本）。
+B. 本地/测试版链接线上数据库
+App 实际上不应直接链接数据库（如 PostgreSQL），而是链接 后端 API。要让 iOS App 在本地或 TestFlight 中使用线上数据，你需要配置 环境变量 来切换 API 地址。
+
+解决方案：
+
+使用 .env 文件管理环境： 在 ios/ 根目录下建立 .env (开发) 和 .env.production (生产)。
+bash
+# ios/.env (本地开发)
+EXPO_PUBLIC_API_URL=http://<你的电脑内网IP>:3000/api
+# ios/.env.production (打包发布/TestFlight)
+EXPO_PUBLIC_API_URL=https://your-production-domain.com/api
+代码中引用： 在代码中使用 process.env.EXPO_PUBLIC_API_URL 获取地址。Expo 会在打包时自动根据构建类型（Development vs Production）替换变量。
+2. App Store 上架合规性检查清单
+根据对当前代码（iOS 部分）的分析，发现以下 必须修改 的问题，否则会被拒审。
+
+🚨 严重问题 (会导致直接拒审)
+[ ] 1. 用户生成内容 (UGC) 合规机制 (缺失)
+你的 App 包含 聊天 和 地图协作 (Drawing/Pin) 功能，属于 UGC (User Generated Content) 应用。苹果对此有严格审核要求。 当前代码缺失：
+
+举报功能：在聊天消息或地图 Pin 点上必须有“举报 (Report)”按钮。
+拉黑功能：必须允许用户拉黑 (Block) 其他用户。
+EULA (用户协议)：必须在 App 内（通常在注册页或关于页）展示最终用户许可协议，明确声明“对 objectionable content (令人反感的内容) 零容忍”以及“滥用用户将被封禁”。
+解决方案：
+
+在 
+DrawingToolbar
+ 或点击 Pin 点的详情页增加 Report 按钮。
+在用户个人主页增加 Block 按钮。
+提示：如果未实现这些，100% 会被拒审 (Guideline 1.2)。
+[ ] 2. 权限描述不完整 (
+app.json
+)
+当前 
+ios/app.json
+ 中仅配置了 NSLocationWhenInUseUsageDescription。 风险点：
+
+相册/保存图片：如果 
+DrawingToolbar
+ 允许保存图片到相册，必须添加 NSPhotoLibraryUsageDescription 和 NSPhotoLibraryAddUsageDescription。
+相机/麦克风：如果聊天功能支持发图或语音，必须添加 NSCameraUsageDescription 和 NSMicrophoneUsageDescription。
+定位描述：当前的描述 "Allow $(PRODUCT_NAME) to access..." 使用了占位符，建议改为更具体的文案，例如："Allow NiubiAgent to access your location to show your position on the shared map."
+[ ] 3. 账户删除功能 (Apple 强制要求)
+如果 App 允许用户注册/登录，必须 在 App 内部提供“删除账户” (Delete Account) 的功能/按钮。
+
+不能仅是“停用”，必须是彻底删除数据。
+必须容易找到（通常放在 Settings -> Account 中）。
+[ ] 4. 第三方登录
+如果你使用了 Google/Facebook 登录，则 必须 同时集成 Sign in with Apple。
+如果只用手机号/邮箱登录，则不需要 Sign in with Apple。
+代码中依赖了 expo-apple-authentication，看来你已有准备，请确保已正确集成。
+3. 区域上架策略 (中国区 vs 美国/全球)
+结论先行：建议 优先上架非中国区 (Rest of World)，中国区单独处理或暂时放弃。
+
+A. 中国区上架的特殊困难
+对于“地图+聊天”类应用，中国区 App Store 审核极难：
+
+ICP 备案：你的后端域名必须经过工信部 ICP 备案（公司主体必须在国内）。
+互联网信息服务安全评估：因为涉及“即时通讯/舆论属性”，可能需要通过网信办的安全评估。
+地图测绘资质 (最难)：
+在中国通过 App 展示地图，必须使用合规的地图服务商（如高德、百度）。
+你使用的是 OpenStreetMap / MapLibre (这类通用 OSM 数据源)，在中国区属于 非法地图数据，极大概率无法通过审核，甚至可能违规。
+UGC 地图标注：用户在地图上画画/标记属于“互联网地图服务”，需要特许资质。
+B. 公司主体与海外上架
+"我的开发者账号是以公司名义申请的，是一家注册在深圳的公司。"
+
+这是一个优势，也是可行的路径。
+
+中国公司可以发布海外区 App：苹果允许中国开发者账号将 App 仅发布在 US (美国) 或其他海外地区，勾选掉 "China Mainland" 即可。
+合规性：发布在海外区（如美国），只需遵守美国的法律（DMCA、GDPR等）和苹果审核指南，不需要中国的 ICP 备案或地图测绘资质。
+地图数据：在海外使用 MapLibre/OSM 是完全合规的。
+✅ 推荐方案
+首发上线：在 App Store Connect 的 "Availability" (销售范围) 中，取消勾选 "China Mainland"，勾选美国、香港、台湾、日本、欧洲等地区。
+规避风险：这样可以只需满足苹果通用审核规则（上述第2点清单），无需处理复杂的中国区牌照问题。
+后续：如果必须上架中国区，建议开发“中国特供版”，移除 UGC 地图标记功能，并接入高德/百度地图 SDK，同时完成域名 ICP 备案。

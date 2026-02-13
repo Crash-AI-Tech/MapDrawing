@@ -29,6 +29,11 @@ export interface DrawingRow {
   updated_at: number;
 }
 
+export interface ViewportCursor {
+  createdAt: number;
+  id: string;
+}
+
 export interface UserRow {
   id: string;
   email: string;
@@ -66,6 +71,64 @@ export async function getDrawingsInViewport(
     .all<DrawingRow>();
 
   return results ?? [];
+}
+
+/**
+ * 查询视口范围内的笔画（游标分页）
+ */
+export async function getDrawingsInViewportPaginated(
+  minLat: number,
+  maxLat: number,
+  minLng: number,
+  maxLng: number,
+  options?: {
+    limit?: number;
+    cursor?: ViewportCursor;
+  }
+): Promise<{
+  rows: DrawingRow[];
+  nextCursor: ViewportCursor | null;
+}> {
+  const { env } = getCloudflareContext();
+  const limit = Math.max(1, Math.min(options?.limit ?? 300, 1000));
+  const pageSize = limit + 1;
+
+  let query = `SELECT * FROM drawings
+     WHERE min_lng <= ?1 AND max_lng >= ?2
+       AND min_lat <= ?3 AND max_lat >= ?4`;
+
+  const binds: Array<string | number> = [maxLng, minLng, maxLat, minLat];
+
+  if (options?.cursor) {
+    query += `
+       AND (created_at < ?5 OR (created_at = ?5 AND id < ?6))`;
+    binds.push(options.cursor.createdAt, options.cursor.id);
+    query += `
+     ORDER BY created_at DESC, id DESC
+     LIMIT ?7`;
+    binds.push(pageSize);
+  } else {
+    query += `
+     ORDER BY created_at DESC, id DESC
+     LIMIT ?5`;
+    binds.push(pageSize);
+  }
+
+  const { results } = await env.DB.prepare(query)
+    .bind(...binds)
+    .all<DrawingRow>();
+
+  const allRows = results ?? [];
+  const hasMore = allRows.length > limit;
+  const rows = hasMore ? allRows.slice(0, limit) : allRows;
+  const last = rows[rows.length - 1];
+
+  return {
+    rows,
+    nextCursor: hasMore && last
+      ? { createdAt: last.created_at, id: last.id }
+      : null,
+  };
 }
 
 /**
