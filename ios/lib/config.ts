@@ -7,3 +7,4 @@
 
 // TODO: Move to environment variable (expo-constants / app.json extra)
 export const API_BASE_URL = 'http://192.168.124.12:3000';
+export const DO_BASE_URL = 'http://192.168.124.12:8787'; // Cloudflare Worker (Wrangler Dev)

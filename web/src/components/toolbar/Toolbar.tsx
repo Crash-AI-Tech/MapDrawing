@@ -5,7 +5,7 @@ import { useDrawingStore } from '@/stores/drawingStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePinStore } from '@/stores/pinStore';
 import { useUIStore } from '@/stores/uiStore';
-import { MIN_PIN_ZOOM, MIN_DRAW_ZOOM } from '@/constants';
+import { MIN_PIN_ZOOM, MIN_DRAW_ZOOM, BRUSH_IDS } from '@/constants';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -41,6 +41,8 @@ interface ToolbarProps {
 export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   const { drawingMode, canUndo, canRedo, undo, redo } = useToolbar();
   const setDrawingMode = useDrawingStore((s) => s.setDrawingMode);
+  const activeBrushId = useDrawingStore((s) => s.activeBrushId);
+  const setActiveBrush = useDrawingStore((s) => s.setActiveBrush);
   const strokeCount = useDrawingStore((s) => s.strokeCount);
   const user = useAuthStore((s) => s.user);
   const placingPin = usePinStore((s) => s.placingPin);
@@ -75,6 +77,13 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
       requireAuth(() => {
         if (currentZoom < MIN_DRAW_ZOOM) {
           flashTooltip(`请放大到 ${MIN_DRAW_ZOOM} 级以上才能绘画（当前 ${Math.floor(currentZoom)} 级）`);
+          return;
+        }
+        // If already in draw mode, toggle pencil ↔ eraser
+        if (currentMode === 'draw') {
+          setActiveBrush(
+            activeBrushId === BRUSH_IDS.ERASER ? BRUSH_IDS.PENCIL : BRUSH_IDS.ERASER
+          );
           return;
         }
         setDrawingMode(true);

@@ -14,7 +14,7 @@ import type { StrokeData } from '@/core/types';
 // Generic fetch wrapper
 // ========================
 
-async function getToken(): Promise<string | null> {
+export async function getToken(): Promise<string | null> {
   try {
     return await SecureStore.getItemAsync('session');
   } catch {
@@ -31,7 +31,7 @@ interface FetchOptions extends Omit<RequestInit, 'headers'> {
  * Fetch with automatic auth token injection.
  * Throws on non-2xx responses.
  */
-async function apiFetch<T = any>(
+export async function apiFetch<T = any>(
   path: string,
   options: FetchOptions = {}
 ): Promise<T> {
@@ -146,9 +146,9 @@ export async function fetchDrawings(
     ...(params.limit != null ? { limit: String(params.limit) } : {}),
     ...(params.cursor
       ? {
-          cursorCreatedAt: String(params.cursor.createdAt),
-          cursorId: params.cursor.id,
-        }
+        cursorCreatedAt: String(params.cursor.createdAt),
+        cursorId: params.cursor.id,
+      }
       : {}),
   }).toString();
 
@@ -166,6 +166,17 @@ export async function saveDrawings(
     method: 'POST',
     auth: true,
     body: JSON.stringify(Array.isArray(strokes) ? strokes : [strokes]),
+  });
+}
+
+/**
+ * DELETE /api/drawings/:id — delete a stroke by ID.
+ * Auth required.
+ */
+export async function deleteStroke(id: string): Promise<void> {
+  return apiFetch(`/api/drawings/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    auth: true,
   });
 }
 
@@ -197,9 +208,9 @@ export async function fetchPins(
     ...(params.limit != null ? { limit: String(params.limit) } : {}),
     ...(params.cursor
       ? {
-          cursorCreatedAt: String(params.cursor.createdAt),
-          cursorId: params.cursor.id,
-        }
+        cursorCreatedAt: String(params.cursor.createdAt),
+        cursorId: params.cursor.id,
+      }
       : {}),
   }).toString();
 

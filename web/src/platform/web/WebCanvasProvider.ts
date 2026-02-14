@@ -33,7 +33,7 @@ export class WebCanvasProvider {
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 10;
+      z-index: 5;
     `;
 
     // Create active canvas (top layer — live drawing + input capture)
@@ -45,7 +45,7 @@ export class WebCanvasProvider {
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 20;
+      z-index: 6;
       pointer-events: none;
       cursor: default;
     `;

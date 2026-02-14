@@ -14,12 +14,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
 
 /**
- * ColorPicker — color grid + custom hex input.
+ * ColorPicker — color grid + custom hex input + Size/Opacity sliders.
+ * Size and opacity controls were moved here from the old BrushPanel.
  */
 export default function ColorPicker() {
-  const { activeColor, colorPresets, selectColor } = useToolbar();
+  const { activeColor, activeSize, activeOpacity, colorPresets, selectColor, changeSize, changeOpacity } = useToolbar();
   const [customColor, setCustomColor] = useState(activeColor);
 
   const handleCustomSubmit = () => {
@@ -41,10 +43,10 @@ export default function ColorPicker() {
             </button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent side="bottom">Color</TooltipContent>
+        <TooltipContent side="bottom">颜色与笔触</TooltipContent>
       </Tooltip>
 
-      <PopoverContent side="bottom" align="start" className="w-72 space-y-3">
+      <PopoverContent side="bottom" align="start" className="w-72 space-y-3 border-white/50 bg-white/80 backdrop-blur-xl">
         <p className="text-xs font-medium text-muted-foreground">Presets</p>
         <div className="grid grid-cols-6 gap-1.5">
           {colorPresets.map((color) => (
@@ -87,6 +89,40 @@ export default function ColorPicker() {
               className="h-9 flex-1 font-mono text-xs"
             />
           </div>
+        </div>
+
+        {/* Size slider */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">大小</span>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {activeSize.toFixed(1)}
+            </span>
+          </div>
+          <Slider
+            value={[activeSize]}
+            onValueChange={([v]) => changeSize(v)}
+            min={0.5}
+            max={10}
+            step={0.5}
+          />
+        </div>
+
+        {/* Opacity slider */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">不透明度</span>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {Math.round(activeOpacity * 100)}%
+            </span>
+          </div>
+          <Slider
+            value={[activeOpacity]}
+            onValueChange={([v]) => changeOpacity(v)}
+            min={0.05}
+            max={1}
+            step={0.05}
+          />
         </div>
       </PopoverContent>
     </Popover>

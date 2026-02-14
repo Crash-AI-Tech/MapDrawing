@@ -59,6 +59,7 @@ pnpm --filter web dev
 pnpm --filter web deploy:workers # 部署到远端用于测试 (推荐)
 # 或者本地启动
 cd cf-workers && pnpm wrangler dev
+pnpm wrangler dev --ip 0.0.0.0
 ```
 
 # 6. 启动 iOS 应用 (可选)

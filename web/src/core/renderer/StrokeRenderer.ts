@@ -19,7 +19,7 @@ export class StrokeRenderer {
     transform?: (geoX: number, geoY: number) => { x: number; y: number },
     currentZoom?: number
   ): void {
-    const brush = this.brushRegistry.get(stroke.brushId);
+    const brush = this.brushRegistry.getOrFallback(stroke.brushId);
     if (!brush) return;
 
     let renderStroke = stroke;

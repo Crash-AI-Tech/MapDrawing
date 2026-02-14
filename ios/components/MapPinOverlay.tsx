@@ -60,7 +60,7 @@ function timeAgo(ts: number): string {
 }
 
 /** Truncate message for preview */
-function truncate(msg: string, max: number = 10): string {
+function truncate(msg: string, max: number = 15): string {
   return msg.length > max ? msg.slice(0, max) + '…' : msg;
 }
 
@@ -102,8 +102,8 @@ function PinMarker({
         {
           left: screenX,
           top: screenY,
-          // Anchor at bottom-center: offset left by half width, up by full height
-          transform: [{ translateX: -14 }, { translateY: -48 }],
+          // Anchor at bottom-center of the pin dot (11px = half of 22px dot)
+          transform: [{ translateX: -11 }, { translateY: -48 }],
         },
       ]}
       pointerEvents="box-none"
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   pinContainer: {
     position: 'absolute',
     alignItems: 'center',
-    width: 28,
+    overflow: 'visible',
   },
   // --- Tooltip ---
   tooltip: {
@@ -241,11 +241,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 5,
-    maxWidth: 120,
+    maxWidth: 160,
+    minWidth: 60,
     alignSelf: 'center',
   },
   tooltipExpanded: {
-    maxWidth: 200,
+    maxWidth: 240,
+    minWidth: 120,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },

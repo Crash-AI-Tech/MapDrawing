@@ -61,11 +61,15 @@ import {
   fetchPins,
   saveDrawings,
   createPin,
+  getToken,
+  fetchProfile,
   type MapPin,
   type PinCluster,
   type PinItem,
   type PageCursor,
 } from '@/lib/api';
+import { API_BASE_URL, DO_BASE_URL } from '@/lib/config';
+import { SyncManager } from '@/core/sync/SyncManager';
 import {
   BRUSH_IDS,
   type BrushId,
@@ -219,10 +223,67 @@ export default function MapScreen() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
+  // ===== Real-time Collaboration =====
+  const [session, setSession] = useState<{ token: string; userId: string } | null>(null);
+  const syncManagerRef = useRef<SyncManager | null>(null);
+
+
+
   // ===== Strokes: ref-based (no React state for big arrays) =====
   const strokesRef = useRef<Map<string, StrokeData>>(new Map());
   const [strokeVersion, setStrokeVersion] = useState(0);
   const bumpStrokeVersion = useCallback(() => setStrokeVersion((v) => v + 1), []);
+
+  // 1. Initial Auth
+  useEffect(() => {
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const profile = await fetchProfile();
+        setSession({ token, userId: profile.id });
+      } catch (e) {
+        console.warn('[MapScreen] Failed to fetch profile', e);
+      }
+    })();
+  }, []);
+
+  // 2. Init SyncManager
+  useEffect(() => {
+    if (!session) return;
+
+    syncManagerRef.current = new SyncManager({
+      doBaseUrl: DO_BASE_URL,
+      accessToken: session.token,
+      userId: session.userId,
+      onRemoteStroke: (stroke) => {
+        strokesRef.current.set(stroke.id, stroke);
+        loadedStrokeIdsRef.current.add(stroke.id);
+        tileRendererRef.current.addStroke(stroke);
+        bumpStrokeVersion();
+      },
+      onRemoteDelete: (strokeId) => {
+        strokesRef.current.delete(strokeId);
+        loadedStrokeIdsRef.current.delete(strokeId);
+        tileRendererRef.current.removeStroke(strokeId);
+        bumpStrokeVersion();
+      },
+    });
+
+    // Join initial room
+    syncManagerRef.current.joinRoom(cameraState.center[1], cameraState.center[0]);
+
+    return () => {
+      syncManagerRef.current?.dispose();
+    };
+  }, [session, bumpStrokeVersion]); // cameraState initial read is safe
+
+  // 3. Update Room (Real-time)
+  useEffect(() => {
+    if (syncManagerRef.current) {
+      syncManagerRef.current.joinRoom(cameraState.center[1], cameraState.center[0]);
+    }
+  }, [cameraState.center]);
 
   // ===== Pin State (flat arrays for MapPinOverlay) =====
   const [visiblePins, setVisiblePins] = useState<PinData[]>([]);
@@ -369,6 +430,13 @@ export default function MapScreen() {
         Array.from(strokesRef.current.values())
       );
       if (newStrokesAdded) bumpStrokeVersion();
+
+      // Update Room (Real-time)
+      if (syncManagerRef.current) {
+        const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+        const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+        syncManagerRef.current.joinRoom(centerLat, centerLng);
+      }
 
       // --- Load Pins (paginated/clustered) ---
       const pinFirstPage = await fetchPins({
@@ -584,10 +652,14 @@ export default function MapScreen() {
 
     historyRef.current?.push({ type: 'ADD_STROKE', stroke });
 
-    // Persist to server (fire-and-forget, don't block UI)
-    saveDrawings(stroke).catch((e) =>
-      console.warn('[saveDrawings] Failed:', e)
-    );
+    // Broadcast & Persist (Dual Write)
+    if (syncManagerRef.current) {
+      syncManagerRef.current.broadcastStroke(stroke);
+    } else {
+      saveDrawings(stroke).catch((e) =>
+        console.warn('[saveDrawings] Failed:', e)
+      );
+    }
 
     currentPointsRef.current = [];
     inkAccumulatorRef.current = 0;

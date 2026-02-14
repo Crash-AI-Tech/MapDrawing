@@ -4,9 +4,9 @@ import { getUserProfile, updateUserProfile } from '@/lib/db/queries';
 /**
  * GET /api/profile — fetch the current user's profile (D1).
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const result = await validateSession();
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -34,7 +34,7 @@ export async function GET() {
  */
 export async function PATCH(request: Request) {
   try {
-    const result = await validateSession();
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

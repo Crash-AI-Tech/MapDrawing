@@ -1,12 +1,10 @@
 /**
  * DrawingToolbar — enhanced floating toolbar for the drawing screen.
  *
- * Matches the web version's feature set:
+ * Simplified to support only pencil + eraser:
  * - Mode switching (hand / draw / pin)
- * - Brush type selection (5 types)
- * - Color picker (54 preset colors)
- * - Brush size control (+/- stepper with value display)
- * - Opacity control (+/- stepper)
+ * - Brush toggle button (pencil ↔ eraser)
+ * - Color picker (54 preset colors) + size/opacity controls
  * - Undo / Redo
  * - Ink bar (gradient + numeric value)
  * - Zoom level display
@@ -58,13 +56,13 @@ interface DrawingToolbarProps {
   currentZoom: number;
 }
 
-const BRUSH_ICONS: Record<BrushId, string> = {
+const BRUSH_ICONS: Record<string, string> = {
   [BRUSH_IDS.PENCIL]: 'pencil-alt',
-  [BRUSH_IDS.MARKER]: 'marker',
-  [BRUSH_IDS.SPRAY]: 'spray-can',
-  [BRUSH_IDS.HIGHLIGHTER]: 'highlighter',
   [BRUSH_IDS.ERASER]: 'eraser',
 } as const;
+
+/** Only these two brushes are supported */
+const SUPPORTED_BRUSHES: BrushId[] = [BRUSH_IDS.PENCIL, BRUSH_IDS.ERASER];
 
 export default function DrawingToolbar({
   currentMode,
@@ -85,19 +83,12 @@ export default function DrawingToolbar({
   maxInk,
   currentZoom,
 }: DrawingToolbarProps) {
-  const [showBrushPanel, setShowBrushPanel] = useState(false);
   const [showColorPanel, setShowColorPanel] = useState(false);
 
   const Divider = () => <View style={styles.divider} />;
 
-  const toggleBrushPanel = () => {
-    setShowBrushPanel(!showBrushPanel);
-    setShowColorPanel(false);
-  };
-
   const toggleColorPanel = () => {
     setShowColorPanel(!showColorPanel);
-    setShowBrushPanel(false);
   };
 
   const adjustSize = (delta: number) => {
@@ -135,14 +126,13 @@ export default function DrawingToolbar({
   };
 
   const closePanels = () => {
-    setShowBrushPanel(false);
     setShowColorPanel(false);
   };
 
   return (
     <>
       {/* Full screen overlay to close panels */}
-      {(showBrushPanel || showColorPanel) && (
+      {showColorPanel && (
         <Pressable style={styles.overlay} onPress={closePanels} />
       )}
 
@@ -185,16 +175,26 @@ export default function DrawingToolbar({
 
           <Divider />
 
-          {/* Group 2: Tools (Brush / Color) */}
+          {/* Group 2: Brush toggle (pencil/eraser) + Color panel */}
           <View style={styles.group}>
             <TouchableOpacity
-              style={[styles.btn, showBrushPanel && styles.activePanelBtn]}
-              onPress={toggleBrushPanel}
+              style={[
+                styles.btn,
+                currentBrush === BRUSH_IDS.ERASER && styles.eraserBtn,
+              ]}
+              onPress={() => {
+                // Toggle between pencil and eraser
+                onBrushSelect(
+                  currentBrush === BRUSH_IDS.ERASER
+                    ? BRUSH_IDS.PENCIL
+                    : BRUSH_IDS.ERASER
+                );
+              }}
             >
               <FontAwesome5
-                name={BRUSH_ICONS[currentBrush]}
+                name={BRUSH_ICONS[currentBrush] || 'pencil-alt'}
                 size={14}
-                color="#333"
+                color={currentBrush === BRUSH_IDS.ERASER ? '#fff' : '#333'}
               />
             </TouchableOpacity>
 
@@ -255,37 +255,25 @@ export default function DrawingToolbar({
           </Text>
         </View>
 
-        {/* ===== Brush Panel (floating) ===== */}
-        {showBrushPanel && (
+        {/* ===== Brush Panel — removed (pencil/eraser toggle is in toolbar) ===== */}
+
+        {/* ===== Color Panel (floating) with size/opacity ===== */}
+        {showColorPanel && (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>画笔</Text>
-            <View style={styles.grid}>
-              {(Object.values(BRUSH_IDS) as BrushId[]).map((brush) => (
+            <Text style={styles.panelTitle}>颜色</Text>
+            <View style={styles.colorGrid}>
+              {COLOR_PRESETS.map((color) => (
                 <TouchableOpacity
-                  key={brush}
+                  key={color}
                   style={[
-                    styles.panelBtn,
-                    currentBrush === brush && styles.activePanelItem,
+                    styles.colorSwatch,
+                    { backgroundColor: color },
+                    currentColor === color && styles.activeSwatch,
                   ]}
                   onPress={() => {
-                    onBrushSelect(brush);
-                    setShowBrushPanel(false);
+                    onColorSelect(color);
                   }}
-                >
-                  <FontAwesome5
-                    name={BRUSH_ICONS[brush]}
-                    size={18}
-                    color={currentBrush === brush ? '#7c3aed' : '#666'}
-                  />
-                  <Text
-                    style={[
-                      styles.panelLabel,
-                      currentBrush === brush && styles.activeLabel,
-                    ]}
-                  >
-                    {brush.charAt(0).toUpperCase() + brush.slice(1)}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
 
@@ -331,29 +319,6 @@ export default function DrawingToolbar({
                   <Text style={styles.stepperBtnText}>+</Text>
                 </Pressable>
               </View>
-            </View>
-          </View>
-        )}
-
-        {/* ===== Color Panel (floating) ===== */}
-        {showColorPanel && (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>颜色</Text>
-            <View style={styles.colorGrid}>
-              {COLOR_PRESETS.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={[
-                    styles.colorSwatch,
-                    { backgroundColor: color },
-                    currentColor === color && styles.activeSwatch,
-                  ]}
-                  onPress={() => {
-                    onColorSelect(color);
-                    setShowColorPanel(false);
-                  }}
-                />
-              ))}
             </View>
           </View>
         )}
@@ -417,6 +382,13 @@ const styles = StyleSheet.create({
   },
   activeBtn: {
     backgroundColor: '#7c3aed',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  eraserBtn: {
+    backgroundColor: '#f97316',
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 2,
