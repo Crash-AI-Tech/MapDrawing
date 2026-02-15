@@ -56,7 +56,7 @@ function getSavedViewport(): { center: [number, number]; zoom: number } | null {
     ) {
       return parsed;
     }
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -66,24 +66,47 @@ function saveViewport(center: { lng: number; lat: number }, zoom: number) {
       VIEWPORT_STORAGE_KEY,
       JSON.stringify({ center: [center.lng, center.lat], zoom })
     );
-  } catch {}
+  } catch { }
 }
 
 /**
  * MapCanvas — the core canvas component.
  * Initializes MapLibre GL, overlays drawing canvases, and wires the full pipeline.
  */
+// Brush cursor (circle with color)
+function brushCursorSvg(color: string, size: number): string {
+  const r = Math.max(4, size / 2 + 2); // visible size
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${r * 2}" height="${r * 2}" viewBox="0 0 ${r * 2} ${r * 2}"><circle cx="${r}" cy="${r}" r="${Math.max(2, size / 2)}" fill="${color}" stroke="white" stroke-width="1" opacity="0.8"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${r} ${r}, auto`;
+}
+
+// Eraser cursor (white circle with border)
+function eraserCursorSvg(size: number): string {
+  const r = Math.max(6, size / 2 + 2);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${r * 2}" height="${r * 2}" viewBox="0 0 ${r * 2} ${r * 2}"><circle cx="${r}" cy="${r}" r="${Math.max(4, size / 2)}" fill="white" stroke="#333" stroke-width="2" opacity="0.8"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${r} ${r}, auto`;
+}
+
 export default function MapCanvas() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const pinMarkersRef = useRef<maplibregl.Marker[]>([]);
+
   const [mapReady, setMapReady] = useState(false);
-  // engine state — triggers re-render so useSync/useViewport get a non-null engine
   const [engine, setEngine] = useState<import('@/core/engine/DrawingEngine').DrawingEngine | null>(null);
   const [currentZoom, setCurrentZoom] = useState(MAP_DEFAULT_ZOOM);
+  const [pinClickCoords, setPinClickCoords] = useState<{ lng: number; lat: number } | null>(null);
+  const [mouseCoords, setMouseCoords] = useState<{ lng: number; lat: number } | null>(null);
 
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
+
+  // Drawing store
   const drawingMode = useDrawingStore((s) => s.drawingMode);
+  const activeBrushId = useDrawingStore((s) => s.activeBrushId);
+  const activeColor = useDrawingStore((s) => s.activeColor);
+  const activeSize = useDrawingStore((s) => s.activeSize);
+
   const setCurrentZoomGlobal = useUIStore((s) => s.setCurrentZoom);
   const showLowInkWarning = useInkStore((s) => s.showLowInkWarning);
   const ink = useInkStore((s) => s.ink);
@@ -96,9 +119,6 @@ export default function MapCanvas() {
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const pinColor = usePinStore((s) => s.pinColor);
   const refreshBlocked = usePinStore((s) => s.refreshBlocked);
-  const [pinClickCoords, setPinClickCoords] = useState<{ lng: number; lat: number } | null>(null);
-  const [mouseCoords, setMouseCoords] = useState<{ lng: number; lat: number } | null>(null);
-  const pinMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   const userId = user?.id ?? 'anonymous';
   const userName = profile?.userName ?? 'Anonymous';
@@ -109,8 +129,7 @@ export default function MapCanvas() {
     userName,
   });
 
-  // 2) Sync — 使用 Session Cookie 进行认证，不再需要 access_token
-  // Cookie 会自动携带在 WebSocket 升级请求中
+  // 2) Sync — Use Session Cookie for auth
   const sessionToken = user?.id ? 'authenticated' : '';
 
   const { joinRoom, loadViewport } = useSync({
@@ -235,7 +254,6 @@ export default function MapCanvas() {
     if (engineRef.current) return; // already init
 
     // 使用 map.getContainer() 而不是 getCanvasContainer()
-    // 因为 getCanvasContainer() 的高度为 0（MapLibre 内部实现细节）
     const mapContainer = mapRef.current.getContainer();
     initWithMap(mapRef.current, mapContainer);
 
@@ -244,7 +262,6 @@ export default function MapCanvas() {
   }, [mapReady, initWithMap, engineRef]);
 
   // 6) Load initial viewport after engine + sync are ready
-  //    (runs after useSync creates SyncManager in the same render cycle)
   useEffect(() => {
     if (!engine) return;
     const bounds = engine.viewport.getBounds();
@@ -265,7 +282,7 @@ export default function MapCanvas() {
     if (currentZoom < MIN_PIN_ZOOM) return;
 
     pins.forEach((pin) => {
-      // Wrapper container — will be the marker element, anchored at bottom center
+      // Wrapper container
       const wrapper = document.createElement('div');
       wrapper.style.position = 'relative';
       wrapper.style.display = 'flex';
@@ -273,7 +290,7 @@ export default function MapCanvas() {
       wrapper.style.alignItems = 'center';
       wrapper.style.cursor = 'pointer';
 
-      // -- Tooltip bubble (always visible, truncated) --
+      // -- Tooltip bubble --
       const tooltip = document.createElement('div');
       tooltip.style.cssText = `
         position: relative;
@@ -294,11 +311,9 @@ export default function MapCanvas() {
         pointer-events: auto;
       `;
 
-      // Truncated message (default view)
       const msgPreview = pin.message.length > 10 ? pin.message.slice(0, 10) + '…' : pin.message;
       tooltip.textContent = msgPreview;
 
-      // Tooltip arrow (tail)
       const arrow = document.createElement('div');
       arrow.style.cssText = `
         position: absolute;
@@ -328,7 +343,7 @@ export default function MapCanvas() {
         transform-origin: center center;
       `;
 
-      // Hover expand: show full details in tooltip with Report/Block actions
+      // Hover handlers
       wrapper.addEventListener('mouseenter', () => {
         tooltip.style.maxWidth = '220px';
         tooltip.style.whiteSpace = 'normal';
@@ -336,17 +351,17 @@ export default function MapCanvas() {
         tooltip.style.transform = 'scale(1.08)';
         tooltip.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
         tooltip.innerHTML = '';
-        // Full message
+
         const msgEl = document.createElement('div');
         msgEl.style.cssText = 'font-size:12px;color:#222;margin-bottom:4px;line-height:1.5;';
         msgEl.textContent = pin.message;
         tooltip.appendChild(msgEl);
-        // Meta line: author + time
+
         const metaEl = document.createElement('div');
         metaEl.style.cssText = 'font-size:10px;color:#999;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;';
         metaEl.innerHTML = `<span>${pin.userName || '匿名'}</span><span>${timeAgo(pin.createdAt)}</span>`;
         tooltip.appendChild(metaEl);
-        // Action buttons row (Report / Block)
+
         if (user && pin.userId !== userId) {
           const actionsRow = document.createElement('div');
           actionsRow.style.cssText = 'display:flex;gap:6px;border-top:1px solid #eee;padding-top:5px;';
@@ -381,7 +396,7 @@ export default function MapCanvas() {
           actionsRow.appendChild(blockBtn);
           tooltip.appendChild(actionsRow);
         }
-        // Re-add arrow
+
         const hoverArrow = document.createElement('div');
         hoverArrow.style.cssText = arrow.style.cssText;
         tooltip.appendChild(hoverArrow);
@@ -397,7 +412,7 @@ export default function MapCanvas() {
         tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
         tooltip.innerHTML = '';
         tooltip.textContent = msgPreview;
-        // Re-add arrow
+
         const leaveArrow = document.createElement('div');
         leaveArrow.style.cssText = arrow.style.cssText;
         tooltip.appendChild(leaveArrow);
@@ -414,9 +429,9 @@ export default function MapCanvas() {
         .addTo(map);
       pinMarkersRef.current.push(marker);
     });
-  }, [pins, currentZoom]);
+  }, [pins, currentZoom, user, userId, refreshBlocked]);
 
-  // 8) Handle pin placement: listen for map clicks when in pin-placing mode
+  // 8) Handle pin placement
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -427,43 +442,45 @@ export default function MapCanvas() {
     }
 
     const handleClick = (e: maplibregl.MapMouseEvent) => {
-      // Only allow placement when zoomed in enough
       if (map.getZoom() < MIN_PIN_ZOOM) return;
       setPinClickCoords({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     };
 
     map.on('click', handleClick);
-    // Use pin-shaped SVG cursor matching selected color
-    map.getCanvas().style.cursor = pinCursorSvg(pinColor);
 
     return () => {
       map.off('click', handleClick);
-      if (map.getCanvas()) {
-        map.getCanvas().style.cursor = '';
-      }
     };
-  }, [placingPin, pinColor]);
+  }, [placingPin]);
 
-  // 9) Pin placement cursor — only show pin cursor when zoomed in enough
+  // 9) Cursor management
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const canvas = map.getCanvas();
+
     if (placingPin && currentZoom >= MIN_PIN_ZOOM) {
-      map.getCanvas().style.cursor = pinCursorSvg(pinColor);
+      canvas.style.cursor = pinCursorSvg(pinColor);
+    } else if (drawingMode) {
+      if (activeBrushId === 'eraser') {
+        canvas.style.cursor = eraserCursorSvg(activeSize);
+      } else {
+        canvas.style.cursor = brushCursorSvg(activeColor, activeSize);
+      }
     } else {
-      map.getCanvas().style.cursor = '';
+      canvas.style.cursor = '';
     }
-  }, [drawingMode, placingPin, pinColor, currentZoom]);
+  }, [drawingMode, placingPin, pinColor, currentZoom, activeBrushId, activeColor, activeSize]);
 
   // Pin confirm handler
   const handlePinConfirm = useCallback(
     async (message: string, color: string) => {
       if (!pinClickCoords) return;
 
-      // Consume ink via InkManager if available
+      // Consume ink
       if (engineRef.current?.inkManager) {
         const ok = engineRef.current.inkManager.consume(PIN_INK_COST);
-        if (!ok) return; // not enough ink
+        if (!ok) return;
       }
 
       try {
@@ -544,11 +561,11 @@ export default function MapCanvas() {
         />
       )}
 
-      {/* Zoom level & mouse coordinates — top left, above MapLibre zoom controls */}
+      {/* Zoom level & mouse coordinates */}
       <div className="absolute top-4 left-3 z-30 flex flex-col gap-1.5">
         <div className="flex items-center gap-2 rounded-xl border border-gray-200/60 bg-white/90 px-3 py-2 text-[11px] tabular-nums text-muted-foreground shadow-md backdrop-blur-md">
           <div className="flex items-center gap-1.5">
-            <svg className="h-3.5 w-3.5 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            <svg className="h-3.5 w-3.5 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
             <span className="font-semibold text-foreground">{currentZoom.toFixed(1)}</span>
           </div>
           {mouseCoords && (

@@ -151,16 +151,7 @@ export default function DrawingToolbar({
                 color={currentMode === 'hand' ? '#fff' : '#666'}
               />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.btn, currentMode === 'draw' && styles.activeBtn]}
-              onPress={() => handleModeChange('draw')}
-            >
-              <MaterialCommunityIcons
-                name="pencil"
-                size={18}
-                color={currentMode === 'draw' ? '#fff' : '#666'}
-              />
-            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.btn, currentMode === 'pin' && styles.activeBtn]}
               onPress={() => handleModeChange('pin')}
@@ -180,9 +171,15 @@ export default function DrawingToolbar({
             <TouchableOpacity
               style={[
                 styles.btn,
+                currentMode === 'draw' && currentBrush !== BRUSH_IDS.ERASER && styles.activeBtn, // Highlight pencil if in draw mode
                 currentBrush === BRUSH_IDS.ERASER && styles.eraserBtn,
               ]}
               onPress={() => {
+                // If not in draw mode, switch to draw
+                if (currentMode !== 'draw') {
+                  handleModeChange('draw');
+                  return;
+                }
                 // Toggle between pencil and eraser
                 onBrushSelect(
                   currentBrush === BRUSH_IDS.ERASER
@@ -194,7 +191,7 @@ export default function DrawingToolbar({
               <FontAwesome5
                 name={BRUSH_ICONS[currentBrush] || 'pencil-alt'}
                 size={14}
-                color={currentBrush === BRUSH_IDS.ERASER ? '#fff' : '#333'}
+                color={(currentMode === 'draw' || currentBrush === BRUSH_IDS.ERASER) ? '#fff' : '#333'}
               />
             </TouchableOpacity>
 

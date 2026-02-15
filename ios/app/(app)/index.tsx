@@ -53,8 +53,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import DrawingToolbar from '@/components/DrawingToolbar';
 import ZoomControls from '@/components/ZoomControls';
 import PinPlacer from '@/components/PinPlacer';
-import MapPinOverlay from '@/components/MapPinOverlay';
-import type { PinData } from '@/components/MapPinOverlay';
+import MapPinOverlay, { MapPinTooltip, type PinData } from '@/components/MapPinOverlay';
 import { useRouter } from 'expo-router';
 import {
   fetchDrawings,
@@ -295,6 +294,7 @@ export default function MapScreen() {
     lat: number;
   } | null>(null);
   const [pinLoading, setPinLoading] = useState(false);
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -801,6 +801,12 @@ export default function MapScreen() {
     [mode, cameraState.zoom]
   );
 
+  // Clear selection when touching map (if not hitting a pin)
+  // Note: ShapeSource onPress handles pin hits. MapView onPress handles map hits.
+  const handleMapBackgroundPress = useCallback(() => {
+    if (selectedPinId) setSelectedPinId(null);
+  }, [selectedPinId]);
+
   const handlePinPlace = useCallback(
     async (data: { message: string; color: string }) => {
       if (!pinClickCoords || !inkManagerRef.current) return;
@@ -949,7 +955,11 @@ export default function MapScreen() {
         pitchEnabled={false}
         onRegionIsChanging={handleRegionChanging}
         onRegionDidChange={handleRegionDidChange}
-        onPress={handleMapPress}
+
+        onPress={(e) => {
+          handleMapPress(e);
+          handleMapBackgroundPress();
+        }}
       >
         <MapLibreGL.Camera
           ref={cameraRef}
@@ -959,7 +969,13 @@ export default function MapScreen() {
           }}
         />
 
-        {/* Pins now rendered via MapPinOverlay above the Skia canvas */}
+        {/* Pins - Native PointAnnotations for stability */}
+        {/* Render unconditionally to avoid Fabric view recycling crashes */}
+        {/* Pins - Native ShapeSource for stability */}
+        <MapPinOverlay
+          pins={cameraState.zoom >= MIN_PIN_ZOOM ? visiblePins : []}
+          onPinPress={setSelectedPinId}
+        />
       </MapLibreGL.MapView>
 
       {/* ===== Skia Drawing Overlay ===== */}
@@ -1026,16 +1042,8 @@ export default function MapScreen() {
         </View>
       </GestureDetector>
 
-      {/* ===== Pin Overlay (above Skia canvas) ===== */}
-      {cameraState.zoom >= MIN_PIN_ZOOM && visiblePins.length > 0 && (
-        <MapPinOverlay
-          pins={visiblePins}
-          projection={projectionRef.current}
-          cameraState={cameraState}
-          screenWidth={screenSize.width}
-          screenHeight={screenSize.height}
-        />
-      )}
+
+
 
       {/* ===== UI Overlays ===== */}
 
@@ -1101,9 +1109,24 @@ export default function MapScreen() {
         canRedo={canRedo}
         ink={ink}
         maxInk={100}
+
         currentZoom={cameraState.zoom}
       />
-      {/* Pin details are now shown inline via MapPinOverlay callout */}
+
+      {/* ===== Selected Pin Tooltip (Outside MapView) ===== */}
+      {selectedPinId && (() => {
+        const pin = visiblePins.find(p => p.id === selectedPinId);
+        if (!pin) return null;
+        const screenPos = projectionRef.current.geoToScreen(pin.lng, pin.lat);
+        return (
+          <MapPinTooltip
+            pin={pin}
+            screenX={screenPos.x}
+            screenY={screenPos.y}
+            onDismiss={() => setSelectedPinId(null)}
+          />
+        );
+      })()}
     </View>
   );
 }

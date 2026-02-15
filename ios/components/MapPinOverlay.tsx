@@ -1,28 +1,14 @@
-/**
- * MapPinOverlay — renders pin markers on a View layer ABOVE the Skia canvas.
- *
- * Converts geo coordinates → screen positions using MercatorProjection.
- * Each pin shows:
- *   - A colored circle/pin icon
- *   - A small tooltip bubble above with truncated message
- *   - Tapping expands the bubble to show full details + Report / Block User
- *
- * This replaces the previous ShapeSource + CircleLayer approach so that
- * pins render above the Skia drawing overlay.
- */
 
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  TouchableWithoutFeedback,
-  type LayoutChangeEvent,
+  GestureResponderEvent,
 } from 'react-native';
+import MapLibreGL from '@maplibre/maplibre-react-native';
 import { Compliance } from '@/utils/compliance';
-import type { MercatorProjection } from '@/core/MercatorProjection';
-import type { CameraState } from '@/core/types';
 
 export interface PinData {
   id: string;
@@ -36,15 +22,8 @@ export interface PinData {
 }
 
 interface MapPinOverlayProps {
-  /** Array of visible pins */
   pins: PinData[];
-  /** Projection for geo → screen conversion */
-  projection: MercatorProjection;
-  /** Current camera for dependency tracking */
-  cameraState: CameraState;
-  /** Screen dimensions */
-  screenWidth: number;
-  screenHeight: number;
+  onPinPress: (pinId: string) => void;
 }
 
 /** Format relative time */
@@ -64,25 +43,18 @@ function truncate(msg: string, max: number = 15): string {
   return msg.length > max ? msg.slice(0, max) + '…' : msg;
 }
 
-// Max pins to render for performance
-const MAX_VISIBLE_PINS = 60;
-
 /**
- * Individual pin marker with expandable callout
+ * MapPinTooltip - Renders OUTSIDE the MapView as an absolute overlay.
  */
-function PinMarker({
+export function MapPinTooltip({
   pin,
   screenX,
   screenY,
-  expanded,
-  onPress,
   onDismiss,
 }: {
   pin: PinData;
   screenX: number;
   screenY: number;
-  expanded: boolean;
-  onPress: () => void;
   onDismiss: () => void;
 }) {
   const handleReport = useCallback(() => {
@@ -98,163 +70,161 @@ function PinMarker({
   return (
     <View
       style={[
-        styles.pinContainer,
+        styles.absoluteContainer,
         {
           left: screenX,
           top: screenY,
-          // Anchor at bottom-center of the pin dot (11px = half of 22px dot)
-          transform: [{ translateX: -11 }, { translateY: -48 }],
         },
       ]}
       pointerEvents="box-none"
     >
-      {/* Tooltip bubble */}
+      {/* 
+         Structure:
+         The container is at the exact screen coordinate of the pin center.
+         We render the dot centered here.
+         We render the tooltip above it using absolute positioning.
+      */}
+
+      {/* Selected Pin Highlight (White ring) - Centered */}
+      <View style={[styles.pinDotSelected, { backgroundColor: pin.color }]} />
+
+      {/* Tooltip bubble - Positioned above */}
       <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={onPress}
-        style={[styles.tooltip, expanded && styles.tooltipExpanded]}
+        activeOpacity={1}
+        style={[styles.tooltip]}
+        onPress={(e) => e.stopPropagation()}
       >
-        {expanded ? (
-          <View>
-            {/* Full message */}
-            <Text style={styles.tooltipMessageFull}>{pin.message}</Text>
-            {/* Meta: author + time */}
-            <View style={styles.tooltipMeta}>
-              <Text style={styles.tooltipAuthor}>{pin.userName || '匿名'}</Text>
-              <Text style={styles.tooltipTime}>{timeAgo(pin.createdAt)}</Text>
-            </View>
-            {/* Actions */}
-            <View style={styles.tooltipActions}>
-              <TouchableOpacity style={styles.actionBtn} onPress={handleReport}>
-                <Text style={styles.actionReport}>🚩 Report</Text>
-              </TouchableOpacity>
-              <View style={styles.actionDivider} />
-              <TouchableOpacity style={styles.actionBtn} onPress={handleBlockUser}>
-                <Text style={styles.actionBlock}>🚫 Block</Text>
-              </TouchableOpacity>
-            </View>
+        <View>
+          <Text style={styles.tooltipMessageFull}>{pin.message}</Text>
+          <View style={styles.tooltipMeta}>
+            <Text style={styles.tooltipAuthor}>{pin.userName || '匿名'}</Text>
+            <Text style={styles.tooltipTime}>{timeAgo(pin.createdAt)}</Text>
           </View>
-        ) : (
-          <Text style={styles.tooltipText} numberOfLines={1}>
-            {truncate(pin.message)}
-          </Text>
-        )}
-        {/* Arrow */}
+          <View style={styles.tooltipActions}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleReport}>
+              <Text style={styles.actionReport}>🚩 Report</Text>
+            </TouchableOpacity>
+            <View style={styles.actionDivider} />
+            <TouchableOpacity style={styles.actionBtn} onPress={handleBlockUser}>
+              <Text style={styles.actionBlock}>🚫 Block</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <View style={styles.tooltipArrow} />
       </TouchableOpacity>
-
-      {/* Pin icon */}
-      <View style={[styles.pinDot, { backgroundColor: pin.color }]} />
     </View>
   );
 }
 
 /**
- * Overlay that renders all visible pins above the Skia canvas.
+ * MapPinOverlay - Renders INSIDE the MapView.
+ * Only responsible for the dots (ShapeSource).
  */
-export default function MapPinOverlay({
-  pins,
-  projection,
-  cameraState,
-  screenWidth,
-  screenHeight,
-}: MapPinOverlayProps) {
-  const [expandedPinId, setExpandedPinId] = useState<string | null>(null);
-
-  // Convert pins to screen positions, filter off-screen
-  const visiblePins = useMemo(() => {
-    const margin = 60; // px margin outside screen to keep partially visible pins
-    const result: { pin: PinData; x: number; y: number }[] = [];
-
-    for (const pin of pins) {
-      const pos = projection.geoToScreen(pin.lng, pin.lat);
-      if (
-        pos.x >= -margin &&
-        pos.x <= screenWidth + margin &&
-        pos.y >= -margin &&
-        pos.y <= screenHeight + margin
-      ) {
-        result.push({ pin, x: pos.x, y: pos.y });
-      }
-      if (result.length >= MAX_VISIBLE_PINS) break;
+export default function MapPinOverlay({ pins, onPinPress }: MapPinOverlayProps) {
+  // Convert pins to GeoJSON FeatureCollection
+  const shape = useMemo(() => {
+    if (!pins || pins.length === 0) {
+      return { type: 'FeatureCollection', features: [] };
     }
-    return result;
-    // Re-compute when camera or pins change
-  }, [pins, projection, cameraState.center, cameraState.zoom, cameraState.bearing, screenWidth, screenHeight]);
 
-  const handlePinPress = useCallback((pinId: string) => {
-    setExpandedPinId((prev) => (prev === pinId ? null : pinId));
-  }, []);
+    const features = pins.map((pin) => ({
+      type: 'Feature',
+      id: pin.id,
+      properties: {
+        id: pin.id,
+        color: pin.color,
+        message: truncate(pin.message, 10), // Short message for label
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [pin.lng, pin.lat],
+      },
+    }));
 
-  const handleDismiss = useCallback(() => {
-    setExpandedPinId(null);
-  }, []);
+    return {
+      type: 'FeatureCollection',
+      features,
+    };
+  }, [pins]);
 
-  if (visiblePins.length === 0) return null;
+  const handleLayerPress = useCallback(
+    (e: any) => {
+      const feature = e.features?.[0];
+      if (feature?.properties?.id) {
+        onPinPress(feature.properties.id);
+      }
+    },
+    [onPinPress]
+  );
 
   return (
-    <View style={styles.overlay} pointerEvents="box-none">
-      {/* Tap background to dismiss expanded pin */}
-      {expandedPinId && (
-        <TouchableWithoutFeedback onPress={handleDismiss}>
-          <View style={StyleSheet.absoluteFill} />
-        </TouchableWithoutFeedback>
-      )}
-      {visiblePins.map(({ pin, x, y }) => (
-        <PinMarker
-          key={pin.id}
-          pin={pin}
-          screenX={x}
-          screenY={y}
-          expanded={expandedPinId === pin.id}
-          onPress={() => handlePinPress(pin.id)}
-          onDismiss={handleDismiss}
-        />
-      ))}
-    </View>
+    <MapLibreGL.ShapeSource
+      id="pins-source"
+      shape={shape as any}
+      onPress={handleLayerPress}
+      hitbox={{ width: 44, height: 44 }}
+    >
+      <MapLibreGL.CircleLayer
+        id="pins-layer"
+        style={{
+          circleRadius: 8,
+          circleColor: ['get', 'color'],
+          circleStrokeWidth: 2,
+          circleStrokeColor: '#ffffff',
+          circlePitchAlignment: 'map',
+        }}
+      />
+      {/* Label Layer - uses Noto Sans Regular to avoid 404 */}
+      <MapLibreGL.SymbolLayer
+        id="pins-label"
+        style={{
+          textField: ['get', 'message'],
+          textFont: ['Noto Sans Regular'], // Explicitly set supported font
+          textSize: 11,
+          textOffset: [0, -2], // Above the dot
+          textColor: '#333',
+          textHaloColor: '#fff',
+          textHaloWidth: 2,
+          textAnchor: 'bottom',
+          textAllowOverlap: false,
+          textIgnorePlacement: false,
+        }}
+      />
+    </MapLibreGL.ShapeSource>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  // Container for Tooltip (absolute positioning context is the MapScreen)
+  absoluteContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 15, // Above Skia canvas (10) but below UI controls (200)
-  },
-  pinContainer: {
-    position: 'absolute',
+    width: 0,
+    height: 0,
     alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100, // Above everything
     overflow: 'visible',
   },
+
   // --- Tooltip ---
   tooltip: {
+    position: 'absolute',
+    bottom: 22, // Distance from center anchor (13px radius + 9px spacing)
     backgroundColor: '#fff',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 5,
-    maxWidth: 160,
-    minWidth: 60,
-    alignSelf: 'center',
+    minWidth: 140,
+    maxWidth: 240,
+    alignSelf: 'center', // Horizontal centering relative to absoluteContainer
   },
   tooltipExpanded: {
-    maxWidth: 240,
-    minWidth: 120,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tooltipText: {
-    fontSize: 11,
-    lineHeight: 16,
-    color: '#333',
+    // Shared style
   },
   tooltipMessageFull: {
     fontSize: 13,
@@ -277,7 +247,7 @@ const styles = StyleSheet.create({
   },
   tooltipArrow: {
     position: 'absolute',
-    bottom: -5,
+    bottom: -6, // Arrow sticks out bottom
     alignSelf: 'center',
     width: 0,
     height: 0,
@@ -313,17 +283,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FF9500',
   },
-  // --- Pin dot ---
-  pinDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2.5,
+  // --- Selected Pin Dot (Native View) ---
+  pinDotSelected: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 3,
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 6,
+    position: 'absolute',
+    top: -13, // Center vertically (26/2)
+    left: -13, // Center horizontally
   },
 });

@@ -16,13 +16,21 @@ import { Pencil, Eraser } from 'lucide-react';
  * Size & opacity controls have been moved to ColorPicker.
  */
 export default function BrushPanel() {
-  const { activeBrushId, selectBrush } = useToolbar();
+  const { activeBrushId, selectBrush, drawingMode, toggleDrawingMode } = useToolbar();
 
   const isEraser = activeBrushId === BRUSH_IDS.ERASER;
 
   const toggleBrush = useCallback(() => {
-    selectBrush(isEraser ? BRUSH_IDS.PENCIL : BRUSH_IDS.ERASER);
-  }, [isEraser, selectBrush]);
+    // If not in draw mode, switch to draw mode
+    if (!drawingMode) {
+      toggleDrawingMode(); // This sets drawingMode=true
+      // Ensure we are on the current brush (or default)
+      selectBrush(activeBrushId);
+    } else {
+      // Toggle between pencil and eraser
+      selectBrush(isEraser ? BRUSH_IDS.PENCIL : BRUSH_IDS.ERASER);
+    }
+  }, [drawingMode, toggleDrawingMode, isEraser, selectBrush, activeBrushId]);
 
   return (
     <Tooltip>
@@ -33,7 +41,9 @@ export default function BrushPanel() {
             'flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-colors',
             isEraser
               ? 'bg-orange-500 text-white shadow hover:bg-orange-400'
-              : 'bg-primary text-primary-foreground shadow hover:bg-primary/90'
+              : drawingMode
+                ? 'bg-violet-600 text-white shadow hover:bg-violet-500' // Highlight when active
+                : 'bg-primary text-primary-foreground shadow hover:bg-primary/90'
           )}
         >
           {isEraser ? <Eraser className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}

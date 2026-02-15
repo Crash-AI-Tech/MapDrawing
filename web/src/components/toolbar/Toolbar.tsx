@@ -119,20 +119,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
           <TooltipContent side="bottom">Navigation</TooltipContent>
         </Tooltip>
 
-        {/* Draw */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn('h-9 w-9 rounded-full', currentMode === 'draw' && ACTIVE_BTN)}
-              onClick={() => switchMode('draw')}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">Draw</TooltipContent>
-        </Tooltip>
+
 
         {/* Pin */}
         <Tooltip>
