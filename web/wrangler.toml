@@ -20,6 +20,7 @@ service = "map"
 binding = "DB"
 database_name = "map-db"
 database_id = "bf333342-1998-421a-a439-465caea85ae9"
+migrations_dir = "../drizzle/migrations"
 
 # R2 对象存储 (用户上传)
 [[r2_buckets]]

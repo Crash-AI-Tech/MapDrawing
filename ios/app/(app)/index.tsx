@@ -67,8 +67,9 @@ import {
   type PinItem,
   type PageCursor,
 } from '@/lib/api';
-import { API_BASE_URL, DO_BASE_URL } from '@/lib/config';
+import { API_BASE_URL } from '@/lib/config';
 import { SyncManager } from '@/core/sync/SyncManager';
+import { TileManager } from '@/core/sync/TileManager';
 import {
   BRUSH_IDS,
   type BrushId,
@@ -225,6 +226,7 @@ export default function MapScreen() {
   // ===== Real-time Collaboration =====
   const [session, setSession] = useState<{ token: string; userId: string } | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
+  const tileManagerRef = useRef<TileManager | null>(null);
 
 
 
@@ -247,42 +249,21 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // 2. Init SyncManager
+  // 2. Init SyncManager & TileManager
   useEffect(() => {
     if (!session) return;
 
     syncManagerRef.current = new SyncManager({
-      doBaseUrl: DO_BASE_URL,
-      accessToken: session.token,
       userId: session.userId,
-      onRemoteStroke: (stroke) => {
-        strokesRef.current.set(stroke.id, stroke);
-        loadedStrokeIdsRef.current.add(stroke.id);
-        tileRendererRef.current.addStroke(stroke);
-        bumpStrokeVersion();
-      },
-      onRemoteDelete: (strokeId) => {
-        strokesRef.current.delete(strokeId);
-        loadedStrokeIdsRef.current.delete(strokeId);
-        tileRendererRef.current.removeStroke(strokeId);
-        bumpStrokeVersion();
-      },
     });
 
-    // Join initial room
-    syncManagerRef.current.joinRoom(cameraState.center[1], cameraState.center[0]);
+    tileManagerRef.current = new TileManager({});
 
     return () => {
       syncManagerRef.current?.dispose();
     };
-  }, [session, bumpStrokeVersion]); // cameraState initial read is safe
+  }, [session]);
 
-  // 3. Update Room (Real-time)
-  useEffect(() => {
-    if (syncManagerRef.current) {
-      syncManagerRef.current.joinRoom(cameraState.center[1], cameraState.center[0]);
-    }
-  }, [cameraState.center]);
 
   // ===== Pin State (flat arrays for MapPinOverlay) =====
   const [visiblePins, setVisiblePins] = useState<PinData[]>([]);
@@ -388,26 +369,23 @@ export default function MapScreen() {
     };
 
     try {
-      // --- Load Strokes (paginated) ---
-      let strokeCursor: PageCursor | null = null;
-      let strokePageCount = 0;
       let newStrokesAdded = false;
-
-      do {
-        const page = await fetchDrawings({
+      // --- Load Strokes (Tile-based) ---
+      if (tileManagerRef.current) {
+        const newStrokes = await tileManagerRef.current.fetchMissingTiles({
           minLat: bounds.minLat, maxLat: bounds.maxLat,
-          minLng: bounds.minLng, maxLng: bounds.maxLng,
-          zoom, limit: DRAWINGS_PAGE_SIZE, cursor: strokeCursor,
+          minLng: bounds.minLng, maxLng: bounds.maxLng
         });
-        for (const stroke of page.items) {
-          if (!strokesRef.current.has(stroke.id)) newStrokesAdded = true;
-          strokesRef.current.set(stroke.id, stroke);
-          loadedStrokeIdsRef.current.add(stroke.id);
-          touchStroke(stroke.id);
+
+        if (newStrokes.length > 0) {
+          for (const stroke of newStrokes) {
+            if (!strokesRef.current.has(stroke.id)) newStrokesAdded = true;
+            strokesRef.current.set(stroke.id, stroke);
+            loadedStrokeIdsRef.current.add(stroke.id);
+            touchStroke(stroke.id);
+          }
         }
-        strokeCursor = page.nextCursor;
-        strokePageCount += 1;
-      } while (strokeCursor && strokePageCount < DRAWINGS_MAX_PAGES);
+      }
 
       // LRU Eviction
       if (strokesRef.current.size > DRAWINGS_MAX_CACHE) {
@@ -431,12 +409,6 @@ export default function MapScreen() {
       );
       if (newStrokesAdded) bumpStrokeVersion();
 
-      // Update Room (Real-time)
-      if (syncManagerRef.current) {
-        const centerLat = (bounds.minLat + bounds.maxLat) / 2;
-        const centerLng = (bounds.minLng + bounds.maxLng) / 2;
-        syncManagerRef.current.joinRoom(centerLat, centerLng);
-      }
 
       // --- Load Pins (paginated/clustered) ---
       const pinFirstPage = await fetchPins({

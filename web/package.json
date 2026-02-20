@@ -10,8 +10,8 @@
     "preview": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare preview",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "db:migrate": "npx wrangler d1 execute map-db --local --file=../drizzle/migrations/0001_init.sql && npx wrangler d1 execute map-db --local --file=../drizzle/migrations/0002_map_pins.sql && npx wrangler d1 execute map-db --local --file=../drizzle/migrations/0003_email_verification.sql",
-    "db:migrate:prod": "npx wrangler d1 execute map-db --remote --file=../drizzle/migrations/0001_init.sql && npx wrangler d1 execute map-db --remote --file=../drizzle/migrations/0002_map_pins.sql && npx wrangler d1 execute map-db --remote --file=../drizzle/migrations/0003_email_verification.sql",
+    "db:migrate": "npx wrangler d1 migrations apply map-db --local",
+    "db:migrate:prod": "npx wrangler d1 migrations apply map-db --remote",
     "deploy": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy",
     "upload": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare upload",
     "deploy:workers": "cd ../cf-workers && npx wrangler deploy"

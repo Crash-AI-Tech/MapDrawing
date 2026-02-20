@@ -1,5 +1,4 @@
 packages:
   - 'web'
   - 'ios'
-  - 'cf-workers'
   - 'packages/*'

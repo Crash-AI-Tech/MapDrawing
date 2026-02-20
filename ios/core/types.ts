@@ -110,3 +110,23 @@ export function getTileKey(lat: number, lng: number, zoom: number = 14): string 
   );
   return `${zoom}/${x}/${y}`;
 }
+/** Convert tile coordinates to lat/lng bounds */
+export function tileToBounds(x: number, y: number, z: number): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+  const n = Math.pow(2, z);
+  const minLng = (x / n) * 360 - 180;
+  const maxLng = ((x + 1) / n) * 360 - 180;
+
+  // Mercator projection reverse
+  const latRad1 = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
+  const latRad2 = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n)));
+
+  const lat1 = (latRad1 * 180) / Math.PI;
+  const lat2 = (latRad2 * 180) / Math.PI;
+
+  return {
+    minLat: Math.min(lat1, lat2),
+    maxLat: Math.max(lat1, lat2),
+    minLng,
+    maxLng,
+  };
+}

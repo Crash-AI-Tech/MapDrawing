@@ -57,3 +57,31 @@ export function getTileKey(lat: number, lng: number, zoom: number = 14): string 
   const tile = latLngToTile(lat, lng, zoom);
   return `${tile.z}/${tile.x}/${tile.y}`;
 }
+
+/** Convert tile coordinates to lat/lng bounds */
+export function tileToBounds(x: number, y: number, z: number): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+  const n = Math.pow(2, z);
+  const minLng = (x / n) * 360 - 180;
+  const maxLng = ((x + 1) / n) * 360 - 180;
+
+  // Mercator projection reverse
+  const latRad1 = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
+  const latRad2 = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n)));
+
+  // latRad1 is the "top" (higher latitude if y is smaller), latRad2 is "bottom"
+  // But wait, tile Y goes from 0 (North) to N (South).
+  // So y=0 -> 85.05, y=max -> -85.05.
+  // We need to return minLat, maxLat.
+  // latRad1 corresponds to y (Top edge), latRad2 corresponds to y+1 (Bottom edge).
+  // So maxLat is latRad1, minLat is latRad2.
+
+  const lat1 = (latRad1 * 180) / Math.PI;
+  const lat2 = (latRad2 * 180) / Math.PI;
+
+  return {
+    minLat: Math.min(lat1, lat2),
+    maxLat: Math.max(lat1, lat2),
+    minLng,
+    maxLng,
+  };
+}
