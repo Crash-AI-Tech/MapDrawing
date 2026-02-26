@@ -21,16 +21,46 @@ export class TileManager {
     /** Track loaded tiles: "z/x/y" -> state */
     private tiles = new Map<string, TileState>();
 
+    /** AbortController for cancelling in-flight requests */
+    private abortController: AbortController | null = null;
+
     constructor(config: TileManagerConfig = {}) {
         this.zoomLevel = config.zoomLevel ?? 14;
         this.cacheExpiration = config.cacheExpiration ?? 5 * 60 * 1000;
     }
 
     /**
+     * Cancel any in-flight tile fetches.
+     * Called automatically when a new fetchMissingTiles starts.
+     */
+    cancelInFlight() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+
+            // Reset all tiles that were in "loading" state back to unfetched.
+            // Without this, aborted tiles stay stuck as loading:true forever
+            // and all future fetchMissingTiles calls skip them → 0 strokes.
+            for (const [key, state] of this.tiles) {
+                if (state.loading) {
+                    this.tiles.delete(key);
+                }
+            }
+        }
+    }
+
+    /**
      * Determine which tiles are needed for the given bounds,
      * find the ones not loaded or expired, and fetch them.
+     * Automatically cancels any previous in-flight fetch.
      */
     async fetchMissingTiles(bounds: GeoBounds): Promise<StrokeData[]> {
+        // Cancel previous fetch batch
+        this.cancelInFlight();
+
+        const controller = new AbortController();
+        this.abortController = controller;
+
         const missingTiles: string[] = [];
         const tilesInView = this.getTilesCoveringBounds(bounds);
 
@@ -50,34 +80,45 @@ export class TileManager {
             return [];
         }
 
-        // Fetch all missing tiles in parallel
+        // Fetch missing tiles with concurrency limit (max 3 concurrent)
         const allNewStrokes: StrokeData[] = [];
+        const MAX_CONCURRENT = 3;
 
-        await Promise.all(missingTiles.map(async (key) => {
-            try {
+        for (let i = 0; i < missingTiles.length; i += MAX_CONCURRENT) {
+            // Check if this fetch was cancelled
+            if (controller.signal.aborted) return allNewStrokes;
+
+            const batch = missingTiles.slice(i, i + MAX_CONCURRENT);
+            await Promise.all(batch.map(async (key) => {
+                if (controller.signal.aborted) return;
+
                 const [z, x, y] = key.split('/').map(Number);
                 const tileBounds = tileToBounds(x, y, z);
 
-                const data = await fetchDrawings({
-                    minLat: tileBounds.minLat,
-                    maxLat: tileBounds.maxLat,
-                    minLng: tileBounds.minLng,
-                    maxLng: tileBounds.maxLng,
-                    zoom: z,
-                    limit: 1000
-                });
+                try {
+                    const data = await fetchDrawings({
+                        minLat: tileBounds.minLat,
+                        maxLat: tileBounds.maxLat,
+                        minLng: tileBounds.minLng,
+                        maxLng: tileBounds.maxLng,
+                        zoom: z,
+                        limit: 1000,
+                        signal: controller.signal,
+                    });
 
-                const items = data.items || [];
-                allNewStrokes.push(...items);
+                    const items = data.items || [];
+                    allNewStrokes.push(...items);
 
-                // Mark as loaded
-                this.tiles.set(key, { loadedAt: Date.now(), loading: false });
-            } catch (e) {
-                console.error(`[TileManager] Failed to fetch tile ${key}:`, e);
-                // Reset loading state so we can retry later
-                this.tiles.delete(key);
-            }
-        }));
+                    // Mark as loaded
+                    this.tiles.set(key, { loadedAt: Date.now(), loading: false });
+                } catch (e: any) {
+                    if (e?.name === 'AbortError') return; // silently ignore aborted
+                    console.error(`[TileManager] Failed to fetch tile ${key}:`, e?.message);
+                    // Reset loading state so we can retry later
+                    this.tiles.delete(key);
+                }
+            }));
+        }
 
         return allNewStrokes;
     }
@@ -115,6 +156,7 @@ export class TileManager {
 
     /** Clear cache (e.g. on force refresh) */
     clearCache() {
+        this.cancelInFlight();
         this.tiles.clear();
     }
 }

@@ -31,9 +31,9 @@ export async function GET(request: Request) {
         cursor:
           cursorCreatedAt && cursorId
             ? {
-                createdAt: parseInt(cursorCreatedAt, 10),
-                id: cursorId,
-              }
+              createdAt: parseInt(cursorCreatedAt, 10),
+              id: cursorId,
+            }
             : undefined,
       }
     );
@@ -64,9 +64,12 @@ export async function GET(request: Request) {
       items: strokes,
       nextCursor,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error('[API /drawings] Server error:', e);
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
+    return Response.json(
+      { error: 'Internal server error', detail: e?.message || String(e) },
+      { status: 500 }
+    );
   }
 }
 

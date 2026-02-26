@@ -49,6 +49,7 @@ import {
   type SkPath,
   type SkPicture,
 } from '@shopify/react-native-skia';
+import * as SecureStore from 'expo-secure-store';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import DrawingToolbar from '@/components/DrawingToolbar';
 import ZoomControls from '@/components/ZoomControls';
@@ -243,21 +244,27 @@ export default function MapScreen() {
       try {
         const profile = await fetchProfile();
         setSession({ token, userId: profile.id });
-      } catch (e) {
-        console.warn('[MapScreen] Failed to fetch profile', e);
+      } catch (e: any) {
+        // If token is expired/invalid (401), clear it so we don't retry on next launch
+        if (e?.status === 401) {
+          await SecureStore.deleteItemAsync('session');
+        }
       }
     })();
   }, []);
 
-  // 2. Init SyncManager & TileManager
+  // 2a. Init TileManager unconditionally (drawings API is public, no auth needed)
+  useEffect(() => {
+    tileManagerRef.current = new TileManager({});
+  }, []);
+
+  // 2b. Init SyncManager (requires session)
   useEffect(() => {
     if (!session) return;
 
     syncManagerRef.current = new SyncManager({
       userId: session.userId,
     });
-
-    tileManagerRef.current = new TileManager({});
 
     return () => {
       syncManagerRef.current?.dispose();
@@ -338,6 +345,9 @@ export default function MapScreen() {
 
   // ===== Viewport loading: paginated fetch + TileRenderer update =====
   const loadViewport = useCallback(async () => {
+    // Cancel any in-flight tile fetches from a previous call
+    // (TileManager.fetchMissingTiles already calls cancelInFlight internally)
+
     const proj = projectionRef.current;
     const bounds = proj.getViewportBounds();
     const zoom = cameraZoomRef.current;
@@ -371,13 +381,17 @@ export default function MapScreen() {
     try {
       let newStrokesAdded = false;
       // --- Load Strokes (Tile-based) ---
-      if (tileManagerRef.current) {
+      // Only fetch tiles when zoomed in enough for drawings to be visible.
+      // TileManager uses zoom 14; drawings hide below zoom (14 - STROKE_HIDE_ZOOM_DIFF).
+      const MIN_DRAWINGS_ZOOM = 14 - STROKE_HIDE_ZOOM_DIFF;
+      if (tileManagerRef.current && zoom >= MIN_DRAWINGS_ZOOM) {
         const newStrokes = await tileManagerRef.current.fetchMissingTiles({
           minLat: bounds.minLat, maxLat: bounds.maxLat,
           minLng: bounds.minLng, maxLng: bounds.maxLng
         });
 
         if (newStrokes.length > 0) {
+          console.log(`[loadViewport] Got ${newStrokes.length} new strokes (total: ${strokesRef.current.size + newStrokes.length})`);
           for (const stroke of newStrokes) {
             if (!strokesRef.current.has(stroke.id)) newStrokesAdded = true;
             strokesRef.current.set(stroke.id, stroke);
@@ -494,8 +508,10 @@ export default function MapScreen() {
           }
         }
       }
-    } catch (e) {
-      console.warn('[loadViewport] Failed:', e);
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        console.warn('[loadViewport] Failed:', e);
+      }
     }
   }, [bumpStrokeVersion]);
 
@@ -504,6 +520,14 @@ export default function MapScreen() {
     const timer = setTimeout(loadViewport, 500);
     return () => clearTimeout(timer);
   }, [loadViewport]);
+
+  // Re-trigger viewport load when session becomes available
+  // (the initial 500ms load may fire before auth completes)
+  useEffect(() => {
+    if (session && tileManagerRef.current) {
+      loadViewport();
+    }
+  }, [session, loadViewport]);
 
   // ===== Tile-based Picture (idle: composed from cached tile images) =====
   const tilePicture = useMemo(() => {
@@ -839,8 +863,8 @@ export default function MapScreen() {
       if (coords && props) {
         setCameraState({
           center: [coords[0], coords[1]] as [number, number],
-          zoom: props.zoomLevel ?? MAP_DEFAULT_ZOOM,
-          bearing: props.heading ?? 0,
+          zoom: props.zoomLevel ?? props.zoom ?? MAP_DEFAULT_ZOOM,
+          bearing: props.heading ?? props.bearing ?? 0,
           pitch: props.pitch ?? 0,
         });
       }
@@ -851,6 +875,14 @@ export default function MapScreen() {
 
   const handleRegionChanging = useCallback(
     (feature: any) => {
+      // Clear any pending interaction-end timer from a previous gesture.
+      // Without this, a timer from a previous drag can fire mid-zoom
+      // and incorrectly set isMapInteracting=false, causing zoom desync.
+      if (interactionEndTimerRef.current) {
+        clearTimeout(interactionEndTimerRef.current);
+        interactionEndTimerRef.current = null;
+      }
+
       if (!isMapInteractingRef.current) {
         isMapInteractingRef.current = true;
         setIsMapInteracting(true);

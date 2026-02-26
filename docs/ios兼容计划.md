@@ -148,6 +148,7 @@ eas build --platform ios --profile production --auto-submit
 ## 打包
 ### 编译打包
 eas build --platform ios
+eas build --platform ios --local
 
 ### 在Expo服务器上构建
 eas submit -p ios

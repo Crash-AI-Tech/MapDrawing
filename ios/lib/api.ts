@@ -25,22 +25,28 @@ export async function getToken(): Promise<string | null> {
 interface FetchOptions extends Omit<RequestInit, 'headers'> {
   auth?: boolean;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 }
 
 /**
  * Fetch with automatic auth token injection.
  * Throws on non-2xx responses.
+ * Supports AbortSignal for request cancellation.
  */
 export async function apiFetch<T = any>(
   path: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { auth = false, headers = {}, ...rest } = options;
+  const { auth = false, headers = {}, signal, ...rest } = options;
 
   const finalHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...headers,
   };
+
+  // Only set Content-Type for requests with a body (POST, PUT, PATCH)
+  if (rest.body) {
+    finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json';
+  }
 
   if (auth) {
     const token = await getToken();
@@ -50,24 +56,33 @@ export async function apiFetch<T = any>(
   }
 
   const url = `${API_BASE_URL}${path}`;
-  const response = await fetch(url, { headers: finalHeaders, ...rest });
 
-  if (!response.ok) {
-    const body = await response.text();
-    let message: string;
-    try {
-      const json = JSON.parse(body);
-      message = json.error || json.message || body;
-    } catch {
-      message = body;
+  try {
+    const response = await fetch(url, { headers: finalHeaders, signal, ...rest });
+
+    if (!response.ok) {
+      const body = await response.text();
+      let message: string;
+      try {
+        const json = JSON.parse(body);
+        message = json.detail || json.error || json.message || body;
+      } catch {
+        message = body;
+      }
+      throw new ApiError(response.status, message);
     }
-    throw new ApiError(response.status, message);
+
+    // Handle empty response (204)
+    if (response.status === 204) return undefined as T;
+
+    return response.json();
+  } catch (error: any) {
+    // Don't log intentionally aborted requests or expected auth failures
+    if (error?.name !== 'AbortError' && error?.status !== 401) {
+      console.error(`[apiFetch] ${url} failed:`, error?.message || error);
+    }
+    throw error;
   }
-
-  // Handle empty response (204)
-  if (response.status === 204) return undefined as T;
-
-  return response.json();
 }
 
 export class ApiError extends Error {
@@ -132,6 +147,7 @@ export async function fetchDrawings(
     zoom?: number;
     limit?: number;
     cursor?: PageCursor | null;
+    signal?: AbortSignal;
   }
 ): Promise<{
   items: StrokeData[];
@@ -152,7 +168,7 @@ export async function fetchDrawings(
       : {}),
   }).toString();
 
-  return apiFetch(`/api/drawings?${qs}`);
+  return apiFetch(`/api/drawings?${qs}`, { signal: params.signal });
 }
 
 /**
