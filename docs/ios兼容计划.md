@@ -143,3 +143,16 @@ eas build --platform ios --profile production --auto-submit
 由于中国区对地图 (测绘资质) 和 UGC (ICP备案/安全评估) 的严格限制，**强烈建议**:
 *   **首发**: 在 App Store Connect 的 "Availability" 中 **取消勾选 "China Mainland"**。
 *   **策略**: 优先上架美国、香港、台湾、日本等地区。这些地区只需遵守 Apple 通用规则，无需中国特有的牌照。
+
+
+## 打包
+### 编译打包
+eas build --platform ios
+
+### 在Expo服务器上构建
+eas submit -p ios
+
+### 查看构建结果
+浏览器登录 Apple Developer 控制台：App Store Connect。https://appstoreconnect.apple.com/
+
+

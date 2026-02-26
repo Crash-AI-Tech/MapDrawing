@@ -70,7 +70,17 @@ export default function Login() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             });
-            const data = await response.json();
+
+            let data;
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await response.json();
+            } else {
+                const textDetail = await response.text();
+                console.error("Non-JSON API response:", textDetail);
+                data = { error: `Server error (${response.status})` };
+            }
+
             if (response.ok && data.token) {
                 await signIn(data.token);
             } else {

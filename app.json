@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "5af51a9c-0e11-4323-9efa-c63ee875f745"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.nsaviour.niubiagentmonorepo",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
