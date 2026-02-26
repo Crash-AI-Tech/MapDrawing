@@ -45,11 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isLoading) return;
 
-        if (!session && rootSegment !== '(auth)') {
-            router.replace('/(auth)/login');
-        } else if (session && rootSegment === '(auth)') {
+        // Only redirect FROM auth pages back to app if logged in.
+        // Guests can freely access the app (map) without logging in.
+        if (session && rootSegment === '(auth)') {
             router.replace('/(app)');
         }
+        // Note: we do NOT redirect unauthenticated users to login.
+        // Guest access is allowed. Login is prompted when drawing/placing pins.
     }, [session, rootSegment, isLoading]);
 
     const signIn = async (token: string) => {

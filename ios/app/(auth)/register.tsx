@@ -1,87 +1,46 @@
-import * as AppleAuthentication from 'expo-apple-authentication';
 import { View, StyleSheet, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import { API_BASE_URL } from '@/lib/config';
 import { useRouter } from 'expo-router';
 
-export default function Login() {
+export default function Register() {
     const { signIn } = useAuth();
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [userName, setUserName] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Verify step (when login detects unverified email)
-    const [step, setStep] = useState<'login' | 'verify'>('login');
+    // Verification step
+    const [step, setStep] = useState<'form' | 'verify'>('form');
     const [verifyEmail, setVerifyEmail] = useState('');
     const [code, setCode] = useState('');
+    const [resending, setResending] = useState(false);
 
-    const handleAppleSignIn = async () => {
-        try {
-            const credential = await AppleAuthentication.signInAsync({
-                requestedScopes: [
-                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
-                ],
-            });
-
-            if (credential.identityToken) {
-                const response = await fetch(`${API_BASE_URL}/api/auth/mobile/apple`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        identityToken: credential.identityToken,
-                        user: JSON.stringify({
-                            name: {
-                                firstName: credential.fullName?.givenName,
-                                lastName: credential.fullName?.familyName
-                            },
-                            email: credential.email
-                        })
-                    }),
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.token) {
-                    await signIn(data.token);
-                } else {
-                    Alert.alert('Login Failed', data.error || 'Unknown error');
-                }
-            }
-        } catch (e: any) {
-            if (e.code === 'ERR_REQUEST_CANCELED') {
-                // User canceled — do nothing
-            } else {
-                Alert.alert('Apple Sign In Error', e.message);
-            }
-        }
-    };
-
-    const handleEmailSignIn = async () => {
+    const handleRegister = async () => {
         if (!email || !password) {
             Alert.alert('Error', 'Please enter email and password');
             return;
         }
+        if (password.length < 6) {
+            Alert.alert('Error', 'Password must be at least 6 characters');
+            return;
+        }
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/mobile/login`, {
+            const res = await fetch(`${API_BASE_URL}/api/auth/mobile/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, userName: userName || undefined }),
             });
+            const data = await res.json();
 
-            const data = await response.json();
-
-            if (response.ok && data.token) {
-                await signIn(data.token);
-            } else if (data.step === 'verify') {
-                // Email not verified — show verify step
-                setVerifyEmail(data.email || email);
+            if (res.ok && data.step === 'verify') {
+                setVerifyEmail(data.email);
                 setStep('verify');
             } else {
-                Alert.alert('Login Failed', data.error || 'Invalid credentials');
+                Alert.alert('Registration Failed', data.error || 'Unknown error');
             }
         } catch (e: any) {
             Alert.alert('Network Error', e.message);
@@ -116,14 +75,35 @@ export default function Login() {
         }
     };
 
+    const handleResend = async () => {
+        setResending(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/mobile/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: verifyEmail, action: 'resend' }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                Alert.alert('Sent', 'A new verification code has been sent to your email');
+            } else {
+                Alert.alert('Error', data.error || 'Failed to resend');
+            }
+        } catch (e: any) {
+            Alert.alert('Network Error', e.message);
+        } finally {
+            setResending(false);
+        }
+    };
+
     if (step === 'verify') {
         return (
             <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <Text style={styles.emoji}>📧</Text>
-                    <Text style={styles.title}>Verify Email</Text>
+                    <Text style={styles.title}>Verify Your Email</Text>
                     <Text style={styles.subtitle}>
-                        Enter the code sent to{'\n'}
+                        We sent a 6-digit code to{'\n'}
                         <Text style={styles.emailHighlight}>{verifyEmail}</Text>
                     </Text>
 
@@ -147,8 +127,8 @@ export default function Login() {
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity onPress={() => setStep('login')}>
-                        <Text style={styles.link}>Back to Login</Text>
+                    <TouchableOpacity onPress={handleResend} disabled={resending}>
+                        <Text style={styles.link}>{resending ? 'Sending...' : 'Resend Code'}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -158,9 +138,9 @@ export default function Login() {
     return (
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-                <Text style={styles.emoji}>🎨</Text>
-                <Text style={styles.title}>Welcome Back</Text>
-                <Text style={styles.subtitle}>Sign in to draw on the world map</Text>
+                <Text style={styles.emoji}>✨</Text>
+                <Text style={styles.title}>Create Account</Text>
+                <Text style={styles.subtitle}>Join the global map drawing community</Text>
 
                 <View style={styles.form}>
                     <TextInput
@@ -174,7 +154,15 @@ export default function Login() {
                     />
                     <TextInput
                         style={styles.input}
-                        placeholder="Password"
+                        placeholder="Username (optional)"
+                        placeholderTextColor="#999"
+                        value={userName}
+                        onChangeText={setUserName}
+                        autoCapitalize="none"
+                    />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Password (min 6 characters)"
                         placeholderTextColor="#999"
                         value={password}
                         onChangeText={setPassword}
@@ -182,39 +170,15 @@ export default function Login() {
                     />
                     <TouchableOpacity
                         style={[styles.button, loading && styles.buttonDisabled]}
-                        onPress={handleEmailSignIn}
+                        onPress={handleRegister}
                         disabled={loading}
                     >
-                        <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
+                        <Text style={styles.buttonText}>{loading ? 'Creating...' : 'Create Account'}</Text>
                     </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                    <Text style={styles.link}>Forgot Password?</Text>
-                </TouchableOpacity>
-
-                <View style={styles.divider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>OR</Text>
-                    <View style={styles.dividerLine} />
-                </View>
-
-                <AppleAuthentication.AppleAuthenticationButton
-                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                    cornerRadius={12}
-                    style={styles.appleButton}
-                    onPress={handleAppleSignIn}
-                />
-
-                <TouchableOpacity style={styles.registerLink} onPress={() => router.push('/(auth)/register')}>
-                    <Text style={styles.registerText}>
-                        Don't have an account? <Text style={styles.registerHighlight}>Sign Up</Text>
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.skipLink} onPress={() => router.replace('/(app)')}>
-                    <Text style={styles.skipText}>Continue as Guest</Text>
+                <TouchableOpacity onPress={() => router.back()}>
+                    <Text style={styles.link}>Already have an account? Log In</Text>
                 </TouchableOpacity>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -256,7 +220,7 @@ const styles = StyleSheet.create({
     form: {
         width: '100%',
         gap: 12,
-        marginBottom: 16,
+        marginBottom: 24,
     },
     input: {
         borderWidth: 1,
@@ -296,46 +260,6 @@ const styles = StyleSheet.create({
     },
     link: {
         color: '#007AFF',
-        fontSize: 14,
-        marginBottom: 8,
-    },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        width: '100%',
-        marginVertical: 20,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#e0e0e0',
-    },
-    dividerText: {
-        marginHorizontal: 12,
-        color: '#999',
-        fontSize: 13,
-        fontWeight: '500',
-    },
-    appleButton: {
-        width: '100%',
-        height: 50,
-    },
-    registerLink: {
-        marginTop: 24,
-    },
-    registerText: {
-        color: '#666',
         fontSize: 15,
-    },
-    registerHighlight: {
-        color: '#007AFF',
-        fontWeight: '600',
-    },
-    skipLink: {
-        marginTop: 16,
-    },
-    skipText: {
-        color: '#999',
-        fontSize: 14,
     },
 });

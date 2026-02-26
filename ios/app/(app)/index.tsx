@@ -286,6 +286,22 @@ export default function MapScreen() {
 
   const router = useRouter();
 
+  // Guarded mode setter: prompt login for draw/pin if not authenticated
+  const handleModeChange = useCallback((newMode: 'hand' | 'draw' | 'pin') => {
+    if ((newMode === 'draw' || newMode === 'pin') && !session) {
+      Alert.alert(
+        'Sign In Required',
+        'You need to sign in to draw or place pins.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+        ]
+      );
+      return;
+    }
+    setMode(newMode);
+  }, [session, router]);
+
   // ===== Remote Data Loading =====
   const loadedStrokeIdsRef = useRef<Set<string>>(new Set());
   const strokeLruRef = useRef<Map<string, number>>(new Map());
@@ -1098,7 +1114,7 @@ export default function MapScreen() {
       {/* ===== Drawing Toolbar ===== */}
       <DrawingToolbar
         currentMode={mode}
-        onModeChange={setMode}
+        onModeChange={handleModeChange}
         currentColor={currentColor}
         onColorSelect={setCurrentColor}
         currentBrush={currentBrush}
