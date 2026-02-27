@@ -234,22 +234,14 @@ export default function DrawingToolbar({
           </View>
         </View>
 
-        {/* ===== Ink Bar ===== */}
-        <View style={styles.inkBarContainer}>
-          <View style={styles.inkBarTrack}>
-            <View
-              style={[
-                styles.inkBarFill,
-                {
-                  width: `${inkPercent * 100}%`,
-                  backgroundColor: inkColor,
-                },
-              ]}
-            />
+        {/* Ink Droplet hovering above toolbar */}
+        <View style={styles.inkDropletContainer}>
+          <View style={styles.inkDroplet}>
+            <MaterialCommunityIcons name="water" size={12} color={inkColor} />
+            <Text style={[styles.inkDropletText, { color: inkColor }]}>
+              {Math.round(inkPercent * 100)}%
+            </Text>
           </View>
-          <Text style={[styles.inkBarText, { color: inkColor }]}>
-            {ink.toFixed(1)}
-          </Text>
         </View>
 
         {/* ===== Brush Panel — removed (pencil/eraser toggle is in toolbar) ===== */}
@@ -405,27 +397,33 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.1)',
   },
 
-  // Ink bar
-  inkBarContainer: {
+  // Ink Droplet (Glassmorphism badge)
+  inkDropletContainer: {
+    position: 'absolute',
+    top: -28, // Hover above the toolbar
+    left: '50%',
+    transform: [{ translateX: -24 }], // Center horizontally (half of width 48)
+    alignItems: 'center',
+  },
+  inkDroplet: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    gap: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
-  inkBarTrack: {
-    width: 100,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    overflow: 'hidden',
-  },
-  inkBarFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  inkBarText: {
+  inkDropletText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
 

@@ -226,11 +226,9 @@ export default function MapScreen() {
   const [canRedo, setCanRedo] = useState(false);
 
   // ===== Real-time Collaboration =====
-  const [session, setSession] = useState<{ token: string; userId: string } | null>(null);
+  const [session, setSession] = useState<{ token: string; userId: string; avatar_url: string | null } | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const tileManagerRef = useRef<TileManager | null>(null);
-
-
 
   // ===== Strokes: ref-based (no React state for big arrays) =====
   const strokesRef = useRef<Map<string, StrokeData>>(new Map());
@@ -244,7 +242,7 @@ export default function MapScreen() {
       if (!token) return;
       try {
         const profile = await fetchProfile();
-        setSession({ token, userId: profile.id });
+        setSession({ token, userId: profile.id, avatar_url: profile.avatar_url });
       } catch (e: any) {
         // If token is expired/invalid (401), clear it so we don't retry on next launch
         if (e?.status === 401) {
@@ -966,7 +964,7 @@ export default function MapScreen() {
           onPress={() => router.push('/(app)/profile')}
         >
           <Image
-            source={require('@/assets/images/react-logo.png')}
+            source={session?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${session.avatar_url.replace(/^\//, '')}` } : require('@/assets/images/react-logo.png')}
             style={styles.avatarImage}
           />
         </TouchableOpacity>
