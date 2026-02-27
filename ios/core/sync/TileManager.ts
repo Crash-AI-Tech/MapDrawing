@@ -39,8 +39,6 @@ export class TileManager {
             this.abortController = null;
 
             // Reset all tiles that were in "loading" state back to unfetched.
-            // Without this, aborted tiles stay stuck as loading:true forever
-            // and all future fetchMissingTiles calls skip them → 0 strokes.
             for (const [key, state] of this.tiles) {
                 if (state.loading) {
                     this.tiles.delete(key);
@@ -51,8 +49,8 @@ export class TileManager {
 
     /**
      * Determine which tiles are needed for the given bounds,
-     * find the ones not loaded or expired, and fetch them.
-     * Automatically cancels any previous in-flight fetch.
+     * find the ones not loaded or expired, and fetch them
+     * using ONE merged API request (instead of per-tile requests).
      */
     async fetchMissingTiles(bounds: GeoBounds): Promise<StrokeData[]> {
         // Cancel previous fetch batch
@@ -63,13 +61,10 @@ export class TileManager {
 
         const missingTiles: string[] = [];
         const tilesInView = this.getTilesCoveringBounds(bounds);
-
         const now = Date.now();
 
         for (const tileKey of tilesInView) {
             const state = this.tiles.get(tileKey);
-
-            // If not loaded, or expired, and not currently loading -> fetch it
             if (!state || (now - state.loadedAt > this.cacheExpiration && !state.loading)) {
                 missingTiles.push(tileKey);
                 this.tiles.set(tileKey, { loadedAt: state?.loadedAt ?? 0, loading: true });
@@ -80,47 +75,47 @@ export class TileManager {
             return [];
         }
 
-        // Fetch missing tiles with concurrency limit (max 3 concurrent)
-        const allNewStrokes: StrokeData[] = [];
-        const MAX_CONCURRENT = 3;
+        // Compute bounding box of all missing tiles (merge into ONE request)
+        let mergedMinLat = Infinity, mergedMaxLat = -Infinity;
+        let mergedMinLng = Infinity, mergedMaxLng = -Infinity;
 
-        for (let i = 0; i < missingTiles.length; i += MAX_CONCURRENT) {
-            // Check if this fetch was cancelled
-            if (controller.signal.aborted) return allNewStrokes;
-
-            const batch = missingTiles.slice(i, i + MAX_CONCURRENT);
-            await Promise.all(batch.map(async (key) => {
-                if (controller.signal.aborted) return;
-
-                const [z, x, y] = key.split('/').map(Number);
-                const tileBounds = tileToBounds(x, y, z);
-
-                try {
-                    const data = await fetchDrawings({
-                        minLat: tileBounds.minLat,
-                        maxLat: tileBounds.maxLat,
-                        minLng: tileBounds.minLng,
-                        maxLng: tileBounds.maxLng,
-                        zoom: z,
-                        limit: 1000,
-                        signal: controller.signal,
-                    });
-
-                    const items = data.items || [];
-                    allNewStrokes.push(...items);
-
-                    // Mark as loaded
-                    this.tiles.set(key, { loadedAt: Date.now(), loading: false });
-                } catch (e: any) {
-                    if (e?.name === 'AbortError') return; // silently ignore aborted
-                    console.error(`[TileManager] Failed to fetch tile ${key}:`, e?.message);
-                    // Reset loading state so we can retry later
-                    this.tiles.delete(key);
-                }
-            }));
+        for (const key of missingTiles) {
+            const [z, x, y] = key.split('/').map(Number);
+            const tb = tileToBounds(x, y, z);
+            mergedMinLat = Math.min(mergedMinLat, tb.minLat);
+            mergedMaxLat = Math.max(mergedMaxLat, tb.maxLat);
+            mergedMinLng = Math.min(mergedMinLng, tb.minLng);
+            mergedMaxLng = Math.max(mergedMaxLng, tb.maxLng);
         }
 
-        return allNewStrokes;
+        try {
+            const data = await fetchDrawings({
+                minLat: mergedMinLat,
+                maxLat: mergedMaxLat,
+                minLng: mergedMinLng,
+                maxLng: mergedMaxLng,
+                zoom: this.zoomLevel,
+                limit: 5000,
+                signal: controller.signal,
+            });
+
+            const items = data.items || [];
+
+            // Mark all missing tiles as loaded
+            for (const key of missingTiles) {
+                this.tiles.set(key, { loadedAt: Date.now(), loading: false });
+            }
+
+            return items;
+        } catch (e: any) {
+            if (e?.name === 'AbortError') return [];
+            console.error(`[TileManager] Failed to fetch merged tiles:`, e?.message);
+            // Reset loading state so we can retry later
+            for (const key of missingTiles) {
+                this.tiles.delete(key);
+            }
+            return [];
+        }
     }
 
     /** Calculate tile keys covering a geographic bounding box */
@@ -130,7 +125,6 @@ export class TileManager {
 
         const n = Math.pow(2, z);
 
-        // Helper to get tile x,y from lat/lng
         const getTileXY = (lat: number, lng: number) => {
             const x = Math.floor(((lng + 180) / 360) * n);
             const latRad = (lat * Math.PI) / 180;
@@ -140,9 +134,7 @@ export class TileManager {
             return { x, y };
         };
 
-        // Top-Left (NW) -> maxLat, minLng
         const tl = getTileXY(maxLat, minLng);
-        // Bottom-Right (SE) -> minLat, maxLng
         const br = getTileXY(minLat, maxLng);
 
         const keys: string[] = [];

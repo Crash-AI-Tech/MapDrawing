@@ -23,6 +23,9 @@ export class TileManager {
     /** Track loaded tiles: "z/x/y" -> state */
     private tiles = new Map<string, TileState>();
 
+    /** AbortController for cancelling in-flight request */
+    private abortController: AbortController | null = null;
+
     constructor(config: TileManagerConfig) {
         this.apiBaseUrl = config.apiBaseUrl;
         this.zoomLevel = config.zoomLevel ?? 14;
@@ -30,21 +33,40 @@ export class TileManager {
     }
 
     /**
+     * Cancel any in-flight fetch.
+     */
+    cancelInFlight() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+
+            // Reset all loading tiles so they can be re-fetched
+            for (const [key, state] of this.tiles) {
+                if (state.loading) {
+                    this.tiles.delete(key);
+                }
+            }
+        }
+    }
+
+    /**
      * Determine which tiles are needed for the given bounds,
-     * find the ones not loaded or expired, and fetch them.
-     * Returns ALL strokes for the requested area (including cached ones if needed, 
-     * but usually the Engine already has them. We just return new ones).
+     * find the ones not loaded or expired, and fetch them
+     * using ONE merged API request (instead of per-tile requests).
      */
     async fetchMissingTiles(bounds: GeoBounds): Promise<StrokeData[]> {
+        // Cancel previous fetch
+        this.cancelInFlight();
+
+        const controller = new AbortController();
+        this.abortController = controller;
+
         const missingTiles: string[] = [];
         const tilesInView = this.getTilesCoveringBounds(bounds);
-
         const now = Date.now();
 
         for (const tileKey of tilesInView) {
             const state = this.tiles.get(tileKey);
-
-            // If not loaded, or expired, and not currently loading -> fetch it
             if (!state || (now - state.loadedAt > this.cacheExpiration && !state.loading)) {
                 missingTiles.push(tileKey);
                 this.tiles.set(tileKey, { loadedAt: state?.loadedAt ?? 0, loading: true });
@@ -55,41 +77,51 @@ export class TileManager {
             return [];
         }
 
-        // Fetch all missing tiles in parallel
-        const allNewStrokes: StrokeData[] = [];
+        // Compute bounding box of all missing tiles (merge into ONE request)
+        let mergedMinLat = Infinity, mergedMaxLat = -Infinity;
+        let mergedMinLng = Infinity, mergedMaxLng = -Infinity;
 
-        await Promise.all(missingTiles.map(async (key) => {
-            try {
-                const [z, x, y] = key.split('/').map(Number);
-                const tileBounds = tileToBounds(x, y, z);
+        for (const key of missingTiles) {
+            const [z, x, y] = key.split('/').map(Number);
+            const tb = tileToBounds(x, y, z);
+            mergedMinLat = Math.min(mergedMinLat, tb.minLat);
+            mergedMaxLat = Math.max(mergedMaxLat, tb.maxLat);
+            mergedMinLng = Math.min(mergedMinLng, tb.minLng);
+            mergedMaxLng = Math.max(mergedMaxLng, tb.maxLng);
+        }
 
-                const params = new URLSearchParams({
-                    minLat: tileBounds.minLat.toString(),
-                    maxLat: tileBounds.maxLat.toString(),
-                    minLng: tileBounds.minLng.toString(),
-                    maxLng: tileBounds.maxLng.toString(),
-                    zoom: z.toString(), // Tell API this is a tile fetch (optional usage)
-                    limit: '1000' // Fetch more for tiles
-                });
+        try {
+            const params = new URLSearchParams({
+                minLat: mergedMinLat.toString(),
+                maxLat: mergedMaxLat.toString(),
+                minLng: mergedMinLng.toString(),
+                maxLng: mergedMaxLng.toString(),
+                zoom: this.zoomLevel.toString(),
+                limit: '5000',
+            });
 
-                const res = await fetch(`${this.apiBaseUrl}/drawings?${params}`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const res = await fetch(`${this.apiBaseUrl}/drawings?${params}`, {
+                signal: controller.signal,
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-                const data: any = await res.json();
-                const items = Array.isArray(data) ? data : (data.items || []);
+            const data: any = await res.json();
+            const items: StrokeData[] = Array.isArray(data) ? data : (data.items || []);
 
-                allNewStrokes.push(...items);
-
-                // Mark as loaded
+            // Mark all missing tiles as loaded
+            for (const key of missingTiles) {
                 this.tiles.set(key, { loadedAt: Date.now(), loading: false });
-            } catch (e) {
-                console.error(`[TileManager] Failed to fetch tile ${key}:`, e);
-                // Reset loading state so we can retry later
+            }
+
+            return items;
+        } catch (e: any) {
+            if (e?.name === 'AbortError') return [];
+            console.error(`[TileManager] Failed to fetch merged tiles:`, e?.message);
+            for (const key of missingTiles) {
                 this.tiles.delete(key);
             }
-        }));
-
-        return allNewStrokes;
+            return [];
+        }
     }
 
     /** Calculate tile keys covering a geographic bounding box */
@@ -97,9 +129,7 @@ export class TileManager {
         const { minLat, maxLat, minLng, maxLng } = bounds;
         const z = this.zoomLevel;
 
-        // Top-Left (NW)
         const tl = latLngToTile(maxLat, minLng, z);
-        // Bottom-Right (SE)
         const br = latLngToTile(minLat, maxLng, z);
 
         const keys: string[] = [];
@@ -113,6 +143,7 @@ export class TileManager {
 
     /** Clear cache (e.g. on force refresh) */
     clearCache() {
+        this.cancelInFlight();
         this.tiles.clear();
     }
 }

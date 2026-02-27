@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { generateId } from 'lucia';
+function generateId(length: number): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const arr = new Uint8Array(length);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(x => chars[x % chars.length]).join('');
+}
 import {
     generateVerificationCode,
     sendPasswordResetEmail,
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
         const emailResult = await sendPasswordResetEmail(env.RESEND_API_KEY, email, code);
         if (!emailResult.success) {
             console.error('[Resend Error]:', emailResult.error);
-            return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
+            return NextResponse.json({ error: `Failed to send email: ${emailResult.error}` }, { status: 400 });
         }
 
         return NextResponse.json({ step: 'code', email });

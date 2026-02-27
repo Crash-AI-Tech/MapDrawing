@@ -6,9 +6,13 @@ import { getDBClient } from '@/lib/db/client';
 import { eq } from 'drizzle-orm';
 import { users } from '../../../../../../../drizzle/schema';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { v7 as uuidv7 } from 'uuid';
+function generateId(length: number): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const arr = new Uint8Array(length);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(x => chars[x % chars.length]).join('');
+}
 
-export const runtime = 'edge';
 
 const APPLE_JWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
 
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Email required for registration' }, { status: 400 });
             }
 
-            let userName = `User_${uuidv7().slice(0, 8)}`;
+            let userName = `User_${generateId(8)}`;
             if (userJson) {
                 try {
                     const appleUser = JSON.parse(userJson) as AppleUser;
@@ -85,8 +89,8 @@ export async function POST(request: Request) {
             }
 
             // Generate a random password since they use Apple Sign In
-            const dummyPassword = await hashPassword(uuidv7());
-            const newUserId = uuidv7();
+            const dummyPassword = await hashPassword(generateId(15));
+            const newUserId = generateId(15);
 
             await db.insert(users).values({
                 id: newUserId,

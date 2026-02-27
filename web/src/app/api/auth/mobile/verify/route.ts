@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
-import { generateId } from 'lucia';
+function generateId(length: number): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const arr = new Uint8Array(length);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(x => chars[x % chars.length]).join('');
+}
 import {
     generateVerificationCode,
     sendVerificationEmail,

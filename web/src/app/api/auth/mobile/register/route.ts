@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { hashPassword } from '@/lib/auth/password';
-import { generateId } from 'lucia';
+// Using custom generateId to avoid Edge runtime module resolution issues with lucia
+function generateId(length: number): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const arr = new Uint8Array(length);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(x => chars[x % chars.length]).join('');
+}
 import {
     generateVerificationCode,
     sendVerificationEmail,
@@ -55,7 +61,7 @@ export async function POST(request: Request) {
             const emailResult = await sendVerificationEmail(env.RESEND_API_KEY, email, code);
             if (!emailResult.success) {
                 console.error('[Resend Error]:', emailResult.error);
-                return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });
+                return NextResponse.json({ error: `Registration failed: ${emailResult.error}` }, { status: 400 });
             }
 
             return NextResponse.json({ step: 'verify', email });
@@ -92,7 +98,7 @@ export async function POST(request: Request) {
         const emailResult = await sendVerificationEmail(env.RESEND_API_KEY, email, code);
         if (!emailResult.success) {
             console.error('[Resend Error]:', emailResult.error);
-            return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });
+            return NextResponse.json({ error: `Registration failed: ${emailResult.error}` }, { status: 400 });
         }
 
         return NextResponse.json({ step: 'verify', email });

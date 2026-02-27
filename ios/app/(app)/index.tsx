@@ -177,9 +177,10 @@ const DRAWINGS_MAX_PAGES = 6;
 const DRAWINGS_MAX_CACHE = 2500;
 const PINS_PAGE_SIZE = 120;
 const PINS_MAX_PAGES = 4;
-const PINS_MAX_CACHE = 800;
+const PINS_MAX_CACHE = 600;
 const CAMERA_UPDATE_THROTTLE_MS = 16;
 const INTERACTION_SETTLE_MS = 120;
+const MIN_PINS_FETCH_ZOOM = 8; // Don't fetch pins when zoomed out below this
 
 // ========================
 // Main Component
@@ -441,89 +442,92 @@ export default function MapScreen() {
 
 
       // --- Load Pins (paginated/clustered) ---
-      const pinFirstPage = await fetchPins({
-        minLat: bounds.minLat, maxLat: bounds.maxLat,
-        minLng: bounds.minLng, maxLng: bounds.maxLng,
-        zoom, limit: PINS_PAGE_SIZE,
-      });
-
-      if (pinFirstPage.mode === 'clustered') {
-        // At low zoom, clustered pins — show cluster markers as pins
-        const clusters = pinFirstPage.items.filter(
-          (item): item is PinCluster => item.type === 'cluster'
-        );
-        setVisiblePins(
-          clusters.map((c) => ({
-            id: c.id,
-            userId: '',
-            userName: '',
-            lng: c.lng,
-            lat: c.lat,
-            message: `${c.count} pins`,
-            color: '#1d4ed8',
-            createdAt: 0,
-          }))
-        );
-      } else {
-        let pinCursor = pinFirstPage.nextCursor;
-        let pinPageCount = 1;
-        const rawPins: PinItem[] = pinFirstPage.items.filter(
-          (item): item is PinItem => item.type === 'pin'
-        );
-        while (pinCursor && pinPageCount < PINS_MAX_PAGES) {
-          const nextPage = await fetchPins({
-            minLat: bounds.minLat, maxLat: bounds.maxLat,
-            minLng: bounds.minLng, maxLng: bounds.maxLng,
-            zoom, limit: PINS_PAGE_SIZE, cursor: pinCursor,
-          });
-          rawPins.push(
-            ...nextPage.items.filter((i): i is PinItem => i.type === 'pin')
-          );
-          pinCursor = nextPage.nextCursor;
-          pinPageCount += 1;
-        }
-
-        rawPins.forEach((pin) => {
-          pinCacheRef.current.set(pin.id, pin);
-          touchPin(pin.id);
+      // 方案 B: Skip pin fetching when zoomed out too far
+      if (zoom >= MIN_PINS_FETCH_ZOOM) {
+        const pinFirstPage = await fetchPins({
+          minLat: bounds.minLat, maxLat: bounds.maxLat,
+          minLng: bounds.minLng, maxLng: bounds.maxLng,
+          zoom, limit: PINS_PAGE_SIZE,
         });
 
-        const filteredPins = Array.from(pinCacheRef.current.values()).filter(
-          (pin) =>
-            pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
-            pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
-        );
+        if (pinFirstPage.mode === 'clustered') {
+          // At low zoom, clustered pins — show cluster markers as pins
+          const clusters = pinFirstPage.items.filter(
+            (item): item is PinCluster => item.type === 'cluster'
+          );
+          setVisiblePins(
+            clusters.map((c) => ({
+              id: c.id,
+              userId: '',
+              userName: '',
+              lng: c.lng,
+              lat: c.lat,
+              message: `${c.count} pins`,
+              color: '#1d4ed8',
+              createdAt: 0,
+            }))
+          );
+        } else {
+          let pinCursor = pinFirstPage.nextCursor;
+          let pinPageCount = 1;
+          const rawPins: PinItem[] = pinFirstPage.items.filter(
+            (item): item is PinItem => item.type === 'pin'
+          );
+          while (pinCursor && pinPageCount < PINS_MAX_PAGES) {
+            const nextPage = await fetchPins({
+              minLat: bounds.minLat, maxLat: bounds.maxLat,
+              minLng: bounds.minLng, maxLng: bounds.maxLng,
+              zoom, limit: PINS_PAGE_SIZE, cursor: pinCursor,
+            });
+            rawPins.push(
+              ...nextPage.items.filter((i): i is PinItem => i.type === 'pin')
+            );
+            pinCursor = nextPage.nextCursor;
+            pinPageCount += 1;
+          }
 
-        setVisiblePins(
-          filteredPins.map((pin) => ({
-            id: pin.id,
-            userId: pin.userId,
-            userName: pin.userName ?? '',
-            lng: pin.lng,
-            lat: pin.lat,
-            message: pin.message ?? '',
-            color: pin.color ?? '#E63946',
-            createdAt: pin.createdAt,
-          }))
-        );
+          rawPins.forEach((pin) => {
+            pinCacheRef.current.set(pin.id, pin);
+            touchPin(pin.id);
+          });
 
-        // Pin LRU Eviction
-        if (pinCacheRef.current.size > PINS_MAX_CACHE) {
-          const pinCandidates = Array.from(pinLruRef.current.entries())
-            .sort((a, b) => a[1] - b[1]);
-          for (const [pinId] of pinCandidates) {
-            if (pinCacheRef.current.size <= PINS_MAX_CACHE) break;
-            const pin = pinCacheRef.current.get(pinId);
-            if (!pin) continue;
-            if (
+          const filteredPins = Array.from(pinCacheRef.current.values()).filter(
+            (pin) =>
               pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
               pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
-            ) continue;
-            pinCacheRef.current.delete(pinId);
-            pinLruRef.current.delete(pinId);
+          );
+
+          setVisiblePins(
+            filteredPins.map((pin) => ({
+              id: pin.id,
+              userId: pin.userId,
+              userName: pin.userName ?? '',
+              lng: pin.lng,
+              lat: pin.lat,
+              message: pin.message ?? '',
+              color: pin.color ?? '#E63946',
+              createdAt: pin.createdAt,
+            }))
+          );
+
+          // Pin LRU Eviction
+          if (pinCacheRef.current.size > PINS_MAX_CACHE) {
+            const pinCandidates = Array.from(pinLruRef.current.entries())
+              .sort((a, b) => a[1] - b[1]);
+            for (const [pinId] of pinCandidates) {
+              if (pinCacheRef.current.size <= PINS_MAX_CACHE) break;
+              const pin = pinCacheRef.current.get(pinId);
+              if (!pin) continue;
+              if (
+                pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
+                pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
+              ) continue;
+              pinCacheRef.current.delete(pinId);
+              pinLruRef.current.delete(pinId);
+            }
           }
         }
-      }
+      } // end MIN_PINS_FETCH_ZOOM guard
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
         console.warn('[loadViewport] Failed:', e);
@@ -927,13 +931,18 @@ export default function MapScreen() {
         setIsMapInteracting(false);
       }, INTERACTION_SETTLE_MS);
 
-      // Debounced viewport loading (matches web: VIEWPORT_LOAD_DEBOUNCE = 300ms)
+      // 方案 C+D: Only load viewport AFTER interaction fully settles.
+      // Instead of debouncing every regionDidChange (which fires during continuous drag),
+      // we wait for isMapInteracting to become false, then load.
       if (viewportLoadTimerRef.current) {
         clearTimeout(viewportLoadTimerRef.current);
       }
       viewportLoadTimerRef.current = setTimeout(() => {
-        loadViewport();
-      }, VIEWPORT_LOAD_DEBOUNCE);
+        // Only fire if not still interacting (方案 D)
+        if (!isMapInteractingRef.current) {
+          loadViewport();
+        }
+      }, 600); // 方案 C: increased from 300ms to 600ms
     },
     [updateCamera, loadViewport]
   );
