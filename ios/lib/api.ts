@@ -257,8 +257,13 @@ export async function createPin(pin: {
 export interface UserProfile {
   id: string;
   email: string;
-  userName: string;
-  avatarUrl: string | null;
+  user_name: string;
+  avatar_url: string | null;
+}
+
+export interface UserProfileStats {
+  pins: number;
+  drawings: number;
 }
 
 /**
@@ -267,4 +272,12 @@ export interface UserProfile {
  */
 export async function fetchProfile(): Promise<UserProfile> {
   return apiFetch<UserProfile>('/api/profile', { auth: true });
+}
+
+/**
+ * GET /api/profile/stats — fetch user statistics (pins, drawings).
+ * Auth required.
+ */
+export async function fetchProfileStats(): Promise<UserProfileStats> {
+  return apiFetch<UserProfileStats>('/api/profile/stats', { auth: true });
 }

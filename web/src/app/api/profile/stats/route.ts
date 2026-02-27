@@ -4,11 +4,11 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 /**
  * GET /api/profile/stats — return user statistics.
  *
- * Response: { pins: number, drawings: number, views: number }
+ * Response: { pins: number, drawings: number }
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const result = await validateSession();
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -28,7 +28,6 @@ export async function GET() {
     return Response.json({
       pins,
       drawings,
-      views: 0, // placeholder — no view tracking yet
     });
   } catch (e) {
     console.error('[API /profile/stats GET]:', e);

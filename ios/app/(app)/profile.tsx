@@ -1,15 +1,90 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, Switch } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import * as ImagePicker from 'expo-image-picker';
+import { fetchProfile, fetchProfileStats, apiFetch } from '@/lib/api';
+import type { UserProfileStats } from '@/lib/api';
+import { API_BASE_URL } from '@/lib/config';
 
 export default function ProfileScreen() {
     const router = useRouter();
     const { signOut, session } = useAuth();
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const [profile, setProfile] = useState<any>(null);
+    const [stats, setStats] = useState<UserProfileStats>({ pins: 0, drawings: 0 });
+    const [isUploading, setIsUploading] = useState(false);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadProfile();
+        }, [])
+    );
+
+    const loadProfile = async () => {
+        try {
+            const [data, statsData] = await Promise.all([
+                fetchProfile(),
+                fetchProfileStats(),
+            ]);
+            setProfile(data);
+            setStats(statsData);
+        } catch (e) {
+            console.error('Failed to load profile', e);
+        }
+    };
+
+    const handlePickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets[0].uri) {
+            uploadAvatar(result.assets[0]);
+        }
+    };
+
+    const uploadAvatar = async (asset: any) => {
+        setIsUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', {
+                uri: asset.uri,
+                name: asset.fileName || 'avatar.jpg',
+                type: asset.mimeType || 'image/jpeg',
+            } as any);
+
+            const res = await fetch(`${API_BASE_URL}/api/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session}`
+                },
+                body: formData,
+            });
+
+            if (!res.ok) throw new Error('Upload failed');
+            const { url } = await res.json();
+
+            await apiFetch('/api/profile', {
+                method: 'PATCH',
+                auth: true,
+                body: JSON.stringify({ avatarUrl: url })
+            });
+
+            await loadProfile();
+        } catch (e: any) {
+            Alert.alert('Upload Failed', e.message);
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     const handleDeleteAccount = () => {
         Alert.alert(
@@ -73,45 +148,35 @@ export default function ProfileScreen() {
 
                     {/* Identity Card */}
                     <View style={styles.identityContainer}>
-                        <View style={styles.avatarContainer}>
-                            <Image
-                                source={require('@/assets/images/react-logo.png')}
-                                style={styles.avatar}
-                            />
+                        <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={isUploading}>
+                            {isUploading ? (
+                                <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#E5E5EA' }]}>
+                                    <ActivityIndicator size="small" color="#000" />
+                                </View>
+                            ) : (
+                                <Image
+                                    source={profile?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${profile.avatar_url.replace(/^\//, '')}` } : require('@/assets/images/react-logo.png')}
+                                    style={styles.avatar}
+                                />
+                            )}
                             <View style={styles.onlineBadge} />
-                        </View>
-                        <Text style={styles.userName}>Anonymous Agent</Text>
-                        <Text style={styles.userHandle}>@{session?.slice(0, 8) || 'unknown'}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.userName}>{profile?.user_name || 'Anonymous Agent'}</Text>
 
                         <View style={styles.statsRow}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>12</Text>
+                                <Text style={styles.statValue}>{stats.pins}</Text>
                                 <Text style={styles.statLabel}>Pins</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>48</Text>
+                                <Text style={styles.statValue}>{stats.drawings}</Text>
                                 <Text style={styles.statLabel}>Drawings</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statItem}>
-                                <Text style={styles.statValue}>2.5k</Text>
-                                <Text style={styles.statLabel}>Views</Text>
                             </View>
                         </View>
                     </View>
 
                     {/* Settings Sections */}
-                    <Text style={styles.sectionTitle}>Preferences</Text>
-                    <View style={styles.menuGroup}>
-                        <View style={styles.menuItem}>
-                            <View style={[styles.menuIconBox, { backgroundColor: "#5856D6" }]}>
-                                <Ionicons name="notifications-outline" size={20} color="#fff" />
-                            </View>
-                            <Text style={styles.menuText}>Notifications</Text>
-                            <Switch value={true} trackColor={{ false: "#767577", true: "#34C759" }} />
-                        </View>
-                    </View>
 
                     <Text style={styles.sectionTitle}>Support & Legal</Text>
                     <View style={styles.menuGroup}>

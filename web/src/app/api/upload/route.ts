@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   try {
     const { env } = getCloudflareContext();
 
-    const result = await validateSession();
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
