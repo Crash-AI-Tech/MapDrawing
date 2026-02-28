@@ -97,6 +97,7 @@ import {
   BASE_ZOOM,
 } from '@/core';
 import type { StrokeData, StrokePoint, CameraState } from '@/core/types';
+import { useLang, ts, tf } from '@/lib/i18n';
 
 // ========================
 // MapLibre Configuration
@@ -228,10 +229,6 @@ export default function MapScreen() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [strokesTransparent, setStrokesTransparent] = useState(false);
-  // Sync transparency flag to TileRenderer so it re-bakes bitmaps at 30% alpha
-  useEffect(() => {
-    tileRendererRef.current.strokesTransparent = strokesTransparent;
-  }, [strokesTransparent]);
   const prevInkRef = useRef(100);
 
   // Haptic feedback when ink depletes to 0
@@ -305,16 +302,17 @@ export default function MapScreen() {
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
 
   const router = useRouter();
+  const [lang] = useLang();
 
   // Guarded mode setter: prompt login for draw/pin if not authenticated
   const handleModeChange = useCallback((newMode: 'hand' | 'draw' | 'pin') => {
     if ((newMode === 'draw' || newMode === 'pin') && !session) {
       Alert.alert(
-        'Sign In Required',
-        'You need to sign in to draw or place pins.',
+        ts('signInRequired', lang),
+        ts('signInToDrawOrPin', lang),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+          { text: ts('cancel', lang), style: 'cancel' },
+          { text: ts('signIn', lang), onPress: () => router.push('/(auth)/login') },
         ]
       );
       return;
@@ -481,7 +479,7 @@ export default function MapScreen() {
               userName: '',
               lng: c.lng,
               lat: c.lat,
-              message: `${c.count} pins`,
+              message: tf('pinsCount', lang)(c.count),
               color: '#1d4ed8',
               createdAt: 0,
             }))
@@ -572,6 +570,10 @@ export default function MapScreen() {
   const tilePicture = useMemo(() => {
     if (isMapInteracting) return null;
     void strokeVersion; // dependency to re-render on stroke changes
+
+    // Sync transparency flag synchronously before rendering
+    // (useEffect would run after render, causing a 1-frame delay / inversion)
+    tileRendererRef.current.strokesTransparent = strokesTransparent;
 
     return tileRendererRef.current.renderFrame(
       cameraState.center,
@@ -802,33 +804,40 @@ export default function MapScreen() {
   }, []);
 
   // ===== Zoom controls =====
+  const zoomRef = useRef(cameraState.zoom);
+  useEffect(() => {
+    zoomRef.current = cameraState.zoom;
+  }, [cameraState.zoom]);
+
   const handleZoomIn = useCallback(() => {
     cameraRef.current?.setCamera({
-      zoomLevel: Math.min(22, cameraState.zoom + 1),
+      zoomLevel: Math.min(22, zoomRef.current + 1),
       animationDuration: 200,
     });
-  }, [cameraState.zoom]);
+  }, []);
 
   const handleZoomOut = useCallback(() => {
     cameraRef.current?.setCamera({
-      zoomLevel: Math.max(1, cameraState.zoom - 1),
+      zoomLevel: Math.max(1, zoomRef.current - 1),
       animationDuration: 200,
     });
-  }, [cameraState.zoom]);
+  }, []);
 
   const handleZoomDelta = useCallback((delta: number) => {
+    const newZoom = Math.max(1, Math.min(22, zoomRef.current + delta));
+    zoomRef.current = newZoom;
     cameraRef.current?.setCamera({
-      zoomLevel: Math.max(1, Math.min(22, cameraState.zoom + delta)),
-      animationDuration: 50,
+      zoomLevel: newZoom,
+      animationDuration: 0,
     });
-  }, [cameraState.zoom]);
+  }, []);
 
   // ===== Pin placement =====
   const handleMapPress = useCallback(
     (feature: any) => {
       if (mode !== 'pin') return;
       if (cameraState.zoom < MIN_PIN_ZOOM) {
-        Alert.alert('提示', `请放大到 ${MIN_PIN_ZOOM} 级以上才能放置图钉`);
+        Alert.alert(ts('hint', lang), tf('zoomInForPin', lang)(MIN_PIN_ZOOM));
         return;
       }
       try {
@@ -855,7 +864,7 @@ export default function MapScreen() {
 
       // Check ink
       if (!inkManagerRef.current.consume(PIN_INK_COST)) {
-        Alert.alert('墨水不足', `放置图钉需要 ${PIN_INK_COST} 墨水`);
+        Alert.alert(ts('inkInsufficient', lang), tf('pinInkCost', lang)(PIN_INK_COST));
         return;
       }
 
@@ -889,7 +898,7 @@ export default function MapScreen() {
       } catch (e: any) {
         // Refund ink on failure
         inkManagerRef.current?.forceConsume(-PIN_INK_COST);
-        Alert.alert('放置失败', e.message || '请重试');
+        Alert.alert(ts('placeFailed', lang), e.message || '');
       } finally {
         setPinLoading(false);
       }
@@ -1067,7 +1076,7 @@ export default function MapScreen() {
               (activeBrushConfig.useLayer ? (
                 <Group
                   layer={
-                    <Paint opacity={activeBrushConfig.layerOpacity ?? 0.3} />
+                    <Paint opacity={(activeBrushConfig.layerOpacity ?? 0.3) * (strokesTransparent ? 0.3 : 1)} />
                   }
                 >
                   <Path
@@ -1089,7 +1098,7 @@ export default function MapScreen() {
                   strokeWidth={activeBrushConfig.strokeWidth(currentSize)}
                   strokeCap={activeBrushConfig.strokeCap}
                   strokeJoin={activeBrushConfig.strokeJoin}
-                  opacity={currentOpacity * activeBrushConfig.opacity}
+                  opacity={currentOpacity * activeBrushConfig.opacity * (strokesTransparent ? 0.3 : 1)}
                   blendMode={activeBrushConfig.blendMode}
                 />
               ))}
@@ -1106,8 +1115,7 @@ export default function MapScreen() {
       {mode === 'draw' && cameraState.zoom < MIN_DRAW_ZOOM && (
         <View style={styles.hintBadge}>
           <Text style={styles.hintText}>
-            请放大到 {MIN_DRAW_ZOOM} 级以上才能绘画（当前{' '}
-            {Math.floor(cameraState.zoom)} 级）
+            {tf('zoomHintDraw', lang)(MIN_DRAW_ZOOM, Math.floor(cameraState.zoom))}
           </Text>
         </View>
       )}
@@ -1116,8 +1124,7 @@ export default function MapScreen() {
       {mode === 'pin' && cameraState.zoom < MIN_PIN_ZOOM && (
         <View style={styles.hintBadge}>
           <Text style={styles.hintText}>
-            请放大到 {MIN_PIN_ZOOM} 级以上才能放置图钉（当前{' '}
-            {Math.floor(cameraState.zoom)} 级）
+            {tf('zoomHintPin', lang)(MIN_PIN_ZOOM, Math.floor(cameraState.zoom))}
           </Text>
         </View>
       )}
@@ -1125,7 +1132,7 @@ export default function MapScreen() {
       {/* Ink depleted warning */}
       {ink <= 0 && (
         <View style={[styles.hintBadge, styles.hintDanger]}>
-          <Text style={styles.hintText}>墨水耗尽，请稍等片刻…</Text>
+          <Text style={styles.hintText}>{ts('inkDepleted', lang)}</Text>
         </View>
       )}
 

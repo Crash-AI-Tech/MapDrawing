@@ -42,6 +42,7 @@ import {
 } from '@niubi/shared';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PanResponder, type GestureResponderEvent } from 'react-native';
+import { useLang, ts, tf } from '@/lib/i18n';
 
 const RECENT_COLORS_KEY = 'niubi-recent-colors';
 const MAX_RECENT_COLORS = 6;
@@ -133,6 +134,7 @@ export default function DrawingToolbar({
   onToggleTransparency,
   syncState = 'connected',
 }: DrawingToolbarProps) {
+  const [lang] = useLang();
   const [showColorPanel, setShowColorPanel] = useState(false);
   const [customHex, setCustomHex] = useState(currentColor);
   const [recentColors, setRecentColors] = useState<string[]>([]);
@@ -289,12 +291,12 @@ export default function DrawingToolbar({
   const handleModeChange = (newMode: 'hand' | 'draw' | 'pin') => {
     if (newMode === 'draw') {
       if (currentZoom < MIN_DRAW_ZOOM) {
-        Alert.alert('Cannot Draw', `Please zoom in to level ${MIN_DRAW_ZOOM} or higher to draw.`);
+        Alert.alert(ts('cannotDraw', lang), tf('zoomInToDraw', lang)(MIN_DRAW_ZOOM));
         return;
       }
     } else if (newMode === 'pin') {
       if (currentZoom < MIN_PIN_ZOOM) {
-        Alert.alert('Cannot Place Pin', `Please zoom in to level ${MIN_PIN_ZOOM} or higher to place a pin.`);
+        Alert.alert(ts('cannotPin', lang), tf('zoomInToPin', lang)(MIN_PIN_ZOOM));
         return;
       }
     }
@@ -461,7 +463,7 @@ export default function DrawingToolbar({
               {/* Recent colors */}
               {recentColors.length > 0 && (
                 <>
-                  <Text style={styles.panelTitle}>最近使用</Text>
+                  <Text style={styles.panelTitle}>{ts('recentColors', lang)}</Text>
                   <View style={styles.recentRow}>
                     {recentColors.map((color) => (
                       <TouchableOpacity
@@ -478,7 +480,7 @@ export default function DrawingToolbar({
                 </>
               )}
 
-              <Text style={styles.panelTitle}>颜色</Text>
+              <Text style={styles.panelTitle}>{ts('colors', lang)}</Text>
               <View style={styles.colorGrid}>
                 {COLOR_PRESETS.map((color) => (
                   <TouchableOpacity
@@ -494,7 +496,7 @@ export default function DrawingToolbar({
               </View>
 
               {/* Visual HSV color picker */}
-              <Text style={styles.panelTitle}>自定义</Text>
+              <Text style={styles.panelTitle}>{ts('custom', lang)}</Text>
               {/* SV gradient area */}
               <View
                 ref={svBoxRef}
@@ -606,7 +608,7 @@ export default function DrawingToolbar({
 
               {/* Size slider */}
               <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>大小</Text>
+                <Text style={styles.sliderLabel}>{ts('size', lang)}</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={0.5}
@@ -623,7 +625,7 @@ export default function DrawingToolbar({
 
               {/* Opacity slider */}
               <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>透明度</Text>
+                <Text style={styles.sliderLabel}>{ts('opacity', lang)}</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={MIN_OPACITY}

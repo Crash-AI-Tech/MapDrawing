@@ -23,31 +23,30 @@ export default function ZoomControls({
   onZoomOut,
   onZoomDelta,
 }: ZoomControlsProps) {
-  const startYRef = useRef(0);
-  const lastZoomRef = useRef(currentZoom);
+  const lastDeltaRef = useRef(0);
   const isDraggingRef = useRef(false);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_e, gs) => Math.abs(gs.dy) > 8,
-      onPanResponderGrant: (e) => {
-        startYRef.current = e.nativeEvent.pageY;
-        lastZoomRef.current = 0;
+      onPanResponderGrant: () => {
+        lastDeltaRef.current = 0;
         isDraggingRef.current = true;
       },
       onPanResponderMove: (_e, gs) => {
         if (!onZoomDelta) return;
-        // Every 30px of drag = 1 zoom level. Up = positive delta, down = negative.
-        const delta = -gs.dy / 30;
-        const rounded = Math.round(delta * 10) / 10;
-        if (rounded !== lastZoomRef.current) {
-          onZoomDelta(rounded - lastZoomRef.current);
-          lastZoomRef.current = rounded;
+        // Every 40px of drag = 1 zoom level. Up = positive delta, down = negative.
+        const absDelta = Math.round((-gs.dy / 40) * 10) / 10;
+        const increment = absDelta - lastDeltaRef.current;
+        if (increment !== 0) {
+          onZoomDelta(increment);
+          lastDeltaRef.current = absDelta;
         }
       },
       onPanResponderRelease: () => {
         isDraggingRef.current = false;
+        lastDeltaRef.current = 0;
       },
     })
   ).current;

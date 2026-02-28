@@ -4,10 +4,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import { API_BASE_URL } from '@/lib/config';
 import { useRouter } from 'expo-router';
+import { useLang, ts } from '@/lib/i18n';
 
 export default function Login() {
     const { signIn } = useAuth();
     const router = useRouter();
+    const [lang] = useLang();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -47,21 +49,21 @@ export default function Login() {
                 if (response.ok && data.token) {
                     await signIn(data.token);
                 } else {
-                    Alert.alert('Login Failed', data.error || 'Unknown error');
+                    Alert.alert(ts('loginFailed', lang), data.error || ts('unknownError', lang));
                 }
             }
         } catch (e: any) {
             if (e.code === 'ERR_REQUEST_CANCELED') {
                 // User canceled — do nothing
             } else {
-                Alert.alert('Apple Sign In Error', e.message);
+                Alert.alert(ts('appleSignInError', lang), e.message);
             }
         }
     };
 
     const handleEmailSignIn = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password');
+            Alert.alert(ts('error', lang), ts('enterEmailPassword', lang));
             return;
         }
         setLoading(true);
@@ -81,10 +83,10 @@ export default function Login() {
                 setVerifyEmail(data.email || email);
                 setStep('verify');
             } else {
-                Alert.alert('Login Failed', data.error || 'Invalid credentials');
+                Alert.alert(ts('loginFailed', lang), data.error || ts('invalidCredentials', lang));
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert(ts('networkError', lang), e.message);
         } finally {
             setLoading(false);
         }
@@ -92,7 +94,7 @@ export default function Login() {
 
     const handleVerify = async () => {
         if (code.length !== 6) {
-            Alert.alert('Error', 'Please enter the 6-digit code');
+            Alert.alert(ts('error', lang), ts('enterCode', lang));
             return;
         }
         setLoading(true);
@@ -107,10 +109,10 @@ export default function Login() {
             if (res.ok && data.token) {
                 await signIn(data.token);
             } else {
-                Alert.alert('Verification Failed', data.error || 'Invalid code');
+                Alert.alert(ts('verificationFailed', lang), data.error || ts('invalidCode', lang));
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert(ts('networkError', lang), e.message);
         } finally {
             setLoading(false);
         }
@@ -121,9 +123,9 @@ export default function Login() {
             <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <Text style={styles.emoji}>📧</Text>
-                    <Text style={styles.title}>Verify Email</Text>
+                    <Text style={styles.title}>{ts('verifyEmail', lang)}</Text>
                     <Text style={styles.subtitle}>
-                        Enter the code sent to{'\n'}
+                        {ts('enterCodeSentTo', lang)}{'\n'}
                         <Text style={styles.emailHighlight}>{verifyEmail}</Text>
                     </Text>
 
@@ -143,12 +145,12 @@ export default function Login() {
                             onPress={handleVerify}
                             disabled={loading}
                         >
-                            <Text style={styles.buttonText}>{loading ? 'Verifying...' : 'Verify'}</Text>
+                            <Text style={styles.buttonText}>{loading ? ts('verifying', lang) : ts('verify', lang)}</Text>
                         </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity onPress={() => setStep('login')}>
-                        <Text style={styles.link}>Back to Login</Text>
+                        <Text style={styles.link}>{ts('backToLogin', lang)}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -159,13 +161,13 @@ export default function Login() {
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                 <Text style={styles.emoji}>🎨</Text>
-                <Text style={styles.title}>Welcome Back</Text>
-                <Text style={styles.subtitle}>Sign in to draw on the world map</Text>
+                <Text style={styles.title}>{ts('welcomeBack', lang)}</Text>
+                <Text style={styles.subtitle}>{ts('signInSubtitle', lang)}</Text>
 
                 <View style={styles.form}>
                     <TextInput
                         style={styles.input}
-                        placeholder="Email"
+                        placeholder={ts('email', lang)}
                         placeholderTextColor="#999"
                         value={email}
                         onChangeText={setEmail}
@@ -174,7 +176,7 @@ export default function Login() {
                     />
                     <TextInput
                         style={styles.input}
-                        placeholder="Password"
+                        placeholder={ts('password', lang)}
                         placeholderTextColor="#999"
                         value={password}
                         onChangeText={setPassword}
@@ -185,17 +187,17 @@ export default function Login() {
                         onPress={handleEmailSignIn}
                         disabled={loading}
                     >
-                        <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
+                        <Text style={styles.buttonText}>{loading ? ts('signingIn', lang) : ts('signIn', lang)}</Text>
                     </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                    <Text style={styles.link}>Forgot Password?</Text>
+                    <Text style={styles.link}>{ts('forgotPassword', lang)}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.divider}>
                     <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>OR</Text>
+                    <Text style={styles.dividerText}>{ts('or', lang)}</Text>
                     <View style={styles.dividerLine} />
                 </View>
 
@@ -209,12 +211,12 @@ export default function Login() {
 
                 <TouchableOpacity style={styles.registerLink} onPress={() => router.push('/(auth)/register')}>
                     <Text style={styles.registerText}>
-                        Don't have an account? <Text style={styles.registerHighlight}>Sign Up</Text>
+                        {ts('noAccount', lang)}<Text style={styles.registerHighlight}>{ts('signUp', lang)}</Text>
                     </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.skipLink} onPress={() => router.replace('/(app)')}>
-                    <Text style={styles.skipText}>Continue as Guest</Text>
+                    <Text style={styles.skipText}>{ts('continueAsGuest', lang)}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </KeyboardAvoidingView>

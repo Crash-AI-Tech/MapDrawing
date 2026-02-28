@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { Compliance } from '@/utils/compliance';
+import { getCurrentLang, tf, ts } from '@/lib/i18n';
 
 export interface PinData {
   id: string;
@@ -27,15 +28,16 @@ interface MapPinOverlayProps {
 }
 
 /** Format relative time */
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts;
+function timeAgo(timestamp: number): string {
+  const lang = getCurrentLang();
+  const diff = Date.now() - timestamp;
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins}分钟前`;
+  if (mins < 1) return ts('justNow', lang);
+  if (mins < 60) return tf('minutesAgo', lang)(mins);
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}小时前`;
+  if (hours < 24) return tf('hoursAgo', lang)(hours);
   const days = Math.floor(hours / 24);
-  return `${days}天前`;
+  return tf('daysAgo', lang)(days);
 }
 
 /** Truncate message for preview */
@@ -97,16 +99,16 @@ export function MapPinTooltip({
         <View>
           <Text style={styles.tooltipMessageFull}>{pin.message}</Text>
           <View style={styles.tooltipMeta}>
-            <Text style={styles.tooltipAuthor}>{pin.userName || '匿名'}</Text>
+            <Text style={styles.tooltipAuthor}>{pin.userName || ts('anonymous')}</Text>
             <Text style={styles.tooltipTime}>{timeAgo(pin.createdAt)}</Text>
           </View>
           <View style={styles.tooltipActions}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleReport}>
-              <Text style={styles.actionReport}>🚩 Report</Text>
+              <Text style={styles.actionReport}>{ts('report')}</Text>
             </TouchableOpacity>
             <View style={styles.actionDivider} />
             <TouchableOpacity style={styles.actionBtn} onPress={handleBlockUser}>
-              <Text style={styles.actionBlock}>🚫 Block</Text>
+              <Text style={styles.actionBlock}>{ts('block')}</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -369,21 +369,21 @@ export class TileRenderer {
       if (rs.config.isSpray && rs.sprayPaths) {
         if (sprayCount > SPRAY_DISABLE_THRESHOLD) {
           paint.setStyle(PaintStyle.Stroke);
-          paint.setAlphaf(rs.data.opacity * 0.3);
+          paint.setAlphaf(rs.data.opacity * 0.3 * alphaMul);
           canvas.drawPath(rs.path, paint);
         } else if (sprayCount > SPRAY_DEGRADE_THRESHOLD) {
           paint.setStyle(PaintStyle.Fill);
           const subset = rs.sprayPaths.slice(0, 2);
           for (const sp of subset) {
             const spPaint = paint.copy();
-            spPaint.setAlphaf(rs.data.opacity * sp.alpha);
+            spPaint.setAlphaf(rs.data.opacity * sp.alpha * alphaMul);
             canvas.drawPath(sp.path, spPaint);
           }
         } else {
           paint.setStyle(PaintStyle.Fill);
           for (const sp of rs.sprayPaths) {
             const spPaint = paint.copy();
-            spPaint.setAlphaf(rs.data.opacity * sp.alpha);
+            spPaint.setAlphaf(rs.data.opacity * sp.alpha * alphaMul);
             canvas.drawPath(sp.path, spPaint);
           }
         }
@@ -391,7 +391,7 @@ export class TileRenderer {
         paint.setStyle(PaintStyle.Stroke);
         if (rs.config.useLayer) {
           const layerPaint = Skia.Paint();
-          layerPaint.setAlphaf(rs.config.layerOpacity ?? 0.3);
+          layerPaint.setAlphaf((rs.config.layerOpacity ?? 0.3) * alphaMul);
           canvas.saveLayer(layerPaint);
           paint.setAlphaf(1.0);
           canvas.drawPath(rs.path, paint);

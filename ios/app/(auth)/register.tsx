@@ -3,10 +3,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import { API_BASE_URL } from '@/lib/config';
 import { useRouter } from 'expo-router';
+import { useLang, ts } from '@/lib/i18n';
 
 export default function Register() {
     const { signIn } = useAuth();
     const router = useRouter();
+    const [lang] = useLang();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [userName, setUserName] = useState('');
@@ -20,11 +22,11 @@ export default function Register() {
 
     const handleRegister = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password');
+            Alert.alert(ts('error', lang), ts('enterEmailPassword', lang));
             return;
         }
         if (password.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
+            Alert.alert(ts('error', lang), ts('passwordTooShort', lang));
             return;
         }
         setLoading(true);
@@ -40,10 +42,10 @@ export default function Register() {
                 setVerifyEmail(data.email);
                 setStep('verify');
             } else {
-                Alert.alert('Registration Failed', data.error || 'Unknown error');
+                Alert.alert(ts('registrationFailed', lang), data.error || ts('unknownError', lang));
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert(ts('networkError', lang), e.message);
         } finally {
             setLoading(false);
         }
@@ -51,7 +53,7 @@ export default function Register() {
 
     const handleVerify = async () => {
         if (code.length !== 6) {
-            Alert.alert('Error', 'Please enter the 6-digit code');
+            Alert.alert(ts('error', lang), ts('enterCode', lang));
             return;
         }
         setLoading(true);
@@ -66,10 +68,10 @@ export default function Register() {
             if (res.ok && data.token) {
                 await signIn(data.token);
             } else {
-                Alert.alert('Verification Failed', data.error || 'Invalid code');
+                Alert.alert(ts('verificationFailed', lang), data.error || ts('invalidCode', lang));
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert(ts('networkError', lang), e.message);
         } finally {
             setLoading(false);
         }
@@ -85,12 +87,12 @@ export default function Register() {
             });
             const data = await res.json();
             if (res.ok) {
-                Alert.alert('Sent', 'A new verification code has been sent to your email');
+                Alert.alert(ts('sent', lang), ts('newCodeSent', lang));
             } else {
-                Alert.alert('Error', data.error || 'Failed to resend');
+                Alert.alert(ts('error', lang), data.error || ts('resendFailed', lang));
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert(ts('networkError', lang), e.message);
         } finally {
             setResending(false);
         }
@@ -101,9 +103,9 @@ export default function Register() {
             <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <Text style={styles.emoji}>📧</Text>
-                    <Text style={styles.title}>Verify Your Email</Text>
+                    <Text style={styles.title}>{ts('verifyEmail', lang)}</Text>
                     <Text style={styles.subtitle}>
-                        We sent a 6-digit code to{'\n'}
+                        {ts('weSentCode', lang)}{'\n'}
                         <Text style={styles.emailHighlight}>{verifyEmail}</Text>
                     </Text>
 
@@ -123,12 +125,12 @@ export default function Register() {
                             onPress={handleVerify}
                             disabled={loading}
                         >
-                            <Text style={styles.buttonText}>{loading ? 'Verifying...' : 'Verify'}</Text>
+                            <Text style={styles.buttonText}>{loading ? ts('verifying', lang) : ts('verify', lang)}</Text>
                         </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity onPress={handleResend} disabled={resending}>
-                        <Text style={styles.link}>{resending ? 'Sending...' : 'Resend Code'}</Text>
+                        <Text style={styles.link}>{resending ? ts('sending', lang) : ts('resendCode', lang)}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -139,13 +141,13 @@ export default function Register() {
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                 <Text style={styles.emoji}>✨</Text>
-                <Text style={styles.title}>Create Account</Text>
-                <Text style={styles.subtitle}>Join the global map drawing community</Text>
+                <Text style={styles.title}>{ts('createAccount', lang)}</Text>
+                <Text style={styles.subtitle}>{ts('joinCommunity', lang)}</Text>
 
                 <View style={styles.form}>
                     <TextInput
                         style={styles.input}
-                        placeholder="Email"
+                        placeholder={ts('email', lang)}
                         placeholderTextColor="#999"
                         value={email}
                         onChangeText={setEmail}
@@ -154,7 +156,7 @@ export default function Register() {
                     />
                     <TextInput
                         style={styles.input}
-                        placeholder="Username (optional)"
+                        placeholder={ts('usernameOptional', lang)}
                         placeholderTextColor="#999"
                         value={userName}
                         onChangeText={setUserName}
@@ -162,7 +164,7 @@ export default function Register() {
                     />
                     <TextInput
                         style={styles.input}
-                        placeholder="Password (min 6 characters)"
+                        placeholder={ts('passwordMin6', lang)}
                         placeholderTextColor="#999"
                         value={password}
                         onChangeText={setPassword}
@@ -173,12 +175,12 @@ export default function Register() {
                         onPress={handleRegister}
                         disabled={loading}
                     >
-                        <Text style={styles.buttonText}>{loading ? 'Creating...' : 'Create Account'}</Text>
+                        <Text style={styles.buttonText}>{loading ? ts('creating', lang) : ts('createAccount', lang)}</Text>
                     </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.link}>Already have an account? Log In</Text>
+                    <Text style={styles.link}>{ts('alreadyHaveAccount', lang)}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </KeyboardAvoidingView>

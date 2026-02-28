@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, Switch, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, Switch, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -9,86 +9,26 @@ import * as ImagePicker from 'expo-image-picker';
 import { fetchProfile, fetchProfileStats, apiFetch } from '@/lib/api';
 import type { UserProfileStats } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLang, ts, type Lang } from '@/lib/i18n';
 
-type Lang = 'zh' | 'en';
-const LANG_KEY = 'niubi-lang';
-
-const t = {
-    zh: {
-        pins: '图钉',
-        drawings: '绘制',
-        supportLegal: '帮助 & 法律',
-        terms: '服务条款',
-        privacy: '隐私政策',
-        blocked: '已屏蔽的用户',
-        blockedEmpty: '暂无已屏蔽的用户',
-        logOut: '退出登录',
-        deleteAccount: '删除账号',
-        deleting: '删除中...',
-        language: '语言',
-        deleteTitle: '删除账号',
-        deleteMsg: '确定要删除账号吗？此操作不可撤销，所有数据将被永久删除。',
-        cancel: '取消',
-        delete: '删除',
-        accountDeleted: '账号已删除',
-        accountDeletedMsg: '您的账号已成功删除。',
-        termsContent: '使用 NiubiAgent 即表示您同意我们的条款。\n\n1. 禁止仇恨言论或欺凌。\n2. 禁止垃圾信息或未经授权的广告。\n3. 尊重他人隐私。\n\n违反规定将导致账号被暂停。',
-        privacyContent: '我们仅收集位置数据以在地图上显示您的位置。我们不出售您的数据。',
-        cannotDraw: '无法绘制',
-        cannotPin: '无法放置图钉',
-        uploadFailed: '上传失败',
-    },
-    en: {
-        pins: 'Pins',
-        drawings: 'Drawings',
-        supportLegal: 'Support & Legal',
-        terms: 'Terms of Service',
-        privacy: 'Privacy Policy',
-        blocked: 'Blocked Users',
-        blockedEmpty: 'No users blocked yet.',
-        logOut: 'Log Out',
-        deleteAccount: 'Delete Account',
-        deleting: 'Deleting...',
-        language: 'Language',
-        deleteTitle: 'Delete Account',
-        deleteMsg: 'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.',
-        cancel: 'Cancel',
-        delete: 'Delete',
-        accountDeleted: 'Account Deleted',
-        accountDeletedMsg: 'Your account has been successfully deleted.',
-        termsContent: 'By using NiubiAgent, you agree to our terms. \n\n1. No hate speech or bullying.\n2. No spam or unsolicited advertising.\n3. Respect privacy of others.\n\nViolations will result in account suspension.',
-        privacyContent: 'We collect location data only to display your position on the map. We do not sell your data.',
-        cannotDraw: 'Cannot Draw',
-        cannotPin: 'Cannot Place Pin',
-        uploadFailed: 'Upload Failed',
-    },
-} as const;
+const LANG_LABELS: Record<Lang, string> = { zh: '中文', en: 'English', ja: '日本語' };
+const LANG_ORDER: Lang[] = ['en', 'zh', 'ja'];
 
 export default function ProfileScreen() {
     const router = useRouter();
     const { signOut, session } = useAuth();
     const [isDeleting, setIsDeleting] = useState(false);
-    const [lang, setLang] = useState<Lang>('en');
+    const [lang, setLang] = useLang();
 
     const [profile, setProfile] = useState<any>(null);
     const [stats, setStats] = useState<UserProfileStats>({ pins: 0, drawings: 0 });
     const [isUploading, setIsUploading] = useState(false);
 
-    const d = t[lang];
-
-    // Load saved language
-    useEffect(() => {
-        AsyncStorage.getItem(LANG_KEY).then((saved) => {
-            if (saved === 'zh' || saved === 'en') setLang(saved);
-        });
-    }, []);
-
-    const toggleLang = useCallback(() => {
-        const next: Lang = lang === 'zh' ? 'en' : 'zh';
+    const cycleLang = useCallback(() => {
+        const idx = LANG_ORDER.indexOf(lang);
+        const next = LANG_ORDER[(idx + 1) % LANG_ORDER.length];
         setLang(next);
-        AsyncStorage.setItem(LANG_KEY, next);
-    }, [lang]);
+    }, [lang, setLang]);
 
     useFocusEffect(
         useCallback(() => {
@@ -156,7 +96,7 @@ export default function ProfileScreen() {
 
             await loadProfile();
         } catch (e: any) {
-            Alert.alert('Upload Failed', e.message);
+            Alert.alert(ts('uploadFailed', lang), e.message);
         } finally {
             setIsUploading(false);
         }
@@ -164,19 +104,19 @@ export default function ProfileScreen() {
 
     const handleDeleteAccount = () => {
         Alert.alert(
-            d.deleteTitle,
-            d.deleteMsg,
+            ts('deleteTitle', lang),
+            ts('deleteMsg', lang),
             [
-                { text: d.cancel, style: 'cancel' },
+                { text: ts('cancel', lang), style: 'cancel' },
                 {
-                    text: d.delete,
+                    text: ts('delete', lang),
                     style: 'destructive',
                     onPress: async () => {
                         setIsDeleting(true);
                         // Simulate API call
                         await new Promise(resolve => setTimeout(resolve, 1500));
                         await signOut();
-                        Alert.alert(d.accountDeleted, d.accountDeletedMsg);
+                        Alert.alert(ts('accountDeleted', lang), ts('accountDeletedMsg', lang));
                     }
                 }
             ]
@@ -185,34 +125,34 @@ export default function ProfileScreen() {
 
     const menuItems = [
         {
-            title: d.language,
+            title: ts('language', lang),
             icon: 'globe-outline',
             color: '#5856D6',
-            rightText: lang === 'zh' ? '中文' : 'English',
-            onPress: toggleLang,
+            rightText: LANG_LABELS[lang],
+            onPress: cycleLang,
         },
         {
-            title: d.terms,
+            title: ts('terms', lang),
             icon: 'document-text-outline',
             color: '#007AFF',
             onPress: () => {
-                Alert.alert(d.terms, d.termsContent);
+                Linking.openURL('https://doc-hosting.flycricket.io/drawmaps-terms-of-use/2197a713-a352-47c7-bf8f-a5a19eee3ddb/terms');
             }
         },
         {
-            title: d.privacy,
+            title: ts('privacy', lang),
             icon: 'shield-checkmark-outline',
             color: '#34C759',
             onPress: () => {
-                Alert.alert(d.privacy, d.privacyContent);
+                Linking.openURL('https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy');
             }
         },
         {
-            title: d.blocked,
+            title: ts('blocked', lang),
             icon: 'people-circle-outline',
             color: '#FF9500',
             onPress: () => {
-                Alert.alert(d.blocked, d.blockedEmpty);
+                Alert.alert(ts('blocked', lang), ts('blockedEmpty', lang));
             }
         }
     ];
@@ -241,24 +181,24 @@ export default function ProfileScreen() {
                             )}
                             <View style={styles.onlineBadge} />
                         </TouchableOpacity>
-                        <Text style={styles.userName}>{profile?.user_name || 'Anonymous Agent'}</Text>
+                        <Text style={styles.userName}>{profile?.user_name || ts('anonymousAgent', lang)}</Text>
 
                         <View style={styles.statsRow}>
                             <View style={styles.statItem}>
                                 <Text style={styles.statValue}>{stats.pins}</Text>
-                                <Text style={styles.statLabel}>{d.pins}</Text>
+                                <Text style={styles.statLabel}>{ts('pins', lang)}</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
                                 <Text style={styles.statValue}>{stats.drawings}</Text>
-                                <Text style={styles.statLabel}>{d.drawings}</Text>
+                                <Text style={styles.statLabel}>{ts('drawings', lang)}</Text>
                             </View>
                         </View>
                     </View>
 
                     {/* Settings Sections */}
 
-                    <Text style={styles.sectionTitle}>{d.supportLegal}</Text>
+                    <Text style={styles.sectionTitle}>{ts('supportLegal', lang)}</Text>
                     <View style={styles.menuGroup}>
                         {menuItems.map((item, index) => (
                             <TouchableOpacity
@@ -284,7 +224,7 @@ export default function ProfileScreen() {
 
                     <View style={styles.footerActions}>
                         <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
-                            <Text style={styles.logoutText}>{d.logOut}</Text>
+                            <Text style={styles.logoutText}>{ts('logOut', lang)}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -293,7 +233,7 @@ export default function ProfileScreen() {
                             disabled={isDeleting}
                         >
                             <Text style={styles.deleteText}>
-                                {isDeleting ? d.deleting : d.deleteAccount}
+                                {isDeleting ? ts('deleting', lang) : ts('deleteAccount', lang)}
                             </Text>
                         </TouchableOpacity>
 

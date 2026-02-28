@@ -2,9 +2,11 @@ import { View, StyleSheet, Text, TextInput, TouchableOpacity, Alert, KeyboardAvo
 import { useState } from 'react';
 import { API_BASE_URL } from '@/lib/config';
 import { useRouter } from 'expo-router';
+import { useLang, ts } from '@/lib/i18n';
 
 export default function ForgotPassword() {
     const router = useRouter();
+    const [lang] = useLang();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -15,7 +17,7 @@ export default function ForgotPassword() {
 
     const handleRequestCode = async () => {
         if (!email) {
-            Alert.alert('Error', 'Please enter your email');
+            Alert.alert(ts('error', lang), ts('enterEmail', lang));
             return;
         }
         setLoading(true);
@@ -30,10 +32,10 @@ export default function ForgotPassword() {
             if (res.ok && data.step === 'code') {
                 setStep('code');
             } else {
-                Alert.alert('Error', data.error || 'Failed to send code');
+                Alert.alert(ts('error', lang), data.error || ts('failedToSendCode', lang));
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert(ts('networkError', lang), e.message);
         } finally {
             setLoading(false);
         }
@@ -41,11 +43,11 @@ export default function ForgotPassword() {
 
     const handleResetPassword = async () => {
         if (code.length !== 6) {
-            Alert.alert('Error', 'Please enter the 6-digit code');
+            Alert.alert(ts('error', lang), ts('enterCode', lang));
             return;
         }
         if (newPassword.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
+            Alert.alert(ts('error', lang), ts('passwordTooShort', lang));
             return;
         }
         setLoading(true);
@@ -60,7 +62,7 @@ export default function ForgotPassword() {
             if (res.ok && data.success) {
                 setStep('done');
             } else {
-                Alert.alert('Error', data.error || 'Failed to reset password');
+                Alert.alert(ts('error', lang), data.error || ts('failedToResetPassword', lang));
             }
         } catch (e: any) {
             Alert.alert('Network Error', e.message);
@@ -74,13 +76,13 @@ export default function ForgotPassword() {
             <View style={styles.container}>
                 <View style={styles.scrollContent}>
                     <Text style={styles.emoji}>✅</Text>
-                    <Text style={styles.title}>Password Reset!</Text>
-                    <Text style={styles.subtitle}>Your password has been updated successfully.</Text>
+                    <Text style={styles.title}>{ts('passwordReset', lang)}</Text>
+                    <Text style={styles.subtitle}>{ts('passwordResetMsg', lang)}</Text>
                     <TouchableOpacity
                         style={styles.button}
                         onPress={() => router.replace('/(auth)/login')}
                     >
-                        <Text style={styles.buttonText}>Back to Login</Text>
+                        <Text style={styles.buttonText}>{ts('backToLogin', lang)}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -92,9 +94,9 @@ export default function ForgotPassword() {
             <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <Text style={styles.emoji}>🔑</Text>
-                    <Text style={styles.title}>Reset Password</Text>
+                    <Text style={styles.title}>{ts('resetPassword', lang)}</Text>
                     <Text style={styles.subtitle}>
-                        Enter the code sent to{'\n'}
+                        {ts('enterCodeSentTo', lang)}{'\n'}
                         <Text style={styles.emailHighlight}>{email}</Text>
                     </Text>
 
@@ -111,7 +113,7 @@ export default function ForgotPassword() {
                         />
                         <TextInput
                             style={styles.input}
-                            placeholder="New Password (min 6 characters)"
+                            placeholder={ts('newPasswordMin6', lang)}
                             placeholderTextColor="#999"
                             value={newPassword}
                             onChangeText={setNewPassword}
@@ -122,12 +124,12 @@ export default function ForgotPassword() {
                             onPress={handleResetPassword}
                             disabled={loading}
                         >
-                            <Text style={styles.buttonText}>{loading ? 'Resetting...' : 'Reset Password'}</Text>
+                            <Text style={styles.buttonText}>{loading ? ts('resetting', lang) : ts('resetPassword', lang)}</Text>
                         </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity onPress={() => router.back()}>
-                        <Text style={styles.link}>Back to Login</Text>
+                        <Text style={styles.link}>{ts('backToLogin', lang)}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -138,13 +140,13 @@ export default function ForgotPassword() {
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                 <Text style={styles.emoji}>🔐</Text>
-                <Text style={styles.title}>Forgot Password</Text>
-                <Text style={styles.subtitle}>Enter your email and we'll send a reset code</Text>
+                <Text style={styles.title}>{ts('forgotPasswordTitle', lang)}</Text>
+                <Text style={styles.subtitle}>{ts('forgotPasswordSubtitle', lang)}</Text>
 
                 <View style={styles.form}>
                     <TextInput
                         style={styles.input}
-                        placeholder="Email"
+                        placeholder={ts('email', lang)}
                         placeholderTextColor="#999"
                         value={email}
                         onChangeText={setEmail}
@@ -156,12 +158,12 @@ export default function ForgotPassword() {
                         onPress={handleRequestCode}
                         disabled={loading}
                     >
-                        <Text style={styles.buttonText}>{loading ? 'Sending...' : 'Send Reset Code'}</Text>
+                        <Text style={styles.buttonText}>{loading ? ts('sending', lang) : ts('sendResetCode', lang)}</Text>
                     </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.link}>Back to Login</Text>
+                    <Text style={styles.link}>{ts('backToLogin', lang)}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </KeyboardAvoidingView>
