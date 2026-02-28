@@ -30,7 +30,8 @@ export async function POST(request: Request) {
     const ext = file.name.split('.').pop() ?? 'png';
     const key = `avatars/${result.user.id}/avatar.${ext}`;
 
-    await env.BUCKET.put(key, file.stream(), {
+    const buffer = await file.arrayBuffer();
+    await env.BUCKET.put(key, buffer, {
       httpMetadata: { contentType: file.type },
     });
 

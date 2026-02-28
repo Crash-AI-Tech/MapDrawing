@@ -148,12 +148,25 @@ eas build --platform ios --profile production --auto-submit
 ## 打包
 ### 编译打包
 eas build --platform ios
+或
 eas build --platform ios --local
 
 ### 在Expo服务器上构建
 eas submit -p ios
+或
+使用Transporter上传ipa
 
 ### 查看构建结果
 浏览器登录 Apple Developer 控制台：App Store Connect。https://appstoreconnect.apple.com/
 
+
+### 隐私政策生成
+** 生成地址**
+https://app-privacy-policy-generator.nisrulz.com/
+
+**生成内容**
+```
+https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy
+https://doc-hosting.flycricket.io/drawmaps-terms-of-use/2197a713-a352-47c7-bf8f-a5a19eee3ddb/terms
+```
 

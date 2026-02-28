@@ -6,5 +6,5 @@
  */
 
 // TODO: Move to environment variable (expo-constants / app.json extra)
-// export const API_BASE_URL = 'http://192.168.124.16:3000';
-export const API_BASE_URL = 'https://map.wisebamboo.fun';
+export const API_BASE_URL = 'http://192.168.124.16:3000';
+// export const API_BASE_URL = 'https://map.wisebamboo.fun';

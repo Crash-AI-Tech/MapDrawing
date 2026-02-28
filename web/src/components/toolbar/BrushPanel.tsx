@@ -50,7 +50,7 @@ export default function BrushPanel() {
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {isEraser ? '切换到铅笔' : '切换到橡皮擦'}
+        {isEraser ? '切换到铅笔 (E)' : '切换到橡皮擦 (E)'}
       </TooltipContent>
     </Tooltip>
   );

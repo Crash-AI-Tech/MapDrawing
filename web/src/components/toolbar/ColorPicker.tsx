@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
+import { MIN_OPACITY, OPACITY_STEP, MAX_BRUSH_SIZE } from '@/constants';
 
 /**
  * ColorPicker — color grid + custom hex input + Size/Opacity sliders.
@@ -43,7 +44,7 @@ export default function ColorPicker() {
             </button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent side="bottom">颜色与笔触</TooltipContent>
+        <TooltipContent side="bottom">颜色与笔触 (B)</TooltipContent>
       </Tooltip>
 
       <PopoverContent side="bottom" align="start" className="w-72 space-y-3 border-white/50 bg-white/80 backdrop-blur-xl">
@@ -103,7 +104,7 @@ export default function ColorPicker() {
             value={[activeSize]}
             onValueChange={([v]) => changeSize(v)}
             min={0.5}
-            max={10}
+            max={MAX_BRUSH_SIZE}
             step={0.5}
           />
         </div>
@@ -119,9 +120,9 @@ export default function ColorPicker() {
           <Slider
             value={[activeOpacity]}
             onValueChange={([v]) => changeOpacity(v)}
-            min={0.05}
+            min={MIN_OPACITY}
             max={1}
-            step={0.05}
+            step={OPACITY_STEP}
           />
         </div>
       </PopoverContent>

@@ -41,6 +41,11 @@ export const DEFAULT_COLOR = '#000000';
 export const DEFAULT_SIZE = 3;
 export const DEFAULT_OPACITY = 1.0;
 
+/** Minimum opacity value */
+export const MIN_OPACITY = 0.05;
+/** Opacity step increment */
+export const OPACITY_STEP = 0.05;
+
 /** Maximum brush size across all brush types */
 export const MAX_BRUSH_SIZE = 10;
 

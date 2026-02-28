@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -9,15 +9,86 @@ import * as ImagePicker from 'expo-image-picker';
 import { fetchProfile, fetchProfileStats, apiFetch } from '@/lib/api';
 import type { UserProfileStats } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+type Lang = 'zh' | 'en';
+const LANG_KEY = 'niubi-lang';
+
+const t = {
+    zh: {
+        pins: '图钉',
+        drawings: '绘制',
+        supportLegal: '帮助 & 法律',
+        terms: '服务条款',
+        privacy: '隐私政策',
+        blocked: '已屏蔽的用户',
+        blockedEmpty: '暂无已屏蔽的用户',
+        logOut: '退出登录',
+        deleteAccount: '删除账号',
+        deleting: '删除中...',
+        language: '语言',
+        deleteTitle: '删除账号',
+        deleteMsg: '确定要删除账号吗？此操作不可撤销，所有数据将被永久删除。',
+        cancel: '取消',
+        delete: '删除',
+        accountDeleted: '账号已删除',
+        accountDeletedMsg: '您的账号已成功删除。',
+        termsContent: '使用 NiubiAgent 即表示您同意我们的条款。\n\n1. 禁止仇恨言论或欺凌。\n2. 禁止垃圾信息或未经授权的广告。\n3. 尊重他人隐私。\n\n违反规定将导致账号被暂停。',
+        privacyContent: '我们仅收集位置数据以在地图上显示您的位置。我们不出售您的数据。',
+        cannotDraw: '无法绘制',
+        cannotPin: '无法放置图钉',
+        uploadFailed: '上传失败',
+    },
+    en: {
+        pins: 'Pins',
+        drawings: 'Drawings',
+        supportLegal: 'Support & Legal',
+        terms: 'Terms of Service',
+        privacy: 'Privacy Policy',
+        blocked: 'Blocked Users',
+        blockedEmpty: 'No users blocked yet.',
+        logOut: 'Log Out',
+        deleteAccount: 'Delete Account',
+        deleting: 'Deleting...',
+        language: 'Language',
+        deleteTitle: 'Delete Account',
+        deleteMsg: 'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.',
+        cancel: 'Cancel',
+        delete: 'Delete',
+        accountDeleted: 'Account Deleted',
+        accountDeletedMsg: 'Your account has been successfully deleted.',
+        termsContent: 'By using NiubiAgent, you agree to our terms. \n\n1. No hate speech or bullying.\n2. No spam or unsolicited advertising.\n3. Respect privacy of others.\n\nViolations will result in account suspension.',
+        privacyContent: 'We collect location data only to display your position on the map. We do not sell your data.',
+        cannotDraw: 'Cannot Draw',
+        cannotPin: 'Cannot Place Pin',
+        uploadFailed: 'Upload Failed',
+    },
+} as const;
 
 export default function ProfileScreen() {
     const router = useRouter();
     const { signOut, session } = useAuth();
     const [isDeleting, setIsDeleting] = useState(false);
+    const [lang, setLang] = useState<Lang>('en');
 
     const [profile, setProfile] = useState<any>(null);
     const [stats, setStats] = useState<UserProfileStats>({ pins: 0, drawings: 0 });
     const [isUploading, setIsUploading] = useState(false);
+
+    const d = t[lang];
+
+    // Load saved language
+    useEffect(() => {
+        AsyncStorage.getItem(LANG_KEY).then((saved) => {
+            if (saved === 'zh' || saved === 'en') setLang(saved);
+        });
+    }, []);
+
+    const toggleLang = useCallback(() => {
+        const next: Lang = lang === 'zh' ? 'en' : 'zh';
+        setLang(next);
+        AsyncStorage.setItem(LANG_KEY, next);
+    }, [lang]);
 
     useFocusEffect(
         useCallback(() => {
@@ -26,6 +97,7 @@ export default function ProfileScreen() {
     );
 
     const loadProfile = async () => {
+        if (!session) return;
         try {
             const [data, statsData] = await Promise.all([
                 fetchProfile(),
@@ -33,7 +105,11 @@ export default function ProfileScreen() {
             ]);
             setProfile(data);
             setStats(statsData);
-        } catch (e) {
+        } catch (e: any) {
+            if (e?.status === 401) {
+                await signOut();
+                return;
+            }
             console.error('Failed to load profile', e);
         }
     };
@@ -88,19 +164,19 @@ export default function ProfileScreen() {
 
     const handleDeleteAccount = () => {
         Alert.alert(
-            'Delete Account',
-            'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.',
+            d.deleteTitle,
+            d.deleteMsg,
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: d.cancel, style: 'cancel' },
                 {
-                    text: 'Delete',
+                    text: d.delete,
                     style: 'destructive',
                     onPress: async () => {
                         setIsDeleting(true);
                         // Simulate API call
                         await new Promise(resolve => setTimeout(resolve, 1500));
                         await signOut();
-                        Alert.alert('Account Deleted', 'Your account has been successfully deleted.');
+                        Alert.alert(d.accountDeleted, d.accountDeletedMsg);
                     }
                 }
             ]
@@ -109,30 +185,34 @@ export default function ProfileScreen() {
 
     const menuItems = [
         {
-            title: 'Terms of Service',
+            title: d.language,
+            icon: 'globe-outline',
+            color: '#5856D6',
+            rightText: lang === 'zh' ? '中文' : 'English',
+            onPress: toggleLang,
+        },
+        {
+            title: d.terms,
             icon: 'document-text-outline',
             color: '#007AFF',
             onPress: () => {
-                Alert.alert(
-                    'Terms of Service',
-                    'By using NiubiAgent, you agree to our terms. \n\n1. No hate speech or bullying.\n2. No spam or unsolicited advertising.\n3. Respect privacy of others.\n\nViolations will result in account suspension.'
-                );
+                Alert.alert(d.terms, d.termsContent);
             }
         },
         {
-            title: 'Privacy Policy',
+            title: d.privacy,
             icon: 'shield-checkmark-outline',
             color: '#34C759',
             onPress: () => {
-                Alert.alert('Privacy Policy', 'We collect location data only to display your position on the map. We do not sell your data.');
+                Alert.alert(d.privacy, d.privacyContent);
             }
         },
         {
-            title: 'Blocked Users',
+            title: d.blocked,
             icon: 'people-circle-outline',
             color: '#FF9500',
             onPress: () => {
-                Alert.alert('Blocked Users', 'No users blocked yet.');
+                Alert.alert(d.blocked, d.blockedEmpty);
             }
         }
     ];
@@ -166,19 +246,19 @@ export default function ProfileScreen() {
                         <View style={styles.statsRow}>
                             <View style={styles.statItem}>
                                 <Text style={styles.statValue}>{stats.pins}</Text>
-                                <Text style={styles.statLabel}>Pins</Text>
+                                <Text style={styles.statLabel}>{d.pins}</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
                                 <Text style={styles.statValue}>{stats.drawings}</Text>
-                                <Text style={styles.statLabel}>Drawings</Text>
+                                <Text style={styles.statLabel}>{d.drawings}</Text>
                             </View>
                         </View>
                     </View>
 
                     {/* Settings Sections */}
 
-                    <Text style={styles.sectionTitle}>Support & Legal</Text>
+                    <Text style={styles.sectionTitle}>{d.supportLegal}</Text>
                     <View style={styles.menuGroup}>
                         {menuItems.map((item, index) => (
                             <TouchableOpacity
@@ -192,14 +272,19 @@ export default function ProfileScreen() {
                                     </View>
                                     <Text style={styles.menuText}>{item.title}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                                <View style={styles.menuRight}>
+                                    {'rightText' in item && item.rightText ? (
+                                        <Text style={styles.menuRightText}>{item.rightText}</Text>
+                                    ) : null}
+                                    <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                                </View>
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     <View style={styles.footerActions}>
                         <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
-                            <Text style={styles.logoutText}>Log Out</Text>
+                            <Text style={styles.logoutText}>{d.logOut}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -208,7 +293,7 @@ export default function ProfileScreen() {
                             disabled={isDeleting}
                         >
                             <Text style={styles.deleteText}>
-                                {isDeleting ? 'Deleting...' : 'Delete Account'}
+                                {isDeleting ? d.deleting : d.deleteAccount}
                             </Text>
                         </TouchableOpacity>
 
@@ -346,6 +431,15 @@ const styles = StyleSheet.create({
     menuLeft: {
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    menuRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    menuRightText: {
+        fontSize: 15,
+        color: '#8E8E93',
     },
     menuIconBox: {
         width: 30,

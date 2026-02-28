@@ -14,19 +14,21 @@ interface SyncManagerConfig {
  * SyncManager — Persistence manager for local strokes.
  * - Saves strokes to API (via fetch)
  * - Handles offline queuing (retry later)
- * - (Real-time sync removed)
+ * - Tracks connectivity state and notifies listeners
  */
 export class SyncManager {
     private offlineQueue: OfflineQueue;
     private userId: string;
-    private isOnline = true; // Simple check, ideally verify with NetInfo
+    private state: SyncState = 'connected';
+    private stateListeners = new Set<SyncStateListener>();
+    private flushTimer: ReturnType<typeof setInterval> | null = null;
 
     constructor(config: SyncManagerConfig) {
         this.userId = config.userId;
         this.offlineQueue = new OfflineQueue();
 
         // Simple retry mechanism
-        setInterval(() => {
+        this.flushTimer = setInterval(() => {
             this.flushOfflineQueue();
         }, 10000);
     }
@@ -40,9 +42,12 @@ export class SyncManager {
         const event: DrawEvent = { type: 'STROKE_ADD', stroke };
 
         try {
+            this.setState('connecting');
             await saveDrawings(stroke);
+            this.setState('connected');
         } catch (e) {
             console.warn('[SyncManager] Failed to save stroke, queuing:', e);
+            this.setState('disconnected');
             await this.offlineQueue.enqueue(event);
         }
     }
@@ -58,9 +63,12 @@ export class SyncManager {
         };
 
         try {
+            this.setState('connecting');
             await deleteStroke(strokeId);
+            this.setState('connected');
         } catch (e) {
             console.warn('[SyncManager] Failed to delete stroke, queuing:', e);
+            this.setState('disconnected');
             await this.offlineQueue.enqueue(event);
         }
     }
@@ -71,13 +79,13 @@ export class SyncManager {
     }
 
     getState(): SyncState {
-        return 'connected';
+        return this.state;
     }
 
     onStateChange(listener: SyncStateListener): () => void {
-        // No real state change logic yet
-        listener('connected');
-        return () => { };
+        this.stateListeners.add(listener);
+        listener(this.state);
+        return () => { this.stateListeners.delete(listener); };
     }
 
     updateToken(token: string): void {
@@ -85,7 +93,20 @@ export class SyncManager {
     }
 
     dispose(): void {
-        // Clean up
+        if (this.flushTimer) {
+            clearInterval(this.flushTimer);
+            this.flushTimer = null;
+        }
+        this.stateListeners.clear();
+    }
+
+    private setState(newState: SyncState): void {
+        if (this.state !== newState) {
+            this.state = newState;
+            for (const listener of this.stateListeners) {
+                listener(newState);
+            }
+        }
     }
 
     private async flushOfflineQueue(): Promise<void> {
@@ -101,7 +122,10 @@ export class SyncManager {
                 }
             } catch (e) {
                 console.error('[SyncManager] Failed to flush offline event:', e);
+                return; // Stop flushing, stay offline
             }
         }
+        // All flushed successfully → back online
+        this.setState('connected');
     }
 }

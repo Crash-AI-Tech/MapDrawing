@@ -193,6 +193,13 @@ export function useDrawingEngine(
         const canDraw = state.drawingMode && currentZoom >= MIN_DRAW_ZOOM;
         canvasProviderRef.current?.setDrawingMode(canDraw);
       }
+      if (state.strokesTransparent !== prevState.strokesTransparent) {
+        const pipeline = pipelineRef.current;
+        if (pipeline) {
+          pipeline.strokesTransparent = state.strokesTransparent;
+          pipeline.requestRender();
+        }
+      }
     });
     return () => unsub();
   }, []);

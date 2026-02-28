@@ -37,7 +37,7 @@ export default function PinPlacer({ lng, lat, onConfirm, onCancel, ink }: PinPla
   };
 
   return (
-    <div className="absolute top-20 left-1/2 z-40 w-80 -translate-x-1/2 rounded-xl border bg-background p-4 shadow-xl">
+    <div className="absolute top-1/2 left-1/2 z-40 w-80 -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-background/95 p-4 shadow-2xl backdrop-blur-md">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">

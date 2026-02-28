@@ -18,6 +18,8 @@ interface DrawingState {
   canRedo: boolean;
   /** Total stroke count */
   strokeCount: number;
+  /** Whether strokes should be rendered semi-transparent to reveal map details */
+  strokesTransparent: boolean;
 
   /** Engine undo/redo callbacks (registered after engine init) */
   _undoFn: (() => void) | null;
@@ -32,6 +34,7 @@ interface DrawingState {
   setCanUndo: (canUndo: boolean) => void;
   setCanRedo: (canRedo: boolean) => void;
   setStrokeCount: (count: number) => void;
+  setStrokesTransparent: (transparent: boolean) => void;
   /** Register engine undo/redo handlers */
   registerEngineActions: (undoFn: () => void, redoFn: () => void) => void;
   /** Unregister engine undo/redo handlers */
@@ -52,6 +55,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
   canUndo: false,
   canRedo: false,
   strokeCount: 0,
+  strokesTransparent: false,
 
   _undoFn: null,
   _redoFn: null,
@@ -65,6 +69,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
   setCanUndo: (canUndo) => set({ canUndo }),
   setCanRedo: (canRedo) => set({ canRedo }),
   setStrokeCount: (strokeCount) => set({ strokeCount }),
+  setStrokesTransparent: (strokesTransparent) => set({ strokesTransparent }),
 
   registerEngineActions: (undoFn, redoFn) => set({ _undoFn: undoFn, _redoFn: redoFn }),
   unregisterEngineActions: () => set({ _undoFn: null, _redoFn: null }),

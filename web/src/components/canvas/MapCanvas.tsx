@@ -16,12 +16,14 @@ import {
 import { useDrawingEngine } from '@/hooks/useDrawingEngine';
 import { useSync } from '@/hooks/useSync';
 import { useViewport } from '@/hooks/useViewport';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useInkStore } from '@/stores/inkStore';
 import { usePinStore, MapPin } from '@/stores/pinStore';
 import PinPlacer from '@/components/pins/PinPlacer';
+import PinDetailModal from '@/components/pins/PinDetailModal';
 import { Compliance } from '@/lib/compliance';
 
 /** Generate an SVG pin cursor data URI — small size (14x20) */
@@ -98,6 +100,9 @@ export default function MapCanvas() {
   const [pinClickCoords, setPinClickCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [mouseCoords, setMouseCoords] = useState<{ lng: number; lat: number } | null>(null);
 
+  // Keyboard shortcuts
+  useKeyboardShortcuts();
+
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
 
@@ -119,6 +124,7 @@ export default function MapCanvas() {
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const pinColor = usePinStore((s) => s.pinColor);
   const refreshBlocked = usePinStore((s) => s.refreshBlocked);
+  const setSelectedPin = usePinStore((s) => s.setSelectedPin);
 
   const userId = user?.id ?? 'anonymous';
   const userName = profile?.userName ?? 'Anonymous';
@@ -421,6 +427,11 @@ export default function MapCanvas() {
       wrapper.appendChild(tooltip);
       wrapper.appendChild(pinEl);
 
+      // Click to open detail modal
+      wrapper.addEventListener('click', () => {
+        setSelectedPin(pin);
+      });
+
       const marker = new maplibregl.Marker({
         element: wrapper,
         anchor: 'bottom',
@@ -429,7 +440,7 @@ export default function MapCanvas() {
         .addTo(map);
       pinMarkersRef.current.push(marker);
     });
-  }, [pins, currentZoom, user, userId, refreshBlocked]);
+  }, [pins, currentZoom, user, userId, refreshBlocked, setSelectedPin]);
 
   // 8) Handle pin placement
   useEffect(() => {
@@ -560,6 +571,9 @@ export default function MapCanvas() {
           onCancel={handlePinCancel}
         />
       )}
+
+      {/* Pin Detail Modal — shown when a pin is clicked */}
+      <PinDetailModal />
 
       {/* Zoom level & mouse coordinates */}
       <div className="absolute top-4 left-3 z-30 flex flex-col gap-1.5">

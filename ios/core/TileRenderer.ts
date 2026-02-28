@@ -224,6 +224,9 @@ export class TileRenderer {
   // For geo→world conversion
   private static proj = new MercatorProjection();
 
+  /** When true, strokes are rendered at 30% opacity to reveal map details */
+  strokesTransparent = false;
+
   // ----------------
   // Public API
   // ----------------
@@ -353,9 +356,10 @@ export class TileRenderer {
       canvas.translate(screenPos.x, screenPos.y);
       canvas.scale(scale, scale);
 
+      const alphaMul = this.strokesTransparent ? 0.3 : 1.0;
       const paint = makePaint(
         rs.data.color,
-        rs.data.opacity * rs.config.opacity,
+        rs.data.opacity * rs.config.opacity * alphaMul,
         rs.baseSize,
         rs.config.strokeCap,
         rs.config.strokeJoin,

@@ -49,8 +49,9 @@ import {
   type SkPath,
   type SkPicture,
 } from '@shopify/react-native-skia';
-import * as SecureStore from 'expo-secure-store';
+import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useAuth } from '@/context/AuthContext';
 import DrawingToolbar from '@/components/DrawingToolbar';
 import ZoomControls from '@/components/ZoomControls';
 import PinPlacer from '@/components/PinPlacer';
@@ -187,6 +188,8 @@ const MIN_PINS_FETCH_ZOOM = 8; // Don't fetch pins when zoomed out below this
 // ========================
 
 export default function MapScreen() {
+  const { signOut: authSignOut } = useAuth();
+
   // ===== Layout =====
   const [screenSize, setScreenSize] = useState(() => {
     const { width, height } = Dimensions.get('window');
@@ -224,11 +227,26 @@ export default function MapScreen() {
   const [ink, setInk] = useState(100);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [strokesTransparent, setStrokesTransparent] = useState(false);
+  // Sync transparency flag to TileRenderer so it re-bakes bitmaps at 30% alpha
+  useEffect(() => {
+    tileRendererRef.current.strokesTransparent = strokesTransparent;
+  }, [strokesTransparent]);
+  const prevInkRef = useRef(100);
+
+  // Haptic feedback when ink depletes to 0
+  useEffect(() => {
+    if (prevInkRef.current > 0 && ink <= 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }
+    prevInkRef.current = ink;
+  }, [ink]);
 
   // ===== Real-time Collaboration =====
   const [session, setSession] = useState<{ token: string; userId: string; avatar_url: string | null } | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const tileManagerRef = useRef<TileManager | null>(null);
+  const [syncState, setSyncState] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connected');
 
   // ===== Strokes: ref-based (no React state for big arrays) =====
   const strokesRef = useRef<Map<string, StrokeData>>(new Map());
@@ -244,9 +262,9 @@ export default function MapScreen() {
         const profile = await fetchProfile();
         setSession({ token, userId: profile.id, avatar_url: profile.avatar_url });
       } catch (e: any) {
-        // If token is expired/invalid (401), clear it so we don't retry on next launch
+        // If token is expired/invalid (401), sign out properly to update AuthContext state
         if (e?.status === 401) {
-          await SecureStore.deleteItemAsync('session');
+          await authSignOut();
         }
       }
     })();
@@ -263,6 +281,9 @@ export default function MapScreen() {
 
     syncManagerRef.current = new SyncManager({
       userId: session.userId,
+    });
+    syncManagerRef.current.onStateChange((state) => {
+      setSyncState(state);
     });
 
     return () => {
@@ -559,7 +580,7 @@ export default function MapScreen() {
       screenSize.height,
       cameraState.bearing
     );
-  }, [isMapInteracting, strokeVersion, cameraState.center, cameraState.zoom, cameraState.bearing, screenSize]);
+  }, [isMapInteracting, strokeVersion, strokesTransparent, cameraState.center, cameraState.zoom, cameraState.bearing, screenSize]);
 
   // ===== Stable Snapshot for Interaction =====
   useEffect(() => {
@@ -792,6 +813,13 @@ export default function MapScreen() {
     cameraRef.current?.setCamera({
       zoomLevel: Math.max(1, cameraState.zoom - 1),
       animationDuration: 200,
+    });
+  }, [cameraState.zoom]);
+
+  const handleZoomDelta = useCallback((delta: number) => {
+    cameraRef.current?.setCamera({
+      zoomLevel: Math.max(1, Math.min(22, cameraState.zoom + delta)),
+      animationDuration: 50,
     });
   }, [cameraState.zoom]);
 
@@ -1106,6 +1134,7 @@ export default function MapScreen() {
         currentZoom={cameraState.zoom}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
+        onZoomDelta={handleZoomDelta}
       />
 
       {/* Pin placement panel */}
@@ -1138,6 +1167,9 @@ export default function MapScreen() {
         maxInk={100}
 
         currentZoom={cameraState.zoom}
+        strokesTransparent={strokesTransparent}
+        onToggleTransparency={() => setStrokesTransparent((v) => !v)}
+        syncState={syncState}
       />
 
       {/* ===== Selected Pin Tooltip (Outside MapView) ===== */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,8 +15,18 @@ import {
   ShieldCheck,
   UserX,
   ChevronRight,
+  Camera,
 } from 'lucide-react';
 import { Compliance } from '@/lib/compliance';
+
+/** Resolve avatar URL — prefix with /api/files for R2-stored paths */
+function resolveAvatarUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  // R2 key like /avatars/userId/avatar.jpg → /api/files/avatars/...
+  const cleaned = url.replace(/^\//, '');
+  return `/api/files/${cleaned}`;
+}
 
 interface UserMenuProps {
   onLoginClick?: () => void;
@@ -33,10 +43,12 @@ interface Stats {
  * Shows identity card, stats, support & legal, log out, delete account.
  */
 export default function UserMenu({ onLoginClick }: UserMenuProps) {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refreshUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch stats when popover opens
   useEffect(() => {
@@ -103,6 +115,36 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      window.alert('File too large (max 2MB)');
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!uploadRes.ok) throw new Error('Upload failed');
+      const { url } = (await uploadRes.json()) as { url: string };
+      await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: url }),
+      });
+      await refreshUser();
+    } catch {
+      window.alert('Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const avatarSrc = resolveAvatarUrl(profile?.avatarUrl);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -111,9 +153,9 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
           size="icon"
           className="relative h-8 w-8 rounded-full border border-gray-200/60 bg-gray-100/80 backdrop-blur-md"
         >
-          {profile?.avatarUrl ? (
+          {avatarSrc ? (
             <img
-              src={profile.avatarUrl}
+              src={avatarSrc}
               alt={displayName}
               className="h-8 w-8 rounded-full object-cover"
             />
@@ -132,19 +174,40 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
       >
         {/* ===== Identity Card ===== */}
         <div className="flex flex-col items-center px-5 pt-5 pb-4">
-          {/* Avatar */}
+          {/* Avatar — click to upload */}
           <div className="relative mb-3">
-            {profile?.avatarUrl ? (
-              <img
-                src={profile.avatarUrl}
-                alt={displayName}
-                className="h-16 w-16 rounded-full border-[3px] border-white object-cover shadow-lg"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-white bg-primary text-lg font-semibold text-primary-foreground shadow-lg">
-                {initials}
+            <button
+              className="group relative cursor-pointer rounded-full"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt={displayName}
+                  className="h-16 w-16 rounded-full border-[3px] border-white object-cover shadow-lg"
+                />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-white bg-primary text-lg font-semibold text-primary-foreground shadow-lg">
+                  {initials}
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/30">
+                <Camera className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
               </div>
-            )}
+              {uploading && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                </div>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarUpload}
+            />
             {/* Online badge */}
             <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-[2.5px] border-white bg-green-500" />
           </div>

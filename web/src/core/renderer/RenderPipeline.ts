@@ -35,6 +35,9 @@ export class RenderPipeline {
   private rafId: number | null = null;
   private needsRender = true;
 
+  /** When true, strokes are rendered at 50% opacity to reveal map underneath */
+  strokesTransparent = false;
+
   constructor(config: RenderPipelineConfig) {
     this.brushRegistry = config.brushRegistry;
     this.viewportManager = config.viewportManager;
@@ -114,6 +117,9 @@ export class RenderPipeline {
     this.compositeCtx.save();
     // Reset scale since we'll work in CSS pixels
     this.compositeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this.strokesTransparent) {
+      this.compositeCtx.globalAlpha = 0.3;
+    }
     this.strokeRenderer.renderStrokes(this.compositeCtx, visibleStrokes, transform, currentZoom);
     this.compositeCtx.restore();
 

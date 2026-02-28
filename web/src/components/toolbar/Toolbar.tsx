@@ -22,6 +22,11 @@ import {
   Hand,
   Pencil,
   MapPin,
+  Eye,
+  EyeOff,
+  Wifi,
+  WifiOff,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useState } from 'react';
@@ -44,10 +49,13 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   const activeBrushId = useDrawingStore((s) => s.activeBrushId);
   const setActiveBrush = useDrawingStore((s) => s.setActiveBrush);
   const strokeCount = useDrawingStore((s) => s.strokeCount);
+  const strokesTransparent = useDrawingStore((s) => s.strokesTransparent);
+  const setStrokesTransparent = useDrawingStore((s) => s.setStrokesTransparent);
   const user = useAuthStore((s) => s.user);
   const placingPin = usePinStore((s) => s.placingPin);
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const currentZoom = useUIStore((s) => s.currentZoom);
+  const syncState = useUIStore((s) => s.syncState);
   const [zoomTooltip, setZoomTooltip] = useState<string | null>(null);
 
   // Derive current tool mode
@@ -116,7 +124,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Hand className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Navigation</TooltipContent>
+          <TooltipContent side="bottom">Navigation (H)</TooltipContent>
         </Tooltip>
 
 
@@ -133,7 +141,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <MapPin className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Pin</TooltipContent>
+          <TooltipContent side="bottom">Pin (P)</TooltipContent>
         </Tooltip>
 
         {/* Zoom tooltip */}
@@ -188,10 +196,53 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
           <TooltipContent side="bottom">Redo (Ctrl+Shift+Z)</TooltipContent>
         </Tooltip>
 
+        {/* Transparency toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('h-9 w-9 rounded-full', strokesTransparent && ACTIVE_BTN)}
+              onClick={() => setStrokesTransparent(!strokesTransparent)}
+            >
+              {strokesTransparent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {strokesTransparent ? '恢复绘制不透明度' : '半透明绘制（查看地图）'}
+          </TooltipContent>
+        </Tooltip>
+
         <div className="h-5 w-px bg-border" />
 
         {/* Ink bar */}
         <InkBar />
+
+        {/* Sync status indicator */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex h-5 w-5 items-center justify-center">
+              {syncState === 'connected' && (
+                <Wifi className="h-3 w-3 text-green-500" />
+              )}
+              {syncState === 'connecting' && (
+                <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
+              )}
+              {syncState === 'disconnected' && (
+                <WifiOff className="h-3 w-3 text-gray-400" />
+              )}
+              {syncState === 'error' && (
+                <WifiOff className="h-3 w-3 text-red-500" />
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {syncState === 'connected' && '已连接'}
+            {syncState === 'connecting' && '连接中...'}
+            {syncState === 'disconnected' && '离线 — 操作将在恢复后同步'}
+            {syncState === 'error' && '连接错误 — 操作已缓存'}
+          </TooltipContent>
+        </Tooltip>
 
         {/* Stroke count */}
         {strokeCount > 0 && (
