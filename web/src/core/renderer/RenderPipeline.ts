@@ -32,6 +32,12 @@ export class RenderPipeline {
   private activeCanvas: HTMLCanvasElement | null = null;
   private activeCtx: CanvasRenderingContext2D | null = null;
 
+  /** Reusable offscreen canvas for transparency compositing */
+  private tmpCanvas: HTMLCanvasElement | null = null;
+  private tmpCtx: CanvasRenderingContext2D | null = null;
+  private tmpCanvasW = 0;
+  private tmpCanvasH = 0;
+
   private rafId: number | null = null;
   private needsRender = true;
 
@@ -104,6 +110,14 @@ export class RenderPipeline {
       (s) => currentZoom >= s.createdZoom - STROKE_HIDE_ZOOM_DIFF
     );
 
+    // Safety cap: skip rendering when too many strokes are visible
+    // (e.g. at global zoom). Prevents main-thread freeze.
+    if (visibleStrokes.length > 2000) {
+      this.compositeCtx.restore();
+      this.needsRender = false;
+      return;
+    }
+
     // Sort by createdAt ascending so newer strokes render on top of older ones
     visibleStrokes.sort((a, b) => a.createdAt - b.createdAt);
 
@@ -119,20 +133,25 @@ export class RenderPipeline {
     this.compositeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (this.strokesTransparent) {
-      // Render strokes to a temporary canvas first, then composite at 30% alpha.
-      // This is needed because each brush's renderFullStroke sets its own globalAlpha
-      // via save/restore, which would override a simple globalAlpha = 0.3.
-      const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width = width;
-      tmpCanvas.height = height;
-      const tmpCtx = tmpCanvas.getContext('2d');
+      // Reuse a cached offscreen canvas for transparency compositing.
+      // Recreating it every frame causes massive GC pressure and page crashes.
+      if (!this.tmpCanvas || this.tmpCanvasW !== width || this.tmpCanvasH !== height) {
+        this.tmpCanvas = document.createElement('canvas');
+        this.tmpCanvas.width = width;
+        this.tmpCanvas.height = height;
+        this.tmpCtx = this.tmpCanvas.getContext('2d');
+        this.tmpCanvasW = width;
+        this.tmpCanvasH = height;
+      }
+      const tmpCtx = this.tmpCtx;
       if (tmpCtx) {
+        tmpCtx.clearRect(0, 0, width, height);
         tmpCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.strokeRenderer.renderStrokes(tmpCtx, visibleStrokes, transform, currentZoom);
         // Reset to identity so drawImage maps device pixels 1:1 (no double-scaling by dpr)
         this.compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
         this.compositeCtx.globalAlpha = 0.3;
-        this.compositeCtx.drawImage(tmpCanvas, 0, 0);
+        this.compositeCtx.drawImage(this.tmpCanvas, 0, 0);
         this.compositeCtx.globalAlpha = 1.0;
         // Restore the dpr transform for anything after
         this.compositeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -184,6 +203,8 @@ export class RenderPipeline {
     this.compositeCtx = null;
     this.activeCanvas = null;
     this.activeCtx = null;
+    this.tmpCanvas = null;
+    this.tmpCtx = null;
   }
 
   private startRenderLoop(): void {

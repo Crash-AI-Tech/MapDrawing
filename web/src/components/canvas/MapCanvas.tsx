@@ -11,6 +11,7 @@ import {
   MAP_STYLE_URL,
   MIN_DRAW_ZOOM,
   MIN_PIN_ZOOM,
+  MIN_DATA_ZOOM,
   PIN_INK_COST,
 } from '@/constants';
 import { useDrawingEngine } from '@/hooks/useDrawingEngine';
@@ -147,6 +148,12 @@ export default function MapCanvas() {
   // 3) Viewport change → load strokes + pins
   const handleViewportChange = useCallback(
     async (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }, zoom: number) => {
+      // Skip ALL data loading when zoomed out too far to prevent performance issues
+      if (zoom < MIN_DATA_ZOOM) {
+        setPins([]);
+        return;
+      }
+
       const center = {
         lat: (bounds.minLat + bounds.maxLat) / 2,
         lng: (bounds.minLng + bounds.maxLng) / 2,

@@ -137,6 +137,13 @@ export class TileManager {
         const tl = getTileXY(maxLat, minLng);
         const br = getTileXY(minLat, maxLng);
 
+        // Safety cap: if the tile count is too large, skip to prevent OOM / freeze
+        const tileCountEstimate = (br.x - tl.x + 1) * (br.y - tl.y + 1);
+        if (tileCountEstimate > 200) {
+            console.warn(`[TileManager] Tile count too large (${tileCountEstimate}), skipping fetch to prevent freeze.`);
+            return [];
+        }
+
         const keys: string[] = [];
         for (let x = tl.x; x <= br.x; x++) {
             for (let y = tl.y; y <= br.y; y++) {

@@ -7,6 +7,8 @@ import type { DrawingEngine } from '@/core/engine/DrawingEngine';
 import type { SyncState } from '@/core/types';
 import { useUIStore } from '@/stores/uiStore';
 
+import { MIN_DATA_ZOOM } from '@/constants';
+
 export interface UseSyncOptions {
   engine: DrawingEngine | null;
   userId: string;
@@ -76,6 +78,8 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
   // === Load strokes for viewport using TileManager ===
   const loadViewport = useCallback(
     async (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }, zoom: number) => {
+      // Safety guard: never load data when zoomed out too far
+      if (zoom < MIN_DATA_ZOOM) return [];
       if (!tileManagerRef.current || !engine) return [];
 
       const strokes = await tileManagerRef.current.fetchMissingTiles(bounds);

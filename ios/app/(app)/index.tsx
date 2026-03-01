@@ -56,7 +56,7 @@ import DrawingToolbar from '@/components/DrawingToolbar';
 import ZoomControls from '@/components/ZoomControls';
 import PinPlacer from '@/components/PinPlacer';
 import MapPinOverlay, { MapPinTooltip, type PinData } from '@/components/MapPinOverlay';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
   fetchDrawings,
   fetchPins,
@@ -82,6 +82,7 @@ import {
   MAP_DEFAULT_ZOOM,
   MIN_DRAW_ZOOM,
   MIN_PIN_ZOOM,
+  MIN_DATA_ZOOM,
   PIN_INK_COST,
   STROKE_HIDE_ZOOM_DIFF,
   VIEWPORT_LOAD_DEBOUNCE,
@@ -241,6 +242,7 @@ export default function MapScreen() {
 
   // ===== Real-time Collaboration =====
   const [session, setSession] = useState<{ token: string; userId: string; avatar_url: string | null } | null>(null);
+  const [avatarVersion, setAvatarVersion] = useState(0);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const tileManagerRef = useRef<TileManager | null>(null);
   const [syncState, setSyncState] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connected');
@@ -266,6 +268,23 @@ export default function MapScreen() {
       }
     })();
   }, []);
+
+  // Re-fetch profile avatar when returning from profile screen
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const token = await getToken();
+        if (!token) return;
+        try {
+          const profile = await fetchProfile();
+          setSession((prev) =>
+            prev ? { ...prev, avatar_url: profile.avatar_url } : prev
+          );
+          setAvatarVersion((v) => v + 1);
+        } catch { }
+      })();
+    }, [])
+  );
 
   // 2a. Init TileManager unconditionally (drawings API is public, no auth needed)
   useEffect(() => {
@@ -379,12 +398,17 @@ export default function MapScreen() {
 
   // ===== Viewport loading: paginated fetch + TileRenderer update =====
   const loadViewport = useCallback(async () => {
+    // Skip ALL data loading when zoomed out too far to prevent performance issues
+    const zoom = cameraZoomRef.current;
+    if (zoom < MIN_DATA_ZOOM) {
+      return;
+    }
+
     // Cancel any in-flight tile fetches from a previous call
     // (TileManager.fetchMissingTiles already calls cancelInFlight internally)
 
     const proj = projectionRef.current;
     const bounds = proj.getViewportBounds();
-    const zoom = cameraZoomRef.current;
 
     const expandedBounds = {
       minLng: bounds.minLng - (bounds.maxLng - bounds.minLng) * 0.5,
@@ -1001,7 +1025,7 @@ export default function MapScreen() {
           onPress={() => router.push('/(app)/profile')}
         >
           <Image
-            source={session?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${session.avatar_url.replace(/^\//, '')}` } : require('@/assets/images/react-logo.png')}
+            source={session?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${session.avatar_url.replace(/^\//, '')}?v=${avatarVersion}` } : require('@/assets/images/react-logo.png')}
             style={styles.avatarImage}
           />
         </TouchableOpacity>

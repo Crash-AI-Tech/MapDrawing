@@ -23,6 +23,7 @@ export default function ProfileScreen() {
     const [profile, setProfile] = useState<any>(null);
     const [stats, setStats] = useState<UserProfileStats>({ pins: 0, drawings: 0 });
     const [isUploading, setIsUploading] = useState(false);
+    const [avatarCacheBust, setAvatarCacheBust] = useState(Date.now());
 
     const cycleLang = useCallback(() => {
         const idx = LANG_ORDER.indexOf(lang);
@@ -95,6 +96,7 @@ export default function ProfileScreen() {
             });
 
             await loadProfile();
+            setAvatarCacheBust(Date.now());
         } catch (e: any) {
             Alert.alert(ts('uploadFailed', lang), e.message);
         } finally {
@@ -175,7 +177,7 @@ export default function ProfileScreen() {
                                 </View>
                             ) : (
                                 <Image
-                                    source={profile?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${profile.avatar_url.replace(/^\//, '')}` } : require('@/assets/images/react-logo.png')}
+                                    source={profile?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${profile.avatar_url.replace(/^\//,'')}?v=${avatarCacheBust}` } : require('@/assets/images/react-logo.png')}
                                     style={styles.avatar}
                                 />
                             )}

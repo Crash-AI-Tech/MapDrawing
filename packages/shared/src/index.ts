@@ -67,6 +67,10 @@ export const STROKE_HIDE_ZOOM_DIFF = 3;
 /** Minimum zoom level to show map pins */
 export const MIN_PIN_ZOOM = 20;
 
+/** Minimum zoom level to load ANY data (strokes + pins) from the database.
+ *  Below this zoom, only the bare map is displayed to prevent performance issues. */
+export const MIN_DATA_ZOOM = 11;
+
 /** Ink cost to place a map pin */
 export const PIN_INK_COST = 50;
 
