@@ -400,9 +400,37 @@ export default function HomePage() {
 
       {/* ====== Footer ====== */}
       <footer className="bg-gray-900 px-6 py-8 text-center">
-        <p className="text-sm text-gray-400" style={FONT}>
-          © {new Date().getFullYear()} Map · {d.footer}
-        </p>
+        <div className="mx-auto flex max-w-4xl flex-col items-center gap-3">
+          <p className="text-sm text-gray-400" style={FONT}>
+            © {new Date().getFullYear()} DrawMaps · {d.footer}
+          </p>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/support"
+              className="text-sm text-gray-500 transition-colors hover:text-violet-400"
+            >
+              Support
+            </Link>
+            <span className="text-gray-700">·</span>
+            <a
+              href="https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-500 transition-colors hover:text-violet-400"
+            >
+              Privacy Policy
+            </a>
+            <span className="text-gray-700">·</span>
+            <a
+              href="https://doc-hosting.flycricket.io/drawmaps-terms-of-use/2197a713-a352-47c7-bf8f-a5a19eee3ddb/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-500 transition-colors hover:text-violet-400"
+            >
+              Terms of Use
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );

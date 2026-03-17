@@ -45,13 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isLoading) return;
 
-        // Only redirect FROM auth pages back to app if logged in.
-        // Guests can freely access the app (map) without logging in.
+        // Redirect authenticated users away from auth screens to the public map.
         if (session && rootSegment === '(auth)') {
-            router.replace('/(app)');
+            router.replace('/');
         }
-        // Note: we do NOT redirect unauthenticated users to login.
-        // Guest access is allowed. Login is prompted when drawing/placing pins.
+        // Unauthenticated users can stay on public routes as guests.
+        // Protected routes handle their own redirect to /login.
     }, [session, rootSegment, isLoading]);
 
     const signIn = async (token: string) => {

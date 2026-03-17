@@ -215,7 +215,7 @@ export default function Login() {
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.skipLink} onPress={() => router.replace('/(app)')}>
+                <TouchableOpacity style={styles.skipLink} onPress={() => router.replace('/')}>
                     <Text style={styles.skipText}>{ts('continueAsGuest', lang)}</Text>
                 </TouchableOpacity>
             </ScrollView>

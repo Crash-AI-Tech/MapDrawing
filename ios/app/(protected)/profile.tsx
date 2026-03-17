@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, Switch, ActivityIndicator, Linking } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
+
 import { fetchProfile, fetchProfileStats, apiFetch } from '@/lib/api';
 import type { UserProfileStats } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
@@ -15,7 +15,6 @@ const LANG_LABELS: Record<Lang, string> = { zh: '中文', en: 'English', ja: '�
 const LANG_ORDER: Lang[] = ['en', 'zh', 'ja'];
 
 export default function ProfileScreen() {
-    const router = useRouter();
     const { signOut, session } = useAuth();
     const [isDeleting, setIsDeleting] = useState(false);
     const [lang, setLang] = useLang();
@@ -81,7 +80,7 @@ export default function ProfileScreen() {
             const res = await fetch(`${API_BASE_URL}/api/upload`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${session}`
+                    Authorization: `Bearer ${session}`
                 },
                 body: formData,
             });
@@ -115,7 +114,6 @@ export default function ProfileScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         setIsDeleting(true);
-                        // Simulate API call
                         await new Promise(resolve => setTimeout(resolve, 1500));
                         await signOut();
                         Alert.alert(ts('accountDeleted', lang), ts('accountDeletedMsg', lang));
@@ -161,14 +159,8 @@ export default function ProfileScreen() {
 
     return (
         <View style={styles.container}>
-
-
             <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-
-
                 <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-                    {/* Identity Card */}
                     <View style={styles.identityContainer}>
                         <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={isUploading}>
                             {isUploading ? (
@@ -197,8 +189,6 @@ export default function ProfileScreen() {
                             </View>
                         </View>
                     </View>
-
-                    {/* Settings Sections */}
 
                     <Text style={styles.sectionTitle}>{ts('supportLegal', lang)}</Text>
                     <View style={styles.menuGroup}>
@@ -241,7 +231,6 @@ export default function ProfileScreen() {
 
                         <Text style={styles.versionText}>NiubiAgent v1.0.0 (Build 15)</Text>
                     </View>
-
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -399,7 +388,6 @@ const styles = StyleSheet.create({
     borderBottom: {
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: '#C6C6C8',
-        // marginLeft: 58, // Removed to fix alignment
     },
     footerActions: {
         marginTop: 20,

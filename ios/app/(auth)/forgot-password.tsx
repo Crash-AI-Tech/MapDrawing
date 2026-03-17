@@ -80,7 +80,7 @@ export default function ForgotPassword() {
                     <Text style={styles.subtitle}>{ts('passwordResetMsg', lang)}</Text>
                     <TouchableOpacity
                         style={styles.button}
-                        onPress={() => router.replace('/(auth)/login')}
+                            onPress={() => router.replace('/login')}
                     >
                         <Text style={styles.buttonText}>{ts('backToLogin', lang)}</Text>
                     </TouchableOpacity>

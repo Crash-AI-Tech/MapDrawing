@@ -331,7 +331,7 @@ export default function MapScreen() {
         ts('signInToDrawOrPin', lang),
         [
           { text: ts('cancel', lang), style: 'cancel' },
-          { text: ts('signIn', lang), onPress: () => router.push('/(auth)/login') },
+          { text: ts('signIn', lang), onPress: () => router.push('/login') },
         ]
       );
       return;
@@ -1022,7 +1022,7 @@ export default function MapScreen() {
       <View style={styles.topControls}>
         <TouchableOpacity
           style={styles.profileBtn}
-          onPress={() => router.push('/(app)/profile')}
+          onPress={() => router.push(session ? '/profile' : '/login')}
         >
           <Image
             source={session?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${session.avatar_url.replace(/^\//, '')}?v=${avatarVersion}` } : require('@/assets/images/react-logo.png')}
