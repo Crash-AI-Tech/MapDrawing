@@ -332,3 +332,101 @@ export async function updateUserProfile(
     .bind(...values)
     .run();
 }
+
+/**
+ * 软删除账号：匿名化所有作品后删除用户
+ * drawings 和 map_pins 的 user_id 会因 FK ON DELETE SET NULL 变为 NULL，
+ * user_name 字段单独更新为 'Anonymous'。
+ */
+export async function deleteUserAndAnonymize(userId: string): Promise<void> {
+  const { env } = getCloudflareContext();
+
+  // 先把作品和图钉的 user_name 改为匿名（user_id 会在删除 user 时由 FK 自动置 NULL）
+  await env.DB.batch([
+    env.DB.prepare('UPDATE drawings SET user_name = ? WHERE user_id = ?')
+      .bind('Anonymous', userId),
+    env.DB.prepare('UPDATE map_pins SET user_name = ? WHERE user_id = ?')
+      .bind('Anonymous', userId),
+    // 删除用户；sessions 会由 ON DELETE CASCADE 自动删除
+    env.DB.prepare('DELETE FROM users WHERE id = ?')
+      .bind(userId),
+  ]);
+}
+
+// =====================
+// 屏蔽用户查询
+// =====================
+
+export interface BlockedUserRow {
+  blocked_id: string;
+  user_name: string;
+  avatar_url: string | null;
+  created_at: number;
+}
+
+/**
+ * 屏蔽一个用户
+ */
+export async function blockUser(blockerId: string, blockedId: string): Promise<void> {
+  const { env } = getCloudflareContext();
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?)'
+  )
+    .bind(blockerId, blockedId)
+    .run();
+}
+
+/**
+ * 取消屏蔽
+ */
+export async function unblockUser(blockerId: string, blockedId: string): Promise<void> {
+  const { env } = getCloudflareContext();
+  await env.DB.prepare(
+    'DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?'
+  )
+    .bind(blockerId, blockedId)
+    .run();
+}
+
+/**
+ * 获取当前用户的屏蔽列表（含被屏蔽人的基本信息）
+ */
+export async function getBlockedUsers(blockerId: string): Promise<BlockedUserRow[]> {
+  const { env } = getCloudflareContext();
+  const { results } = await env.DB.prepare(
+    `SELECT bu.blocked_id, u.user_name, u.avatar_url, bu.created_at
+     FROM blocked_users bu
+     LEFT JOIN users u ON u.id = bu.blocked_id
+     WHERE bu.blocker_id = ?
+     ORDER BY bu.created_at DESC`
+  )
+    .bind(blockerId)
+    .all<BlockedUserRow>();
+  return results ?? [];
+}
+
+/**
+ * 检查某用户是否屏蔽了另一个用户
+ */
+export async function isUserBlocked(blockerId: string, blockedId: string): Promise<boolean> {
+  const { env } = getCloudflareContext();
+  const row = await env.DB.prepare(
+    'SELECT 1 FROM blocked_users WHERE blocker_id = ? AND blocked_id = ? LIMIT 1'
+  )
+    .bind(blockerId, blockedId)
+    .first();
+  return !!row;
+}
+
+/**
+ * 获取用户被哪些人屏蔽（用于过滤查询）
+ */
+export async function getBlockedByIds(userId: string): Promise<string[]> {
+  const { env } = getCloudflareContext();
+  const { results } = await env.DB.prepare(
+    'SELECT blocker_id FROM blocked_users WHERE blocked_id = ?'
+  )
+    .bind(userId)
+    .all<{ blocker_id: string }>();
+  return (results ?? []).map((r) => r.blocker_id);
+}

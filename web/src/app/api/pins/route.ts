@@ -1,6 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { v7 as uuidv7 } from 'uuid';
+import { getBlockedUsers } from '@/lib/db/queries';
 
 /**
  * GET /api/pins — fetch pins within a viewport bounds.
@@ -93,7 +94,22 @@ export async function GET(request: Request) {
     const hasMore = allRows.length > clampedLimit;
     const rows = hasMore ? allRows.slice(0, clampedLimit) : allRows;
 
-    const items = rows.map((row: any) => ({
+    // Filter out pins from blocked users if authenticated (gracefully degrade if table not yet migrated)
+    let blockedIds: string[] = [];
+    try {
+      const sessionResult = await validateSession(request).catch(() => null);
+      if (sessionResult) {
+        const blockedRows = await getBlockedUsers(sessionResult.user.id);
+        blockedIds = blockedRows.map((r) => r.blocked_id);
+      }
+    } catch {
+      // blocked_users table may not exist in local dev — skip filtering
+    }
+    const filteredRows = blockedIds.length > 0
+      ? (rows as any[]).filter((r) => !r.user_id || !blockedIds.includes(r.user_id))
+      : rows;
+
+    const items = filteredRows.map((row: any) => ({
       type: 'pin' as const,
       id: row.id,
       userId: row.user_id,

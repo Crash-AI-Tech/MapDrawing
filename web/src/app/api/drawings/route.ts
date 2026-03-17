@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
-import { getDrawingsInViewportPaginated } from '@/lib/db/queries';
+import { getDrawingsInViewportPaginated, getBlockedUsers } from '@/lib/db/queries';
 
 /**
  * GET /api/drawings — fetch strokes within a viewport bounds (D1).
@@ -21,6 +21,18 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Optionally get blocked users if authenticated (gracefully degrade if table not yet migrated)
+    let blockedIds: string[] = [];
+    try {
+      const sessionResult = await validateSession(request).catch(() => null);
+      if (sessionResult) {
+        const blockedRows = await getBlockedUsers(sessionResult.user.id);
+        blockedIds = blockedRows.map((r) => r.blocked_id);
+      }
+    } catch {
+      // blocked_users table may not exist in local dev — skip filtering
+    }
+
     const { rows, nextCursor } = await getDrawingsInViewportPaginated(
       minLat,
       maxLat,
@@ -38,8 +50,13 @@ export async function GET(request: Request) {
       }
     );
 
+    // Filter out drawings from blocked users
+    const filteredRows = blockedIds.length > 0
+      ? rows.filter((r) => !r.user_id || !blockedIds.includes(r.user_id))
+      : rows;
+
     // Transform DB rows to StrokeData format
-    const strokes = rows.map((row) => ({
+    const strokes = filteredRows.map((row) => ({
       id: row.id,
       userId: row.user_id,
       userName: row.user_name ?? 'Unknown',

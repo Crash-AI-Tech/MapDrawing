@@ -281,3 +281,54 @@ export async function fetchProfile(): Promise<UserProfile> {
 export async function fetchProfileStats(): Promise<UserProfileStats> {
   return apiFetch<UserProfileStats>('/api/profile/stats', { auth: true });
 }
+
+/**
+ * DELETE /api/profile — anonymize + permanently delete the current user account.
+ * Auth required.
+ */
+export async function deleteAccount(): Promise<void> {
+  return apiFetch('/api/profile', { method: 'DELETE', auth: true });
+}
+
+// ========================
+// Block API
+// ========================
+
+export interface BlockedUser {
+  userId: string;
+  userName: string;
+  avatarUrl: string | null;
+  blockedAt: number;
+}
+
+/**
+ * GET /api/block — list all blocked users.
+ * Auth required.
+ */
+export async function fetchBlockedUsers(): Promise<{ items: BlockedUser[] }> {
+  return apiFetch<{ items: BlockedUser[] }>('/api/block', { auth: true });
+}
+
+/**
+ * POST /api/block — block a user by ID.
+ * Auth required.
+ */
+export async function blockUserApi(blockedId: string): Promise<void> {
+  return apiFetch('/api/block', {
+    method: 'POST',
+    auth: true,
+    body: JSON.stringify({ blockedId }),
+  });
+}
+
+/**
+ * DELETE /api/block — unblock a user by ID.
+ * Auth required.
+ */
+export async function unblockUserApi(blockedId: string): Promise<void> {
+  return apiFetch('/api/block', {
+    method: 'DELETE',
+    auth: true,
+    body: JSON.stringify({ blockedId }),
+  });
+}

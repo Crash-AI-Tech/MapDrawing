@@ -68,6 +68,7 @@ export const translations = {
   inkDepleted: { zh: '墨水耗尽，请稍等片刻…', en: 'Ink depleted, please wait…', ja: 'インクが切れました。しばらくお待ちください…' },
 
   // ===== Profile =====
+  profile: { zh: '个人主页', en: 'Profile', ja: 'プロフィール' },
   pins: { zh: '图钉', en: 'Pins', ja: 'ピン' },
   drawings: { zh: '绘制', en: 'Drawings', ja: '描画' },
   supportLegal: { zh: '帮助 & 法律', en: 'Support & Legal', ja: 'サポート & 法律' },

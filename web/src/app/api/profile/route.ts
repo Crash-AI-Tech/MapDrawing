@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/auth/session';
-import { getUserProfile, updateUserProfile } from '@/lib/db/queries';
+import { getUserProfile, updateUserProfile, deleteUserAndAnonymize } from '@/lib/db/queries';
 
 /**
  * GET /api/profile — fetch the current user's profile (D1).
@@ -60,6 +60,26 @@ export async function PATCH(request: Request) {
     });
   } catch (e) {
     console.error('[API /profile PATCH]:', e);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/profile — anonymize and permanently delete the current user account.
+ * All drawings and pins remain, but user_id is nulled and user_name becomes 'Anonymous'.
+ */
+export async function DELETE(request: Request) {
+  try {
+    const result = await validateSession(request);
+    if (!result) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await deleteUserAndAnonymize(result.user.id);
+
+    return Response.json({ ok: true });
+  } catch (e) {
+    console.error('[API /profile DELETE]:', e);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

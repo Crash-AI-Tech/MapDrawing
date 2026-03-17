@@ -21,6 +21,7 @@ export default function ProtectedLayout() {
     return (
         <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="profile" options={{ headerShown: false }} />
+            <Stack.Screen name="blocked" options={{ headerShown: false }} />
         </Stack>
     );
 }

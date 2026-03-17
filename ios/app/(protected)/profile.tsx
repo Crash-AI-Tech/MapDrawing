@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Image, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { fetchProfile, fetchProfileStats, apiFetch } from '@/lib/api';
+import { fetchProfile, fetchProfileStats, apiFetch, deleteAccount as deleteAccountApi } from '@/lib/api';
 import type { UserProfileStats } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
 import { useLang, ts, type Lang } from '@/lib/i18n';
@@ -15,6 +15,7 @@ const LANG_LABELS: Record<Lang, string> = { zh: '中文', en: 'English', ja: '�
 const LANG_ORDER: Lang[] = ['en', 'zh', 'ja'];
 
 export default function ProfileScreen() {
+    const router = useRouter();
     const { signOut, session } = useAuth();
     const [isDeleting, setIsDeleting] = useState(false);
     const [lang, setLang] = useLang();
@@ -114,9 +115,14 @@ export default function ProfileScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         setIsDeleting(true);
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        await signOut();
-                        Alert.alert(ts('accountDeleted', lang), ts('accountDeletedMsg', lang));
+                        try {
+                            await deleteAccountApi();
+                        } catch (e: any) {
+                            console.error('Failed to delete account', e);
+                        } finally {
+                            // Sign out regardless — session is gone after deletion
+                            await signOut();
+                        }
                     }
                 }
             ]
@@ -152,14 +158,23 @@ export default function ProfileScreen() {
             icon: 'people-circle-outline',
             color: '#FF9500',
             onPress: () => {
-                Alert.alert(ts('blocked', lang), ts('blockedEmpty', lang));
+                router.push('/(protected)/blocked');
             }
         }
     ];
 
     return (
         <View style={styles.container}>
-            <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+            <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+                <View style={styles.navBar}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                        <Ionicons name="chevron-back" size={24} color="#000" />
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#000' }}>
+                        {ts('profile', lang) || 'Profile'}
+                    </Text>
+                    <View style={{ width: 40 }} />
+                </View>
                 <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                     <View style={styles.identityContainer}>
                         <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={isUploading}>
