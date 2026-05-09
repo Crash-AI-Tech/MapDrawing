@@ -1,4 +1,22 @@
 // ========================
+// Core Types (shared between web & iOS)
+// ========================
+
+export type {
+    StrokePoint,
+    GeoBounds,
+    StrokeData,
+    DrawEvent,
+    StrokeAddEvent,
+    StrokeDeleteEvent,
+    StrokeUpdateEvent,
+    CursorMoveEvent,
+    SyncMessage,
+    SyncState,
+} from './types';
+export { getTileKey, tileToBounds } from './types';
+
+// ========================
 // Drawing Tool Constants
 // ========================
 

@@ -83,6 +83,26 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid verification code' }, { status: 400 });
         }
 
+        // Rate limit: max 5 verify attempts per email per 15 minutes
+        const attemptWindow = Date.now() - 15 * 60 * 1000;
+        const attempts = await env.DB.prepare(
+            `SELECT COUNT(*) as cnt FROM verification_codes
+             WHERE email = ? AND type = 'verify_attempt' AND expires_at > ?`
+        ).bind(email, attemptWindow).first<{ cnt: number }>();
+
+        if (attempts && attempts.cnt >= 5) {
+            return NextResponse.json(
+                { error: 'Too many attempts. Please wait 15 minutes.' },
+                { status: 429 }
+            );
+        }
+
+        // Record this attempt
+        await env.DB.prepare(
+            `INSERT INTO verification_codes (id, user_id, email, code, type, expires_at)
+             VALUES (?, '', ?, '', 'verify_attempt', ?)`
+        ).bind(generateId(15), email, Date.now() + 15 * 60 * 1000).run();
+
         const record = await env.DB.prepare(
             `SELECT id, user_id, expires_at
        FROM verification_codes

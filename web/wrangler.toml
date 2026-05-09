@@ -38,9 +38,9 @@ binding = "CACHE"
 id = "e2837190f44c4e2f854c39b95cea2e51"
 
 # 环境变量
+# RESEND_API_KEY 和 AUTH_SECRET 已迁移到 Cloudflare Secrets (wrangler secret put)
+# 本地开发使用 .dev.vars 文件
 [vars]
-RESEND_API_KEY = "re_a6XTh9eh_Hg1B7hfZg7wvxBv6bLBAPEJ9"
-AUTH_SECRET = "your-32-char-random-string"
 NEXT_PUBLIC_DO_WEBSOCKET_URL = "map-worker.privacy2privacy.workers.dev"
 
 [observability]

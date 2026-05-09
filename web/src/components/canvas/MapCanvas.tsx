@@ -26,6 +26,9 @@ import { usePinStore, MapPin } from '@/stores/pinStore';
 import PinPlacer from '@/components/pins/PinPlacer';
 import PinDetailModal from '@/components/pins/PinDetailModal';
 import { Compliance } from '@/lib/compliance';
+import { getI18nText, useI18n } from '@/lib/i18n';
+import { usePresence } from '@/hooks/usePresence';
+import { CursorOverlay } from '@/components/canvas/CursorOverlay';
 
 /** Generate an SVG pin cursor data URI — small size (14x20) */
 function pinCursorSvg(color: string): string {
@@ -33,16 +36,16 @@ function pinCursorSvg(color: string): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 7 19, pointer`;
 }
 
-/** Format a relative time string */
+/** Format a relative time string (i18n-aware) */
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins}分钟前`;
+  if (mins < 1) return getI18nText('timeJustNow');
+  if (mins < 60) return getI18nText('timeMinutesAgo', { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}小时前`;
+  if (hours < 24) return getI18nText('timeHoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  return `${days}天前`;
+  return getI18nText('timeDaysAgo', { n: days });
 }
 
 const VIEWPORT_STORAGE_KEY = 'niubi-map-viewport';
@@ -103,6 +106,7 @@ export default function MapCanvas() {
 
   // Keyboard shortcuts
   useKeyboardShortcuts();
+  const { t } = useI18n();
 
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
@@ -116,6 +120,9 @@ export default function MapCanvas() {
   const setCurrentZoomGlobal = useUIStore((s) => s.setCurrentZoom);
   const showLowInkWarning = useInkStore((s) => s.showLowInkWarning);
   const ink = useInkStore((s) => s.ink);
+
+  // Remote cursor presence
+  const remoteCursors = usePresence(engine);
 
   // Pin state
   const pins = usePinStore((s) => s.pins);
@@ -222,6 +229,7 @@ export default function MapCanvas() {
       maxZoom: MAP_MAX_ZOOM,
       attributionControl: false,
       antialias: true,
+      preserveDrawingBuffer: true,
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-left');
@@ -372,7 +380,7 @@ export default function MapCanvas() {
 
         const metaEl = document.createElement('div');
         metaEl.style.cssText = 'font-size:10px;color:#999;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;';
-        metaEl.innerHTML = `<span>${pin.userName || '匿名'}</span><span>${timeAgo(pin.createdAt)}</span>`;
+        metaEl.innerHTML = `<span>${pin.userName || getI18nText('pinAnonymous')}</span><span>${timeAgo(pin.createdAt)}</span>`;
         tooltip.appendChild(metaEl);
 
         if (user && pin.userId !== userId) {
@@ -380,26 +388,26 @@ export default function MapCanvas() {
           actionsRow.style.cssText = 'display:flex;gap:6px;border-top:1px solid #eee;padding-top:5px;';
 
           const reportBtn = document.createElement('button');
-          reportBtn.textContent = 'Report';
+          reportBtn.textContent = getI18nText('pinReport');
           reportBtn.style.cssText = 'flex:1;font-size:10px;padding:3px 0;border-radius:4px;border:1px solid #e5e7eb;background:#fff;color:#ef4444;cursor:pointer;transition:background 0.15s;';
           reportBtn.addEventListener('mouseenter', () => { reportBtn.style.background = '#fef2f2'; });
           reportBtn.addEventListener('mouseleave', () => { reportBtn.style.background = '#fff'; });
           reportBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const reason = window.prompt('Report reason:');
+            const reason = window.prompt(getI18nText('pinReportReason'));
             if (reason) {
               Compliance.reportContent(pin.id, 'pin', reason);
             }
           });
 
           const blockBtn = document.createElement('button');
-          blockBtn.textContent = 'Block User';
+          blockBtn.textContent = getI18nText('pinBlockUser');
           blockBtn.style.cssText = 'flex:1;font-size:10px;padding:3px 0;border-radius:4px;border:1px solid #e5e7eb;background:#fff;color:#ef4444;cursor:pointer;transition:background 0.15s;';
           blockBtn.addEventListener('mouseenter', () => { blockBtn.style.background = '#fef2f2'; });
           blockBtn.addEventListener('mouseleave', () => { blockBtn.style.background = '#fff'; });
           blockBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (window.confirm(`Block ${pin.userName || 'this user'}? Their pins will be hidden.`)) {
+            if (window.confirm(getI18nText('pinBlockConfirm', { name: pin.userName || 'this user' }))) {
               Compliance.blockUser(pin.userId);
               refreshBlocked();
             }
@@ -540,31 +548,34 @@ export default function MapCanvas() {
         style={{ position: 'absolute', inset: 0 }}
       />
 
+      {/* Remote user cursors */}
+      <CursorOverlay map={mapRef.current} cursors={remoteCursors} />
+
       {/* Ink depleted warning */}
       {showLowInkWarning && (
         <div className="absolute top-28 left-1/2 -translate-x-1/2 z-30 rounded-lg bg-red-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300">
-          墨水耗尽，请稍等片刻…
+          {t('inkDepleted')}
         </div>
       )}
 
       {/* Zoom hint: show when drawing mode is on but zoom is too low */}
       {drawingMode && currentZoom < MIN_DRAW_ZOOM && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 rounded-lg bg-yellow-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-sm">
-          请放大到 {MIN_DRAW_ZOOM} 级以上才能绘画（当前 {Math.floor(currentZoom)} 级）
+          {t('zoomDrawHint', { zoom: MIN_DRAW_ZOOM, current: Math.floor(currentZoom) })}
         </div>
       )}
 
       {/* Zoom hint for pin placement */}
       {placingPin && currentZoom < MIN_PIN_ZOOM && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 rounded-lg bg-yellow-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-sm">
-          请放大到 {MIN_PIN_ZOOM} 级以上才能放置图钉（当前 {Math.floor(currentZoom)} 级）
+          {t('zoomPinHint', { zoom: MIN_PIN_ZOOM, current: Math.floor(currentZoom) })}
         </div>
       )}
 
       {/* Pin placement prompt */}
       {placingPin && currentZoom >= MIN_PIN_ZOOM && !pinClickCoords && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 rounded-lg bg-primary/90 px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg backdrop-blur-sm">
-          点击地图选择图钉位置
+          {t('zoomPinPrompt')}
         </div>
       )}
 

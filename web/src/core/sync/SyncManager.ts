@@ -148,15 +148,8 @@ export class SyncManager {
   private async flushOfflineQueue(): Promise<void> {
     if (!this.offlineQueue.hasEvents) return;
 
-    // Peek first
-    // Note: OfflineQueue 'drain' clears everything. We should probably process one by one or batch.
-    // For simplicity, we drain and try to send. If fail, re-enqueue?
-    // The original OfflineQueue logic might be simple. 
-    // Let's rely on standard retry for now or keep it simple.
-
-    // Actually standard OfflineQueue usually pops items. 
-    // Let's assume drain() returns all.
-    const events = await this.offlineQueue.drain();
+    const events = await this.offlineQueue.peek();
+    let processedCount = 0;
 
     for (const event of events) {
       try {
@@ -165,12 +158,17 @@ export class SyncManager {
         } else if (event.type === 'STROKE_DELETE') {
           await this.deleteStrokeFromApi(event.strokeId);
         }
+        processedCount++;
       } catch (e) {
-        // Failed again, put back? 
-        // For now preventing infinite loops/complexity, just log error. 
-        // Ideally should support persistent queue.
-        console.error('[SyncManager] Failed to flush event:', e);
+        // Stop processing on first failure — remaining events stay in queue
+        console.error('[SyncManager] Failed to flush event, will retry later:', e);
+        break;
       }
+    }
+
+    // Only remove successfully processed events
+    if (processedCount > 0) {
+      await this.offlineQueue.removeProcessed(processedCount);
     }
   }
 

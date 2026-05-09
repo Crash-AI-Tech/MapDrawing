@@ -1,6 +1,8 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { getDrawingsInViewportPaginated, getBlockedUsers } from '@/lib/db/queries';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { validateCsrf } from '@/lib/csrf';
 
 /**
  * GET /api/drawings — fetch strokes within a viewport bounds (D1).
@@ -84,7 +86,7 @@ export async function GET(request: Request) {
   } catch (e: any) {
     console.error('[API /drawings] Server error:', e);
     return Response.json(
-      { error: 'Internal server error', detail: e?.message || String(e) },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -95,6 +97,9 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
+
     const { env } = getCloudflareContext();
 
     // 验证 Session (Cookie 或 Bearer token)
@@ -103,10 +108,46 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Rate limit: 60 stroke batches per minute per user
+    const rl = await checkRateLimit(`drawings:POST:${result.user.id}`, 60, 60_000);
+    if (!rl.allowed) return rateLimitResponse(rl.resetAt);
+
     const body = await request.json();
 
     // 支持单条和批量
     const strokes = Array.isArray(body) ? body : [body];
+
+    // Validate batch size
+    if (strokes.length === 0 || strokes.length > 50) {
+      return Response.json({ error: 'Invalid batch size (1-50)' }, { status: 400 });
+    }
+
+    // Validate each stroke
+    const VALID_BRUSHES = new Set(['pencil', 'eraser', 'marker', 'spray', 'highlighter']);
+    for (const s of strokes) {
+      if (!s.id || typeof s.id !== 'string') {
+        return Response.json({ error: 'Invalid stroke id' }, { status: 400 });
+      }
+      if (s.color && !/^#[0-9a-fA-F]{6}$/.test(s.color)) {
+        return Response.json({ error: 'Invalid color format' }, { status: 400 });
+      }
+      if (s.opacity !== undefined && (typeof s.opacity !== 'number' || s.opacity < 0.05 || s.opacity > 1)) {
+        return Response.json({ error: 'Invalid opacity (0.05-1.0)' }, { status: 400 });
+      }
+      if (s.size !== undefined && (typeof s.size !== 'number' || s.size < 0.1 || s.size > 50)) {
+        return Response.json({ error: 'Invalid brush size' }, { status: 400 });
+      }
+      if (s.brushId && !VALID_BRUSHES.has(s.brushId)) {
+        return Response.json({ error: 'Invalid brush type' }, { status: 400 });
+      }
+      // Validate bounds coordinates
+      const b = s.bounds;
+      if (b) {
+        if (!isFinite(b.minLat) || !isFinite(b.maxLat) || !isFinite(b.minLng) || !isFinite(b.maxLng)) {
+          return Response.json({ error: 'Invalid bounds' }, { status: 400 });
+        }
+      }
+    }
 
     const stmt = env.DB.prepare(
       `INSERT INTO drawings (id, user_id, user_name, brush_id, color, opacity, size,

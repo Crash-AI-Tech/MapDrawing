@@ -55,17 +55,26 @@ export async function POST(request: Request) {
         });
 
         // If not found, try by email (account linking)
+        // Security: only link if the existing account's email is verified,
+        // preventing attackers from pre-registering with victim's email then
+        // hijacking via Apple Sign-In.
         if (!user && email) {
             user = await db.query.users.findFirst({
                 where: eq(users.email, email)
             });
 
-            // Use a SQL update if found by email to link appleId? 
-            // For now, let's keep it simple: if email exists but no appleId, we could link it.
-            // But for safety, let's just create a new user or rely on appleId.
-            // Actually, if email exists, we SHOULD link it if we trust the email is verified.
-            // Apple emails are verified.
             if (user) {
+                // Check email_verified via raw D1 (column not in Drizzle schema yet)
+                const verifiedRow = await env.DB.prepare(
+                    'SELECT email_verified FROM users WHERE id = ?'
+                ).bind(user.id).first<{ email_verified: number }>();
+
+                if (!verifiedRow || !verifiedRow.email_verified) {
+                    return NextResponse.json(
+                        { error: 'An unverified account exists with this email. Please verify it first.' },
+                        { status: 409 }
+                    );
+                }
                 await db.update(users).set({ appleId }).where(eq(users.id, user.id));
             }
         }

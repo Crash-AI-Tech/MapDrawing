@@ -42,7 +42,12 @@ export async function PATCH(request: Request) {
     const body = (await request.json()) as { userName?: string; avatarUrl?: string };
     const updates: { userName?: string; avatarUrl?: string } = {};
 
-    if (body.userName !== undefined) updates.userName = body.userName;
+    if (body.userName !== undefined) {
+      if (typeof body.userName !== 'string' || body.userName.length < 1 || body.userName.length > 30) {
+        return Response.json({ error: 'Username must be 1-30 characters' }, { status: 400 });
+      }
+      updates.userName = body.userName.trim();
+    }
     if (body.avatarUrl !== undefined) updates.avatarUrl = body.avatarUrl;
 
     if (Object.keys(updates).length === 0) {

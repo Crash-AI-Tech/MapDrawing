@@ -105,8 +105,8 @@ export class TileManager {
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-            const data: any = await res.json();
-            const items: StrokeData[] = Array.isArray(data) ? data : (data.items || []);
+            const data = await res.json() as { items?: StrokeData[] } | StrokeData[];
+            const items: StrokeData[] = Array.isArray(data) ? data : (data.items ?? []);
 
             // Mark all missing tiles as loaded
             for (const key of missingTiles) {

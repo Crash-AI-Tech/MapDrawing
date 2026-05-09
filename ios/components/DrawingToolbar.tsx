@@ -101,6 +101,7 @@ interface DrawingToolbarProps {
   currentZoom: number;
   strokesTransparent: boolean;
   onToggleTransparency: () => void;
+  onExport?: () => void;
   syncState?: 'connecting' | 'connected' | 'disconnected' | 'error';
 }
 
@@ -132,6 +133,7 @@ export default function DrawingToolbar({
   currentZoom,
   strokesTransparent,
   onToggleTransparency,
+  onExport,
   syncState = 'connected',
 }: DrawingToolbarProps) {
   const [lang] = useLang();
@@ -368,7 +370,7 @@ export default function DrawingToolbar({
             >
               {(BRUSH_ICONS[currentBrush]?.lib === 'mci') ? (
                 <MaterialCommunityIcons
-                  name={BRUSH_ICONS[currentBrush]?.name ?? 'eraser'}
+                  name={(BRUSH_ICONS[currentBrush]?.name ?? 'eraser') as any}
                   size={16}
                   color={(currentMode === 'draw' || currentBrush === BRUSH_IDS.ERASER) ? '#fff' : '#333'}
                 />
@@ -432,6 +434,16 @@ export default function DrawingToolbar({
               color={strokesTransparent ? '#fff' : '#333'}
             />
           </TouchableOpacity>
+
+          {/* Group 5: Export */}
+          {onExport && (
+            <>
+              <Divider />
+              <TouchableOpacity style={styles.btn} onPress={onExport}>
+                <Feather name="share" size={16} color="#333" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Ink Droplet hovering above toolbar */}
@@ -509,7 +521,7 @@ export default function DrawingToolbar({
                 <View style={{ position: 'absolute', inset: 0, backgroundColor: 'white', opacity: 1 }}>
                   <View style={{
                     flex: 1,
-                    background: undefined,
+                    backgroundColor: undefined,
                     // Use linear gradient via React Native styling workaround
                   }} />
                 </View>

@@ -44,7 +44,27 @@ export class OfflineQueue {
     await this.persist();
   }
 
-  /** Get all queued events, sorted by timestamp */
+  /** Get all queued events sorted by timestamp without removing them */
+  async peek(): Promise<DrawEvent[]> {
+    if (!this.loaded) await this.load();
+
+    return this.queue
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map((item) => item.event);
+  }
+
+  /** Remove the first N processed events from the queue */
+  async removeProcessed(count: number): Promise<void> {
+    if (!this.loaded) await this.load();
+    this.queue.sort((a, b) => a.timestamp - b.timestamp);
+    this.queue = this.queue.slice(count);
+    await this.persist();
+  }
+
+  /**
+   * Get all queued events, sorted by timestamp.
+   * @deprecated Use peek() + removeProcessed() for safe processing
+   */
   async drain(): Promise<DrawEvent[]> {
     if (!this.loaded) await this.load();
 

@@ -15,4 +15,4 @@ export type {
   CoordinateConverter,
   TileCoord,
 } from './viewport';
-export { latLngToTile, getTileKey } from './viewport';
+export { latLngToTile, getTileKey, tileToBounds } from './viewport';

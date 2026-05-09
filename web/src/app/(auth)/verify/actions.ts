@@ -39,6 +39,23 @@ export async function verifyEmail(
   try {
     const { env } = getCloudflareContext();
 
+    // Rate limit: max 5 verify attempts per email per 15 minutes
+    const attemptWindow = Date.now() - 15 * 60 * 1000;
+    const attempts = await env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM verification_codes
+       WHERE email = ? AND type = 'verify_attempt' AND expires_at > ?`
+    ).bind(email, attemptWindow).first<{ cnt: number }>();
+
+    if (attempts && attempts.cnt >= 5) {
+      return { error: '尝试次数过多，请等待 15 分钟后重试' };
+    }
+
+    // Record this attempt
+    await env.DB.prepare(
+      `INSERT INTO verification_codes (id, user_id, email, code, type, expires_at)
+       VALUES (?, '', ?, '', 'verify_attempt', ?)`
+    ).bind(generateId(15), email, Date.now() + 15 * 60 * 1000).run();
+
     // 查找有效验证码
     const record = await env.DB.prepare(
       `SELECT id, user_id, code, expires_at

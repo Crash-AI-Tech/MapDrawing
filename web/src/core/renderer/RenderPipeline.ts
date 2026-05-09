@@ -110,12 +110,18 @@ export class RenderPipeline {
       (s) => currentZoom >= s.createdZoom - STROKE_HIDE_ZOOM_DIFF
     );
 
-    // Safety cap: skip rendering when too many strokes are visible
-    // (e.g. at global zoom). Prevents main-thread freeze.
-    if (visibleStrokes.length > 2000) {
-      this.compositeCtx.restore();
+    // Safety cap: degrade rendering when too many strokes.
+    // At high counts, only render the most recent strokes to prevent freeze.
+    const SOFT_CAP = 3000;
+    const HARD_CAP = 8000;
+    if (visibleStrokes.length > HARD_CAP) {
       this.needsRender = false;
       return;
+    }
+    if (visibleStrokes.length > SOFT_CAP) {
+      // Keep only the most recent strokes
+      visibleStrokes.sort((a, b) => b.createdAt - a.createdAt);
+      visibleStrokes = visibleStrokes.slice(0, SOFT_CAP);
     }
 
     // Sort by createdAt ascending so newer strokes render on top of older ones

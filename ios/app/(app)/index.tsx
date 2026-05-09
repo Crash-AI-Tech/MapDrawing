@@ -98,7 +98,11 @@ import {
   BASE_ZOOM,
 } from '@/core';
 import type { StrokeData, StrokePoint, CameraState } from '@/core/types';
-import { useLang, ts, tf } from '@/lib/i18n';
+import { useLang, ts, tf, getCurrentLang } from '@/lib/i18n';
+import ViewShot from 'react-native-view-shot';
+import { showExportMenu } from '@/utils/exportMap';
+import { usePresence } from '@/hooks/usePresence';
+import { CursorOverlay } from '@/components/CursorOverlay';
 
 // ========================
 // MapLibre Configuration
@@ -220,6 +224,7 @@ export default function MapScreen() {
   const inkManagerRef = useRef<InkManager | null>(null);
   const historyRef = useRef<HistoryManager | null>(null);
   const cameraRef = useRef<CameraRef | null>(null);
+  const viewShotRef = useRef<ViewShot | null>(null);
 
   // ===== Tile Renderer (core of scheme A) =====
   const tileRendererRef = useRef(new TileRenderer());
@@ -360,6 +365,14 @@ export default function MapScreen() {
   const [currentColor, setCurrentColor] = useState<string>(DEFAULT_COLOR);
   const [currentSize, setCurrentSize] = useState<number>(DEFAULT_SIZE);
   const [currentOpacity, setCurrentOpacity] = useState<number>(DEFAULT_OPACITY);
+
+  // ===== Presence (remote cursors) =====
+  const remoteCursors = usePresence({
+    lat: cameraState.center[1],
+    lng: cameraState.center[0],
+    color: currentColor,
+    isAuthenticated: !!session,
+  });
 
   // ===== Active Drawing State =====
   const currentPointsRef = useRef<
@@ -1031,8 +1044,9 @@ export default function MapScreen() {
         </TouchableOpacity>
       </View>
       {/* ===== MapLibre GL Native ===== */}
+      <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={styles.map}>
       <MapLibreGL.MapView
-        style={styles.map}
+        style={StyleSheet.absoluteFill}
         mapStyle={MAP_STYLE_URL}
         logoEnabled={false}
         attributionEnabled={false}
@@ -1129,9 +1143,13 @@ export default function MapScreen() {
           </Canvas>
         </View>
       </GestureDetector>
+      </ViewShot>
 
-
-
+      {/* ===== Remote Cursors Overlay ===== */}
+      <CursorOverlay
+        projection={projectionRef.current}
+        cursors={remoteCursors}
+      />
 
       {/* ===== UI Overlays ===== */}
 
@@ -1200,6 +1218,7 @@ export default function MapScreen() {
         currentZoom={cameraState.zoom}
         strokesTransparent={strokesTransparent}
         onToggleTransparency={() => setStrokesTransparent((v) => !v)}
+        onExport={() => showExportMenu(viewShotRef, getCurrentLang())}
         syncState={syncState}
       />
 

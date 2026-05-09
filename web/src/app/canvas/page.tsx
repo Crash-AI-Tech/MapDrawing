@@ -9,6 +9,7 @@ import AuthDialog from '@/components/auth/AuthDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useI18n } from '@/lib/i18n';
 
 // MapCanvas uses MapLibre GL which requires window — lazy import with client-only guard
 const LazyMapCanvas = lazy(() => import('@/components/canvas/MapCanvas'));
@@ -21,6 +22,7 @@ export default function CanvasPage() {
   const { isLoading } = useAuth();
   const user = useAuthStore((s) => s.user);
   const syncState = useUIStore((s) => s.syncState);
+  const { t } = useI18n();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -47,7 +49,7 @@ export default function CanvasPage() {
           {/* Sync status dot */}
           <div
             className="flex items-center gap-1.5 rounded-full border border-gray-200/60 bg-gray-100/80 px-2.5 py-1 text-[11px] backdrop-blur-md"
-            title={syncState === 'connected' ? '已连接' : syncState === 'connecting' ? '连接中…' : '离线'}
+            title={syncState === 'connected' ? t('syncConnected') : syncState === 'connecting' ? t('syncConnecting') : t('syncOffline')}
           >
             <span
               className={`h-2 w-2 rounded-full ${
@@ -59,7 +61,7 @@ export default function CanvasPage() {
               }`}
             />
             <span className="text-muted-foreground">
-              {syncState === 'connected' ? '在线' : syncState === 'connecting' ? '连接中' : '离线'}
+              {syncState === 'connected' ? t('syncOnline') : syncState === 'connecting' ? t('syncConnecting') : t('syncOffline')}
             </span>
           </div>
           <UserMenu onLoginClick={() => setShowAuthDialog(true)} />

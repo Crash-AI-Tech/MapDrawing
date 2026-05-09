@@ -8,6 +8,12 @@ import { useUIStore } from '@/stores/uiStore';
 import { MIN_PIN_ZOOM, MIN_DRAW_ZOOM, BRUSH_IDS } from '@/constants';
 import { Button } from '@/components/ui/button';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -16,6 +22,7 @@ import {
 import BrushPanel from './BrushPanel';
 import ColorPicker from './ColorPicker';
 import InkBar from './InkBar';
+import ExportMenu from './ExportMenu';
 import {
   Undo2,
   Redo2,
@@ -27,8 +34,10 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useI18n } from '@/lib/i18n';
 import { useState } from 'react';
 
 type ToolMode = 'hand' | 'draw' | 'pin';
@@ -44,6 +53,7 @@ interface ToolbarProps {
  * Toolbar — main floating toolbar on the left side.
  */
 export default function Toolbar({ onAuthRequired }: ToolbarProps) {
+  const { t } = useI18n();
   const { drawingMode, canUndo, canRedo, undo, redo } = useToolbar();
   const setDrawingMode = useDrawingStore((s) => s.setDrawingMode);
   const activeBrushId = useDrawingStore((s) => s.activeBrushId);
@@ -84,7 +94,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
     } else if (mode === 'draw') {
       requireAuth(() => {
         if (currentZoom < MIN_DRAW_ZOOM) {
-          flashTooltip(`请放大到 ${MIN_DRAW_ZOOM} 级以上才能绘画（当前 ${Math.floor(currentZoom)} 级）`);
+          flashTooltip(t('zoomDrawHint', { zoom: MIN_DRAW_ZOOM, current: Math.floor(currentZoom) }));
           return;
         }
         // If already in draw mode, toggle pencil ↔ eraser
@@ -100,7 +110,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
     } else if (mode === 'pin') {
       requireAuth(() => {
         if (currentZoom < MIN_PIN_ZOOM) {
-          flashTooltip(`请放大到 ${MIN_PIN_ZOOM} 级以上才能放置图钉（当前 ${Math.floor(currentZoom)} 级）`);
+          flashTooltip(t('zoomPinHint', { zoom: MIN_PIN_ZOOM, current: Math.floor(currentZoom) }));
           return;
         }
         setDrawingMode(false);
@@ -111,7 +121,11 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="absolute left-1/2 top-4 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl border border-gray-200/60 bg-gray-100/80 p-1.5 shadow-lg backdrop-blur-md">
+      {/*
+        Desktop: top-center horizontal bar
+        Mobile:  bottom-center compact bar with overflow menu
+      */}
+      <div className="absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-gray-200/60 bg-gray-100/80 p-1.5 shadow-lg backdrop-blur-md bottom-4 md:bottom-auto md:top-4 md:gap-1.5">
         {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -124,10 +138,23 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Hand className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Navigation (H)</TooltipContent>
+          <TooltipContent>{t('toolNavigation')}</TooltipContent>
         </Tooltip>
 
-
+        {/* Draw */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('h-9 w-9 rounded-full', currentMode === 'draw' && ACTIVE_BTN)}
+              onClick={() => switchMode('draw')}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('toolDraw')}</TooltipContent>
+        </Tooltip>
 
         {/* Pin */}
         <Tooltip>
@@ -141,24 +168,21 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <MapPin className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Pin (P)</TooltipContent>
+          <TooltipContent>{t('toolPin')}</TooltipContent>
         </Tooltip>
 
         {/* Zoom tooltip */}
         {zoomTooltip && (
-          <div className="absolute left-1/2 top-full mt-2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+          <div className="absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm bottom-full mb-2 md:bottom-auto md:top-full md:mt-2 md:mb-0">
             {zoomTooltip}
           </div>
         )}
 
         <div className="h-5 w-px bg-border" />
 
-        {/* Brush & Color — Disabled if guest */}
-        <div className={cn('flex items-center gap-1.5', !user && 'opacity-50 pointer-events-none grayscale')}>
-          {/* Brush panel */}
+        {/* Brush & Color — visible on both, disabled if guest */}
+        <div className={cn('flex items-center gap-1', !user && 'opacity-50 pointer-events-none grayscale')}>
           <BrushPanel />
-
-          {/* Color picker */}
           <ColorPicker />
         </div>
 
@@ -177,7 +201,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Undo2 className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Undo (Ctrl+Z)</TooltipContent>
+          <TooltipContent>{t('toolUndo')}</TooltipContent>
         </Tooltip>
 
         {/* Redo */}
@@ -193,66 +217,100 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <Redo2 className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Redo (Ctrl+Shift+Z)</TooltipContent>
+          <TooltipContent>{t('toolRedo')}</TooltipContent>
         </Tooltip>
 
-        {/* Transparency toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn('h-9 w-9 rounded-full', strokesTransparent && ACTIVE_BTN)}
-              onClick={() => setStrokesTransparent(!strokesTransparent)}
-            >
-              {strokesTransparent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {strokesTransparent ? '恢复绘制不透明度' : '半透明绘制（查看地图）'}
-          </TooltipContent>
-        </Tooltip>
+        {/* === Desktop-only secondary tools === */}
+        <div className="hidden md:flex md:items-center md:gap-1.5">
+          {/* Transparency toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('h-9 w-9 rounded-full', strokesTransparent && ACTIVE_BTN)}
+                onClick={() => setStrokesTransparent(!strokesTransparent)}
+              >
+                {strokesTransparent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {strokesTransparent ? t('toolTransparencyOff') : t('toolTransparencyOn')}
+            </TooltipContent>
+          </Tooltip>
 
-        <div className="h-5 w-px bg-border" />
+          {/* Export / Share */}
+          <ExportMenu />
 
-        {/* Ink bar */}
-        <InkBar />
+          <div className="h-5 w-px bg-border" />
 
-        {/* Sync status indicator */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex h-5 w-5 items-center justify-center">
-              {syncState === 'connected' && (
-                <Wifi className="h-3 w-3 text-green-500" />
-              )}
-              {syncState === 'connecting' && (
-                <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
-              )}
-              {syncState === 'disconnected' && (
-                <WifiOff className="h-3 w-3 text-gray-400" />
-              )}
-              {syncState === 'error' && (
-                <WifiOff className="h-3 w-3 text-red-500" />
-              )}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {syncState === 'connected' && '已连接'}
-            {syncState === 'connecting' && '连接中...'}
-            {syncState === 'disconnected' && '离线 — 操作将在恢复后同步'}
-            {syncState === 'error' && '连接错误 — 操作已缓存'}
-          </TooltipContent>
-        </Tooltip>
+          {/* Ink bar */}
+          <InkBar />
 
-        {/* Stroke count */}
-        {strokeCount > 0 && (
-          <>
-            <div className="h-5 w-px bg-border" />
-            <div className="px-1 text-center text-[10px] tabular-nums text-muted-foreground">
-              {strokeCount}
-            </div>
-          </>
-        )}
+          {/* Sync status indicator */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex h-5 w-5 items-center justify-center">
+                {syncState === 'connected' && (
+                  <Wifi className="h-3 w-3 text-green-500" />
+                )}
+                {syncState === 'connecting' && (
+                  <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
+                )}
+                {syncState === 'disconnected' && (
+                  <WifiOff className="h-3 w-3 text-gray-400" />
+                )}
+                {syncState === 'error' && (
+                  <WifiOff className="h-3 w-3 text-red-500" />
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {syncState === 'connected' && t('syncConnected')}
+              {syncState === 'connecting' && t('syncConnecting')}
+              {syncState === 'disconnected' && t('syncDisconnected')}
+              {syncState === 'error' && t('syncError')}
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Stroke count */}
+          {strokeCount > 0 && (
+            <>
+              <div className="h-5 w-px bg-border" />
+              <div className="px-1 text-center text-[10px] tabular-nums text-muted-foreground">
+                {strokeCount}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* === Mobile-only overflow menu === */}
+        <div className="flex items-center md:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-48">
+              <DropdownMenuItem onClick={() => setStrokesTransparent(!strokesTransparent)}>
+                {strokesTransparent ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                {strokesTransparent ? t('toolTransparencyOff') : t('toolTransparencyOn')}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  {syncState === 'connected' && <Wifi className="h-3 w-3 text-green-500" />}
+                  {syncState === 'connecting' && <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />}
+                  {(syncState === 'disconnected' || syncState === 'error') && <WifiOff className="h-3 w-3 text-gray-400" />}
+                  {syncState === 'connected' ? t('syncConnected') : syncState === 'connecting' ? t('syncConnecting') : t('syncOffline')}
+                </span>
+                {strokeCount > 0 && (
+                  <span className="text-[10px] tabular-nums text-muted-foreground">{strokeCount}</span>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </TooltipProvider>
   );

@@ -75,3 +75,27 @@ export const drawings = sqliteTable('drawings', {
     .notNull()
     .$defaultFn(() => Math.floor(Date.now() / 1000)),
 });
+
+// =====================
+// 举报/审核表
+// =====================
+export const reports = sqliteTable('reports', {
+  id: text('id').primaryKey(),
+  reporterId: text('reporter_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  contentId: text('content_id').notNull(),
+  contentType: text('content_type').notNull(), // 'pin' | 'drawing' | 'user'
+  reason: text('reason').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'reviewed' | 'resolved' | 'dismissed'
+  adminNote: text('admin_note'),
+  resolvedBy: text('resolved_by')
+    .references(() => users.id, { onDelete: 'set null' }),
+  resolvedAt: integer('resolved_at', { mode: 'number' }),
+  createdAt: integer('created_at', { mode: 'number' })
+    .notNull()
+    .$defaultFn(() => Math.floor(Date.now() / 1000)),
+  updatedAt: integer('updated_at', { mode: 'number' })
+    .notNull()
+    .$defaultFn(() => Math.floor(Date.now() / 1000)),
+});

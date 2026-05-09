@@ -6,7 +6,7 @@ export const Compliance = {
      * Report inappropriate content (User/Pin).
      * Sends to real backend /api/report endpoint.
      */
-    reportContent: async (contentId: string, type: 'user' | 'pin', reason: string) => {
+    reportContent: async (contentId: string, type: 'user' | 'pin' | 'drawing', reason: string) => {
         try {
             await apiFetch('/api/report', {
                 method: 'POST',

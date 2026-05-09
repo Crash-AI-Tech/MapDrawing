@@ -2,6 +2,8 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { v7 as uuidv7 } from 'uuid';
 import { getBlockedUsers } from '@/lib/db/queries';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { validateCsrf } from '@/lib/csrf';
 
 /**
  * GET /api/pins — fetch pins within a viewport bounds.
@@ -143,10 +145,17 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
+
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Rate limit: 30 pins per minute per user
+    const rl = await checkRateLimit(`pins:POST:${result.user.id}`, 30, 60_000);
+    if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
     const body = await request.json();
     const { lng, lat, message, color } = body as {
@@ -160,11 +169,18 @@ export async function POST(request: Request) {
     if (typeof lng !== 'number' || typeof lat !== 'number') {
       return Response.json({ error: 'Invalid coordinates' }, { status: 400 });
     }
+    if (!isFinite(lng) || !isFinite(lat) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return Response.json({ error: 'Coordinates out of range' }, { status: 400 });
+    }
     if (!message || typeof message !== 'string') {
       return Response.json({ error: 'Message is required' }, { status: 400 });
     }
     if (message.length > 50) {
       return Response.json({ error: 'Message too long (max 50 chars)' }, { status: 400 });
+    }
+    // Validate color format (hex only)
+    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
+      return Response.json({ error: 'Invalid color format' }, { status: 400 });
     }
 
     const id = uuidv7();

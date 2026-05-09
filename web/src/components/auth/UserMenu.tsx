@@ -102,14 +102,15 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
     signOut();
   };
 
-  const showBlockedUsers = () => {
-    const blocked = Compliance.getBlockedUsers();
+  const showBlockedUsers = async () => {
+    // Sync from server first
+    const blocked = await Compliance.syncBlockedUsers();
     if (blocked.length === 0) {
       window.alert('No users blocked yet.');
     } else {
       const msg = blocked.map((id, i) => `${i + 1}. ${id}`).join('\n');
       if (window.confirm(`Blocked users:\n${msg}\n\nClick OK to unblock all.`)) {
-        blocked.forEach((id) => Compliance.unblockUser(id));
+        await Promise.all(blocked.map((id) => Compliance.unblockUser(id)));
         window.alert('All users have been unblocked.');
       }
     }
