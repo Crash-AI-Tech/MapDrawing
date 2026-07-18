@@ -1,10 +1,24 @@
-/**
- * Centralized configuration for the iOS app.
- *
- * In development, points to local Next.js dev server.
- * In production, should be set to the deployed URL.
- */
+/** Public API endpoints. Secrets must never be exposed through EXPO_PUBLIC_*. */
+const API_ENDPOINTS = {
+  staging: 'https://map-staging.privacy2privacy.workers.dev',
+  production: 'https://map.wisebamboo.fun',
+} as const;
 
-// TODO: Move to environment variable (expo-constants / app.json extra)
-// export const API_BASE_URL = 'http://192.168.124.16:3000';
-export const API_BASE_URL = 'https://map.wisebamboo.fun';
+type ApiEnvironment = keyof typeof API_ENDPOINTS;
+
+const requestedEnvironment = process.env.EXPO_PUBLIC_API_ENV?.trim();
+const apiEnvironment: ApiEnvironment = requestedEnvironment === 'production'
+  ? 'production'
+  : 'staging';
+const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+
+/**
+ * This branch defaults to staging so a fresh checkout is safe to test.
+ * Override with EXPO_PUBLIC_API_BASE_URL for a LAN server, or select production
+ * explicitly with EXPO_PUBLIC_API_ENV=production.
+ */
+export const API_BASE_URL = (
+  configuredBaseUrl || API_ENDPOINTS[apiEnvironment]
+).replace(/\/$/, '');
+
+export const API_ENVIRONMENT = apiEnvironment;

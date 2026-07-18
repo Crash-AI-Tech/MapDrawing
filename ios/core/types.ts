@@ -16,7 +16,7 @@ export type {
   SyncMessage,
   SyncState,
 } from '@niubi/shared';
-export { getTileKey, tileToBounds } from '@niubi/shared';
+export { getTileKey, latLngToTile, tileToBounds, tilesForBounds } from '@niubi/shared';
 
 // ========================
 // iOS-specific Types

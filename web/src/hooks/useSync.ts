@@ -8,6 +8,9 @@ import type { SyncState } from '@/core/types';
 import { useUIStore } from '@/stores/uiStore';
 
 import { MIN_DATA_ZOOM } from '@/constants';
+import { Compliance } from '@/lib/compliance';
+
+const MAX_CACHED_STROKES = 5000;
 
 export interface UseSyncOptions {
   engine: DrawingEngine | null;
@@ -23,41 +26,45 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
   const tileManagerRef = useRef<TileManager | null>(null);
   const setSyncState = useUIStore((s) => s.setSyncState);
 
-  // === Init sync & tile manager ===
+  // Public drawing tiles are available to guests.
   useEffect(() => {
-    if (!engine || !userId) return;
-
-    // 1. Init Persistence Manager
-    if (!syncRef.current) {
-      const sync = new SyncManager({
-        accessToken,
-        userId,
-        apiBaseUrl: '/api',
-      });
-      sync.bindEngine(engine);
-
-      sync.onStateChange((state: SyncState) => {
-        setSyncState(state);
-      });
-
-      syncRef.current = sync;
-      setSyncState(sync.getState()); // Set initial state
-    } else {
-      syncRef.current.updateToken(accessToken);
-    }
-
-    // 2. Init Tile Manager
     if (!tileManagerRef.current) {
       tileManagerRef.current = new TileManager({
         apiBaseUrl: '/api',
       });
     }
+  }, []);
+
+  // Persistence must be rebound when the authenticated identity changes.
+  useEffect(() => {
+    syncRef.current?.dispose();
+    syncRef.current = null;
+    if (!engine || !accessToken || userId === 'anonymous') {
+      setSyncState('connected');
+      return;
+    }
+
+    const sync = new SyncManager({
+      accessToken,
+      userId,
+      apiBaseUrl: '/api',
+    });
+    sync.bindEngine(engine);
+    sync.onStateChange((state: SyncState) => setSyncState(state));
+    syncRef.current = sync;
+    setSyncState(sync.getState());
+    void fetch('/api/ink')
+      .then(async (response): Promise<{ ink?: number } | null> =>
+        response.ok ? response.json() as Promise<{ ink?: number }> : null
+      )
+      .then((data) => {
+        if (typeof data?.ink === 'number') engine.inkManager.reconcile(data.ink);
+      })
+      .catch(() => undefined);
 
     return () => {
-      // We don't necessarily dispose SyncManager on re-renders unless unmounting
-      // But for strict correctness:
-      // In React Strict Mode this might run twice.
-      // Usually we want to keep one instance if dependencies match.
+      if (syncRef.current === sync) syncRef.current = null;
+      sync.dispose();
     };
   }, [engine, userId, accessToken, setSyncState]);
 
@@ -71,7 +78,7 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
   }, []);
 
   // === Join room (Deprecated - kept for API compatibility if needed, but does nothing now) ===
-  const joinRoom = useCallback((lat: number, lng: number) => {
+  const joinRoom = useCallback((_lat: number, _lng: number) => {
     // No-op in tile-based sync
   }, []);
 
@@ -82,16 +89,14 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
       if (zoom < MIN_DATA_ZOOM) return [];
       if (!tileManagerRef.current || !engine) return [];
 
-      const strokes = await tileManagerRef.current.fetchMissingTiles(bounds);
+      const blockedUserIds = new Set(Compliance.getBlockedUsers());
+      const strokes = (await tileManagerRef.current.fetchMissingTiles(bounds))
+        .filter((stroke) => !blockedUserIds.has(stroke.userId));
 
       if (strokes.length > 0) {
-        engine.addExternalStroke
-        // Use bulk load or addExternalStroke? 
-        // addExternalStroke triggers render per stroke which is slow.
-        // DrawingEngine should support bulk load better.
-        // Let's use loadStrokes which calls bulkLoad.
         engine.loadStrokes(strokes);
       }
+      engine.pruneLoadedStrokes(bounds, MAX_CACHED_STROKES, blockedUserIds);
       return strokes;
     },
     [engine]

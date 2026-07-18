@@ -78,6 +78,12 @@ export class InkManager {
     return true;
   }
 
+  reconcile(serverInk: number): void {
+    if (!Number.isFinite(serverInk)) return;
+    this.ink = Math.max(0, Math.min(MAX_INK, serverInk));
+    this.onChange?.(this.ink);
+  }
+
   /** Clean up timer */
   dispose(): void {
     if (this.regenTimer) {

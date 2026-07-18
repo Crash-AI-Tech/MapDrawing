@@ -1,0 +1,5 @@
+AUTH_SECRET="replace-with-at-least-32-random-characters"
+RESEND_API_KEY=""
+APPLE_CLIENT_ID="com.niubi.agent"
+ENABLE_PRESENCE="false"
+NEXT_PUBLIC_ENABLE_PRESENCE="false"

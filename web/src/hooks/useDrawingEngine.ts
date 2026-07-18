@@ -3,7 +3,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import {
   DrawingEngine,
-  type DrawingEngineConfig,
   type EngineEvent,
 } from '@/core/engine/DrawingEngine';
 import { RenderPipeline } from '@/core/renderer/RenderPipeline';
@@ -43,6 +42,9 @@ export function useDrawingEngine(
   const inputRef = useRef<InputManager | null>(null);
   const canvasProviderRef = useRef<WebCanvasProvider | null>(null);
   const adapterRef = useRef<MapLibreAdapter | null>(null);
+  const engineUnsubscribeRef = useRef<(() => void) | null>(null);
+  const inkUnsubscribeRef = useRef<(() => void) | null>(null);
+  const mapCleanupRef = useRef<(() => void) | null>(null);
 
   const drawingStore = useDrawingStore;
   const inkStore = useInkStore;
@@ -95,7 +97,7 @@ export function useDrawingEngine(
       inputRef.current = input;
 
       // 7) Wire engine events → Zustand store + pipeline
-      engine.subscribe((event: EngineEvent) => {
+      engineUnsubscribeRef.current = engine.subscribe((event: EngineEvent) => {
         switch (event.type) {
           case 'render:request':
             pipeline.requestRender();
@@ -131,7 +133,7 @@ export function useDrawingEngine(
       });
 
       // 7b) Wire InkManager → inkStore
-      const inkUnsub = engine.inkManager.subscribe((ink, maxInk) => {
+      inkUnsubscribeRef.current = engine.inkManager.subscribe((ink, maxInk) => {
         inkStore.getState().setInk(ink);
         inkStore.getState().setMaxInk(maxInk);
       });
@@ -150,8 +152,13 @@ export function useDrawingEngine(
         const canDraw = storeDrawingMode && currentZoom >= MIN_DRAW_ZOOM;
         canvasProvider.setDrawingMode(canDraw);
       };
+      const onMapResize = () => pipeline.resize();
       map.on('move', onMapMove);
-      map.on('resize', () => pipeline.resize());
+      map.on('resize', onMapResize);
+      mapCleanupRef.current = () => {
+        map.off('move', onMapMove);
+        map.off('resize', onMapResize);
+      };
 
       // 9) Sync initial drawing store state → engine
       const state = drawingStore.getState();
@@ -166,7 +173,7 @@ export function useDrawingEngine(
         () => engine.redo()
       );
     },
-    [options.userId, options.userName, drawingStore]
+    [options.userId, options.userName, drawingStore, inkStore]
   );
 
   // === Sync store changes → engine ===
@@ -204,10 +211,19 @@ export function useDrawingEngine(
     return () => unsub();
   }, []);
 
+  // Authentication is loaded after the map. Keep newly-created strokes bound
+  // to the current account instead of the initial anonymous placeholder.
+  useEffect(() => {
+    engineRef.current?.setUser(options.userId, options.userName);
+  }, [options.userId, options.userName]);
+
   // === Cleanup on unmount ===
   const destroy = useCallback(() => {
     // Unregister engine actions from store
     useDrawingStore.getState().unregisterEngineActions();
+    mapCleanupRef.current?.();
+    engineUnsubscribeRef.current?.();
+    inkUnsubscribeRef.current?.();
 
     inputRef.current?.dispose();
     pipelineRef.current?.dispose();
@@ -219,6 +235,9 @@ export function useDrawingEngine(
     canvasProviderRef.current = null;
     engineRef.current = null;
     adapterRef.current = null;
+    mapCleanupRef.current = null;
+    engineUnsubscribeRef.current = null;
+    inkUnsubscribeRef.current = null;
   }, []);
 
   useEffect(() => {

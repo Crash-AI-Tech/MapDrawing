@@ -109,6 +109,8 @@ export interface MapPin {
   message: string;
   color: string;
   createdAt: number;
+  /** Authoritative balance returned after an authenticated write. */
+  ink?: number;
 }
 
 export interface PinCluster {
@@ -172,18 +174,47 @@ export async function fetchDrawings(
   return apiFetch(`/api/drawings?${qs}`, { signal: params.signal });
 }
 
+/** Fetch one exact server-side drawing tile with cursor pagination. */
+export async function fetchDrawingTile(params: {
+  z: number;
+  x: number;
+  y: number;
+  limit?: number;
+  cursor?: PageCursor | null;
+  signal?: AbortSignal;
+}): Promise<{ items: StrokeData[]; nextCursor: PageCursor | null }> {
+  const qs = new URLSearchParams({
+    z: String(params.z),
+    x: String(params.x),
+    y: String(params.y),
+    limit: String(params.limit ?? 500),
+    ...(params.cursor
+      ? {
+          cursorCreatedAt: String(params.cursor.createdAt),
+          cursorId: params.cursor.id,
+        }
+      : {}),
+  });
+  return apiFetch(`/api/drawings/tile?${qs}`, { signal: params.signal });
+}
+
 /**
  * POST /api/drawings — persist strokes to D1.
  * Auth required.
  */
 export async function saveDrawings(
   strokes: StrokeData | StrokeData[]
-): Promise<{ ok: boolean; count: number }> {
+): Promise<{ ok: boolean; count: number; ink?: number; duplicate?: boolean }> {
   return apiFetch('/api/drawings', {
     method: 'POST',
     auth: true,
     body: JSON.stringify(Array.isArray(strokes) ? strokes : [strokes]),
   });
+}
+
+/** Fetch the server-authoritative, regenerated ink balance. */
+export async function fetchInk(): Promise<{ ink: number; maxInk: number }> {
+  return apiFetch('/api/ink', { auth: true, silent: true });
 }
 
 /**

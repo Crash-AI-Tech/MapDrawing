@@ -41,7 +41,9 @@ id = "e2837190f44c4e2f854c39b95cea2e51"
 # RESEND_API_KEY 和 AUTH_SECRET 已迁移到 Cloudflare Secrets (wrangler secret put)
 # 本地开发使用 .dev.vars 文件
 [vars]
-NEXT_PUBLIC_DO_WEBSOCKET_URL = "map-worker.privacy2privacy.workers.dev"
+APPLE_CLIENT_ID = "com.niubi.agent"
+ENABLE_PRESENCE = "false"
+NEXT_PUBLIC_ENABLE_PRESENCE = "false"
 
 [observability]
 enabled = true

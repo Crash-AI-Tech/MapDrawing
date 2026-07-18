@@ -1,0 +1,42 @@
+# Isolated Cloudflare test environment. Resource identifiers are public config;
+# AUTH_SECRET and RESEND_API_KEY remain Cloudflare Secrets and are never committed.
+name = "map-staging"
+account_id = "97c791889a9678820bdb511581c1635b"
+main = ".open-next/worker.js"
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "map-staging"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "map-db-staging"
+database_id = "3c1ccc89-4fc6-478f-bc1d-2df32755a29f"
+migrations_dir = "../drizzle/migrations"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "map-storage-staging"
+
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
+bucket_name = "map-next-cache-staging"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "a411247c9b69487e8ebcc978cf02e9aa"
+
+[vars]
+APPLE_CLIENT_ID = "com.niubi.agent"
+ENABLE_PRESENCE = "false"
+NEXT_PUBLIC_ENABLE_PRESENCE = "false"
+APP_ENV = "staging"
+
+[observability]
+enabled = true

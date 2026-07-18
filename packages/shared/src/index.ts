@@ -14,7 +14,7 @@ export type {
     SyncMessage,
     SyncState,
 } from './types';
-export { getTileKey, tileToBounds } from './types';
+export { getTileKey, latLngToTile, tileToBounds, tilesForBounds } from './types';
 
 // ========================
 // Drawing Tool Constants

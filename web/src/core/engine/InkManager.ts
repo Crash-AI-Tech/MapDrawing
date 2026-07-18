@@ -107,6 +107,14 @@ export class InkManager {
     return this.ink;
   }
 
+  /** Replace the optimistic client balance with the authoritative server value. */
+  reconcile(serverInk: number): void {
+    if (!Number.isFinite(serverInk)) return;
+    this.ink = Math.max(0, Math.min(MAX_INK, serverInk));
+    this.save();
+    this.notifyListeners();
+  }
+
   /** Subscribe to ink changes */
   subscribe(listener: InkChangeListener): () => void {
     this.listeners.add(listener);

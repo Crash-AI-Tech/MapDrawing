@@ -13,7 +13,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
  */
 
 const PRESENCE_ZOOM = 10;
-const PRESENCE_TTL = 15; // seconds
+const PRESENCE_TTL = 180; // Cloudflare KV requires expirationTtl >= 60 seconds.
 
 function getTileKey(lat: number, lng: number): string {
   const n = Math.pow(2, PRESENCE_ZOOM);
@@ -36,6 +36,10 @@ export interface CursorEntry {
 
 export async function PUT(request: Request) {
   try {
+    const { env } = getCloudflareContext();
+    if (env.ENABLE_PRESENCE !== 'true') {
+      return Response.json({ error: 'Presence is disabled' }, { status: 404 });
+    }
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -54,7 +58,6 @@ export async function PUT(request: Request) {
       return Response.json({ error: 'Invalid coordinates' }, { status: 400 });
     }
 
-    const { env } = getCloudflareContext();
     const tileKey = getTileKey(body.lat, body.lng);
     const kvKey = `presence:${tileKey}:${result.user.id}`;
 
@@ -67,8 +70,9 @@ export async function PUT(request: Request) {
       ts: Date.now(),
     };
 
-    await env.CACHE.put(kvKey, JSON.stringify(entry), {
+    await env.CACHE.put(kvKey, '', {
       expirationTtl: PRESENCE_TTL,
+      metadata: entry,
     });
 
     return Response.json({ ok: true, tile: tileKey });
@@ -80,6 +84,10 @@ export async function PUT(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const { env } = getCloudflareContext();
+    if (env.ENABLE_PRESENCE !== 'true') {
+      return Response.json({ error: 'Presence is disabled' }, { status: 404 });
+    }
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -93,29 +101,15 @@ export async function GET(request: Request) {
       return Response.json({ error: 'Invalid coordinates' }, { status: 400 });
     }
 
-    const { env } = getCloudflareContext();
     const tileKey = getTileKey(lat, lng);
     const prefix = `presence:${tileKey}:`;
 
-    const list = await env.CACHE.list({ prefix, limit: 50 });
+    const list = await env.CACHE.list<CursorEntry>({ prefix, limit: 50 });
     const cursors: CursorEntry[] = [];
 
-    // Fetch all values in parallel
-    const values = await Promise.all(
-      list.keys.map((k) => env.CACHE.get(k.name))
-    );
-
-    for (const val of values) {
-      if (!val) continue;
-      try {
-        const entry = JSON.parse(val) as CursorEntry;
-        // Exclude self
-        if (entry.userId !== result.user.id) {
-          cursors.push(entry);
-        }
-      } catch {
-        // skip malformed entries
-      }
+    for (const key of list.keys) {
+      const entry = key.metadata;
+      if (entry && entry.userId !== result.user.id) cursors.push(entry);
     }
 
     return Response.json({ cursors, tile: tileKey });

@@ -2,15 +2,16 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://map.wisebamboo.fun'),
   title: 'Map — Global Collaborative Map Drawing',
-  description: 'Collaboratively draw on a real-world map in real-time. Features multiple brushes, high-concurrency sync, and digital heritage persistence.',
-  keywords: ['map collaboration', 'real-time drawing', 'global canvas', 'digital graffiti', 'collaborative art', 'interactive map'],
+  description: 'Draw and leave messages on a shared real-world map with a global community.',
+  keywords: ['map collaboration', 'global canvas', 'digital graffiti', 'collaborative art', 'interactive map'],
   authors: [{ name: 'Map Team' }],
   icons: { icon: '/logo.png' },
   openGraph: {
     title: 'Map — Global Collaborative Map Drawing',
     description: 'Sketch on the streets of the world. Connect with others through art on a shared global canvas.',
-    url: 'https://map.example.com',
+    url: 'https://map.wisebamboo.fun',
     siteName: 'Map',
     images: [
       {

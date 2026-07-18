@@ -4,6 +4,38 @@ import { v7 as uuidv7 } from 'uuid';
 import { getBlockedUsers } from '@/lib/db/queries';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { validateCsrf } from '@/lib/csrf';
+import { readJsonBody, RequestBodyError } from '@/lib/http/body';
+import { isInsufficientInkError, prepareInkConsumption } from '@/lib/ink/server';
+import {
+  parseCursor,
+  parseInteger,
+  parseViewport,
+  QueryValidationError,
+} from '@/lib/http/query';
+
+const MAX_PIN_REQUEST_BYTES = 16 * 1024;
+const PIN_INK_COST = 50;
+
+interface PinClusterRow {
+  gx: number;
+  gy: number;
+  count: number;
+  lng: number;
+  lat: number;
+  created_at_ms: number;
+}
+
+interface PinRow {
+  id: string;
+  user_id: string | null;
+  user_name: string;
+  lng: number;
+  lat: number;
+  message: string;
+  color: string;
+  created_at: number;
+  created_at_ms: number | null;
+}
 
 /**
  * GET /api/pins — fetch pins within a viewport bounds.
@@ -11,21 +43,18 @@ import { validateCsrf } from '@/lib/csrf';
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const minLat = parseFloat(url.searchParams.get('minLat') ?? '0');
-  const maxLat = parseFloat(url.searchParams.get('maxLat') ?? '0');
-  const minLng = parseFloat(url.searchParams.get('minLng') ?? '0');
-  const maxLng = parseFloat(url.searchParams.get('maxLng') ?? '0');
-  const zoom = parseFloat(url.searchParams.get('zoom') ?? '0');
-  const limit = parseInt(url.searchParams.get('limit') ?? '200', 10);
-  const cursorCreatedAt = url.searchParams.get('cursorCreatedAt');
-  const cursorId = url.searchParams.get('cursorId');
-
-  if (minLat === 0 && maxLat === 0 && minLng === 0 && maxLng === 0) {
-    return Response.json([]);
-  }
 
   try {
+    const { minLat, maxLat, minLng, maxLng } = parseViewport(url.searchParams, 5);
+    const zoomRaw = url.searchParams.get('zoom') ?? '0';
+    const zoom = Number(zoomRaw);
+    if (!Number.isFinite(zoom) || zoom < 0 || zoom > 24) {
+      throw new QueryValidationError('zoom must be between 0 and 24');
+    }
+    const limit = parseInteger(url.searchParams, 'limit', 200, 1, 500);
+    const cursor = parseCursor(url.searchParams);
     const { env } = getCloudflareContext();
+    const database = env.DB.withSession();
 
     // Low zooms return clustered pins to avoid annotation explosion on mobile
     if (zoom < 21) {
@@ -36,25 +65,25 @@ export async function GET(request: Request) {
       const cellLat = latSpan / gridSize;
       const cellLng = lngSpan / gridSize;
 
-      const result = await env.DB.prepare(
+      const result = await database.prepare(
         `SELECT
             CAST((lng - ?1) / ?2 AS INTEGER) AS gx,
             CAST((lat - ?3) / ?4 AS INTEGER) AS gy,
             COUNT(*) AS count,
             AVG(lng) AS lng,
             AVG(lat) AS lat,
-            MAX(created_at) AS created_at
+            MAX(COALESCE(created_at_ms, created_at * 1000)) AS created_at_ms
          FROM map_pins
          WHERE lat BETWEEN ?5 AND ?6
            AND lng BETWEEN ?7 AND ?8
          GROUP BY gx, gy
-         ORDER BY count DESC, created_at DESC
+         ORDER BY count DESC, created_at_ms DESC
          LIMIT ?9`
       )
         .bind(minLng, cellLng, minLat, cellLat, minLat, maxLat, minLng, maxLng, clampedLimit)
-        .all();
+        .all<PinClusterRow>();
 
-      const items = (result.results ?? []).map((row: any) => ({
+      const items = (result.results ?? []).map((row) => ({
         type: 'cluster' as const,
         id: `cluster-${row.gx}-${row.gy}`,
         lng: Number(row.lng),
@@ -62,36 +91,39 @@ export async function GET(request: Request) {
         count: Number(row.count),
       }));
 
-      return Response.json({
-        mode: 'clustered' as const,
-        items,
-        nextCursor: null,
-      });
+      return Response.json(
+        { mode: 'clustered' as const, items, nextCursor: null },
+        { headers: { 'x-d1-bookmark': database.getBookmark() ?? '' } },
+      );
     }
 
     const clampedLimit = Math.max(10, Math.min(limit, 500));
     const pageSize = clampedLimit + 1;
-    let query = `SELECT id, user_id, user_name, lng, lat, message, color, created_at
+    let query = `SELECT id, user_id, user_name, lng, lat, message, color,
+                        created_at, created_at_ms
        FROM map_pins
        WHERE lat BETWEEN ?1 AND ?2
          AND lng BETWEEN ?3 AND ?4`;
 
     const binds: Array<string | number> = [minLat, maxLat, minLng, maxLng];
 
-    if (cursorCreatedAt && cursorId) {
+    if (cursor) {
       query += `
-         AND (created_at < ?5 OR (created_at = ?5 AND id < ?6))
-       ORDER BY created_at DESC, id DESC
+         AND (
+           COALESCE(created_at_ms, created_at * 1000) < ?5
+           OR (COALESCE(created_at_ms, created_at * 1000) = ?5 AND id < ?6)
+         )
+       ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
        LIMIT ?7`;
-      binds.push(parseInt(cursorCreatedAt, 10), cursorId, pageSize);
+      binds.push(cursor.createdAt, cursor.id, pageSize);
     } else {
       query += `
-       ORDER BY created_at DESC, id DESC
+       ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
        LIMIT ?5`;
       binds.push(pageSize);
     }
 
-    const result = await env.DB.prepare(query).bind(...binds).all();
+    const result = await database.prepare(query).bind(...binds).all<PinRow>();
     const allRows = result.results ?? [];
     const hasMore = allRows.length > clampedLimit;
     const rows = hasMore ? allRows.slice(0, clampedLimit) : allRows;
@@ -108,32 +140,34 @@ export async function GET(request: Request) {
       // blocked_users table may not exist in local dev — skip filtering
     }
     const filteredRows = blockedIds.length > 0
-      ? (rows as any[]).filter((r) => !r.user_id || !blockedIds.includes(r.user_id))
+      ? rows.filter((r) => !r.user_id || !blockedIds.includes(r.user_id))
       : rows;
 
-    const items = filteredRows.map((row: any) => ({
+    const items = filteredRows.map((row) => ({
       type: 'pin' as const,
       id: row.id,
-      userId: row.user_id,
+      userId: row.user_id ?? '',
       userName: row.user_name,
       lng: row.lng,
       lat: row.lat,
       message: row.message,
       color: row.color,
-      createdAt: row.created_at * 1000, // unix seconds → ms
+      createdAt: row.created_at_ms ?? row.created_at * 1000,
     }));
 
-    const last = rows[rows.length - 1] as any;
+    const last = rows[rows.length - 1];
     const nextCursor = hasMore && last
-      ? { createdAt: last.created_at, id: last.id }
+      ? { createdAt: last.created_at_ms ?? last.created_at * 1000, id: last.id }
       : null;
 
-    return Response.json({
-      mode: 'raw' as const,
-      items,
-      nextCursor,
-    });
+    return Response.json(
+      { mode: 'raw' as const, items, nextCursor },
+      { headers: { 'x-d1-bookmark': database.getBookmark() ?? '' } },
+    );
   } catch (e) {
+    if (e instanceof QueryValidationError) {
+      return Response.json({ error: e.message }, { status: 400 });
+    }
     console.error('[API /pins GET] Error:', e);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -157,7 +191,10 @@ export async function POST(request: Request) {
     const rl = await checkRateLimit(`pins:POST:${result.user.id}`, 30, 60_000);
     if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
-    const body = await request.json();
+    const body = await readJsonBody(request, MAX_PIN_REQUEST_BYTES);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return Response.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const { lng, lat, message, color } = body as {
       lng: number;
       lat: number;
@@ -185,21 +222,30 @@ export async function POST(request: Request) {
 
     const id = uuidv7();
     const { env } = getCloudflareContext();
+    const nowMs = Date.now();
+    const nowSeconds = Math.floor(nowMs / 1000);
 
-    await env.DB.prepare(
-      `INSERT INTO map_pins (id, user_id, user_name, lng, lat, message, color)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        id,
-        result.user.id,
-        result.user.userName ?? 'Anonymous',
-        lng,
-        lat,
-        message.trim(),
-        color || '#E63946'
-      )
-      .run();
+    const batchResults = await env.DB.batch([
+      prepareInkConsumption(env.DB, result.user.id, PIN_INK_COST, nowSeconds),
+      env.DB.prepare(
+        `INSERT INTO map_pins (
+           id, user_id, user_name, lng, lat, message, color,
+           created_at, created_at_ms, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+          id,
+          result.user.id,
+          result.user.userName ?? 'Anonymous',
+          lng,
+          lat,
+          message.trim(),
+          color || '#E63946',
+          nowSeconds,
+          nowMs,
+          nowSeconds,
+        ),
+    ]);
+    const inkRow = batchResults[0]?.results?.[0] as { ink?: number } | undefined;
 
     return Response.json(
       {
@@ -210,11 +256,18 @@ export async function POST(request: Request) {
         lat,
         message: message.trim(),
         color: color || '#E63946',
-        createdAt: Date.now(),
+        createdAt: nowMs,
+        ink: inkRow?.ink,
       },
       { status: 201 }
     );
-  } catch (e) {
+  } catch (e: unknown) {
+    if (e instanceof RequestBodyError) {
+      return Response.json({ error: e.message }, { status: e.status });
+    }
+    if (isInsufficientInkError(e)) {
+      return Response.json({ error: 'Insufficient ink' }, { status: 402 });
+    }
     console.error('[API /pins POST] Error:', e);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }

@@ -1,7 +1,16 @@
 import { Alert } from 'react-native';
 import { apiFetch, blockUserApi } from '@/lib/api';
 
+const blockedUserIds = new Set<string>();
+
 export const Compliance = {
+    setBlockedUsers: (userIds: Iterable<string>) => {
+        blockedUserIds.clear();
+        for (const userId of userIds) blockedUserIds.add(userId);
+    },
+
+    isBlocked: (userId: string) => blockedUserIds.has(userId),
+
     /**
      * Report inappropriate content (User/Pin).
      * Sends to real backend /api/report endpoint.
@@ -30,11 +39,13 @@ export const Compliance = {
      * The blocked user's pins/drawings will be filtered out server-side.
      */
     blockUser: async (userId: string) => {
+        blockedUserIds.add(userId);
         try {
             await blockUserApi(userId, { silent: true });
             Alert.alert('User Blocked', 'This user has been blocked. You will no longer see their content.', [{ text: 'OK' }]);
             return true;
         } catch (e: any) {
+            blockedUserIds.delete(userId);
             const isSelfBlock = e?.status === 400 && /cannot block yourself/i.test(e?.message || '');
 
             if (isSelfBlock) {

@@ -8,6 +8,7 @@ import {
   text,
   real,
   integer,
+  primaryKey,
 } from 'drizzle-orm/sqlite-core';
 
 // =====================
@@ -19,6 +20,9 @@ export const users = sqliteTable('users', {
   userName: text('user_name').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   appleId: text('apple_id').unique(), // For Sign in with Apple
+  emailVerified: integer('email_verified', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   avatarUrl: text('avatar_url'),
   createdAt: integer('created_at', { mode: 'number' })
     .notNull()
@@ -45,8 +49,7 @@ export const sessions = sqliteTable('sessions', {
 export const drawings = sqliteTable('drawings', {
   id: text('id').primaryKey(), // UUID v7
   userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+    .references(() => users.id, { onDelete: 'set null' }),
   userName: text('user_name').notNull(),
   brushId: text('brush_id').notNull().default('pencil'),
   color: text('color').notNull().default('#000000'),
@@ -55,6 +58,7 @@ export const drawings = sqliteTable('drawings', {
 
   // 点数据 (JSON 数组)
   points: text('points').notNull(), // JSON string
+  pointCount: integer('point_count').notNull().default(0),
 
   // 边界框 (用于空间查询)
   minLat: real('min_lat').notNull(),
@@ -71,10 +75,83 @@ export const drawings = sqliteTable('drawings', {
   createdAt: integer('created_at', { mode: 'number' })
     .notNull()
     .$defaultFn(() => Math.floor(Date.now() / 1000)),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }),
   updatedAt: integer('updated_at', { mode: 'number' })
     .notNull()
     .$defaultFn(() => Math.floor(Date.now() / 1000)),
 });
+
+// =====================
+// 地图图钉
+// =====================
+export const mapPins = sqliteTable('map_pins', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+  userName: text('user_name').notNull().default('Anonymous'),
+  lng: real('lng').notNull(),
+  lat: real('lat').notNull(),
+  message: text('message').notNull().default(''),
+  color: text('color').notNull().default('#E63946'),
+  createdAt: integer('created_at', { mode: 'number' }).notNull(),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
+});
+
+// =====================
+// 邮箱验证/密码重置
+// =====================
+export const verificationCodes = sqliteTable('verification_codes', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  code: text('code').notNull(),
+  type: text('type').notNull().default('email_verification'),
+  expiresAt: integer('expires_at', { mode: 'number' }).notNull(),
+  createdAt: integer('created_at', { mode: 'number' }).notNull(),
+});
+
+// =====================
+// 用户屏蔽关系
+// =====================
+export const blockedUsers = sqliteTable('blocked_users', {
+  blockerId: text('blocker_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  blockedId: text('blocked_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at', { mode: 'number' }).notNull(),
+}, (table) => [primaryKey({ columns: [table.blockerId, table.blockedId] })]);
+
+// =====================
+// 服务端墨水与原子限流
+// =====================
+export const userInk = sqliteTable('user_ink', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  ink: real('ink').notNull().default(100),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
+});
+
+export const apiRateLimits = sqliteTable('api_rate_limits', {
+  key: text('key').primaryKey(),
+  windowStart: integer('window_start', { mode: 'number' }).notNull(),
+  requestCount: integer('request_count').notNull(),
+  expiresAt: integer('expires_at', { mode: 'number' }).notNull(),
+});
+
+export const drawingTiles = sqliteTable('drawing_tiles', {
+  z: integer('z').notNull(),
+  x: integer('x').notNull(),
+  y: integer('y').notNull(),
+  drawingId: text('drawing_id')
+    .notNull()
+    .references(() => drawings.id, { onDelete: 'cascade' }),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+}, (table) => [primaryKey({ columns: [table.z, table.x, table.y, table.drawingId] })]);
 
 // =====================
 // 举报/审核表

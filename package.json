@@ -4,11 +4,15 @@
     "scripts": {
         "dev": "pnpm --filter web dev",
         "build": "pnpm --filter web build",
-        "deploy": "pnpm --filter web deploy"
+        "deploy": "pnpm --filter web deploy",
+        "type-check": "pnpm --filter web type-check && pnpm --filter ios type-check",
+        "lint": "pnpm --filter web lint && pnpm --filter ios lint",
+        "db:check": "sh scripts/check-migrations.sh",
+        "check": "pnpm db:check && pnpm type-check && pnpm lint"
     },
     "packageManager": "pnpm@9.0.0",
     "engines": {
-        "node": ">=18"
+        "node": ">=20.9 <25"
     },
     "dependencies": {
         "drizzle-orm": "^0.38.0"

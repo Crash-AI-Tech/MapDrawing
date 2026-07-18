@@ -5,18 +5,21 @@
 
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
+type D1Queryable = Pick<D1Database, 'prepare'>;
+
 // =====================
 // 笔画数据类型
 // =====================
 export interface DrawingRow {
   id: string;
-  user_id: string;
+  user_id: string | null;
   user_name: string;
   brush_id: string;
   color: string;
   opacity: number;
   size: number;
   points: string; // JSON string
+  point_count: number;
   min_lat: number;
   max_lat: number;
   min_lng: number;
@@ -26,10 +29,12 @@ export interface DrawingRow {
   created_zoom: number;
   meta: string | null;
   created_at: number;
+  created_at_ms: number | null;
   updated_at: number;
 }
 
 export interface ViewportCursor {
+  /** Millisecond server timestamp (legacy rows fall back to created_at * 1000). */
   createdAt: number;
   id: string;
 }
@@ -84,12 +89,13 @@ export async function getDrawingsInViewportPaginated(
   options?: {
     limit?: number;
     cursor?: ViewportCursor;
-  }
+  },
+  database?: D1Queryable,
 ): Promise<{
   rows: DrawingRow[];
   nextCursor: ViewportCursor | null;
 }> {
-  const { env } = getCloudflareContext();
+  const db = database ?? getCloudflareContext().env.DB;
   const limit = Math.max(1, Math.min(options?.limit ?? 300, 1000));
   const pageSize = limit + 1;
 
@@ -101,20 +107,23 @@ export async function getDrawingsInViewportPaginated(
 
   if (options?.cursor) {
     query += `
-       AND (created_at < ?5 OR (created_at = ?5 AND id < ?6))`;
+       AND (
+         COALESCE(created_at_ms, created_at * 1000) < ?5
+         OR (COALESCE(created_at_ms, created_at * 1000) = ?5 AND id < ?6)
+       )`;
     binds.push(options.cursor.createdAt, options.cursor.id);
     query += `
-     ORDER BY created_at DESC, id DESC
+     ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
      LIMIT ?7`;
     binds.push(pageSize);
   } else {
     query += `
-     ORDER BY created_at DESC, id DESC
+     ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
      LIMIT ?5`;
     binds.push(pageSize);
   }
 
-  const { results } = await env.DB.prepare(query)
+  const { results } = await db.prepare(query)
     .bind(...binds)
     .all<DrawingRow>();
 
@@ -126,7 +135,7 @@ export async function getDrawingsInViewportPaginated(
   return {
     rows,
     nextCursor: hasMore && last
-      ? { createdAt: last.created_at, id: last.id }
+      ? { createdAt: last.created_at_ms ?? last.created_at * 1000, id: last.id }
       : null,
   };
 }
@@ -140,112 +149,6 @@ export async function getDrawingById(id: string): Promise<DrawingRow | null> {
   return env.DB.prepare('SELECT * FROM drawings WHERE id = ?')
     .bind(id)
     .first<DrawingRow>();
-}
-
-/**
- * 插入笔画
- */
-export async function insertDrawing(drawing: {
-  id: string;
-  userId: string;
-  userName: string;
-  brushId: string;
-  color: string;
-  opacity: number;
-  size: number;
-  points: string;
-  minLat: number;
-  maxLat: number;
-  minLng: number;
-  maxLng: number;
-  createdZoom: number;
-  meta?: string | null;
-}): Promise<void> {
-  const { env } = getCloudflareContext();
-
-  const centerLat = (drawing.minLat + drawing.maxLat) / 2;
-  const centerLng = (drawing.minLng + drawing.maxLng) / 2;
-
-  await env.DB.prepare(
-    `INSERT INTO drawings (id, user_id, user_name, brush_id, color, opacity, size,
-                           points, min_lat, max_lat, min_lng, max_lng,
-                           center_lat, center_lng, created_zoom, meta)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      drawing.id,
-      drawing.userId,
-      drawing.userName,
-      drawing.brushId,
-      drawing.color,
-      drawing.opacity,
-      drawing.size,
-      drawing.points,
-      drawing.minLat,
-      drawing.maxLat,
-      drawing.minLng,
-      drawing.maxLng,
-      centerLat,
-      centerLng,
-      drawing.createdZoom,
-      drawing.meta ?? null
-    )
-    .run();
-}
-
-/**
- * 批量插入笔画
- */
-export async function batchInsertDrawings(
-  db: D1Database,
-  drawings: Array<{
-    id: string;
-    userId: string;
-    userName: string;
-    brushId: string;
-    color: string;
-    opacity: number;
-    size: number;
-    points: string;
-    minLat: number;
-    maxLat: number;
-    minLng: number;
-    maxLng: number;
-    createdZoom: number;
-    meta?: string | null;
-  }>
-): Promise<void> {
-  if (drawings.length === 0) return;
-
-  const stmt = db.prepare(
-    `INSERT INTO drawings (id, user_id, user_name, brush_id, color, opacity, size,
-                           points, min_lat, max_lat, min_lng, max_lng,
-                           center_lat, center_lng, created_zoom, meta)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-
-  const batch = drawings.map((d) =>
-    stmt.bind(
-      d.id,
-      d.userId,
-      d.userName,
-      d.brushId,
-      d.color,
-      d.opacity,
-      d.size,
-      d.points,
-      d.minLat,
-      d.maxLat,
-      d.minLng,
-      d.maxLng,
-      (d.minLat + d.maxLat) / 2,
-      (d.minLng + d.maxLng) / 2,
-      d.createdZoom,
-      d.meta ?? null
-    )
-  );
-
-  await db.batch(batch);
 }
 
 /**

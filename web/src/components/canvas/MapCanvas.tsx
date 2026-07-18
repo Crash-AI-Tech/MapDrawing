@@ -93,6 +93,16 @@ function eraserCursorSvg(size: number): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${r} ${r}, auto`;
 }
 
+function isMapPin(value: unknown): value is MapPin & { type?: 'pin' } {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  return (item.type == null || item.type === 'pin') &&
+    typeof item.id === 'string' && typeof item.userId === 'string' &&
+    typeof item.userName === 'string' && typeof item.lng === 'number' &&
+    typeof item.lat === 'number' && typeof item.message === 'string' &&
+    typeof item.color === 'string' && typeof item.createdAt === 'number';
+}
+
 export default function MapCanvas() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -138,7 +148,7 @@ export default function MapCanvas() {
   const userName = profile?.userName ?? 'Anonymous';
 
   // 1) Drawing engine
-  const { engineRef, pipelineRef, initWithMap, destroy } = useDrawingEngine({
+  const { engineRef, initWithMap, destroy } = useDrawingEngine({
     userId,
     userName,
   });
@@ -174,23 +184,13 @@ export default function MapCanvas() {
           const qs = `minLat=${bounds.minLat}&maxLat=${bounds.maxLat}&minLng=${bounds.minLng}&maxLng=${bounds.maxLng}&zoom=${Math.floor(zoom)}`;
           const res = await fetch(`/api/pins?${qs}`);
           if (res.ok) {
-            const body: any = await res.json();
+            const body: unknown = await res.json();
             // API returns { mode, items, nextCursor } — extract pins array
             if (Array.isArray(body)) {
-              setPins(body);
-            } else if (body && Array.isArray(body.items)) {
-              const pinItems: MapPin[] = body.items
-                .filter((i: any) => i.type === 'pin')
-                .map((i: any) => ({
-                  id: i.id,
-                  userId: i.userId,
-                  userName: i.userName,
-                  lng: i.lng,
-                  lat: i.lat,
-                  message: i.message,
-                  color: i.color,
-                  createdAt: i.createdAt,
-                }));
+              setPins(body.filter(isMapPin));
+            } else if (body && typeof body === 'object' &&
+              Array.isArray((body as { items?: unknown }).items)) {
+              const pinItems = ((body as { items: unknown[] }).items).filter(isMapPin);
               setPins(pinItems);
             } else {
               setPins([]);
@@ -521,8 +521,19 @@ export default function MapCanvas() {
           }),
         });
         if (res.ok) {
-          const newPin: MapPin = await res.json();
+          const newPin = await res.json() as MapPin & { ink?: number };
+          if (typeof newPin.ink === 'number') {
+            engineRef.current?.inkManager.reconcile(newPin.ink);
+          }
           addPin(newPin);
+        } else if (res.status === 402) {
+          const inkResponse = await fetch('/api/ink');
+          if (inkResponse.ok) {
+            const serverInk = await inkResponse.json() as { ink?: number };
+            if (typeof serverInk.ink === 'number') {
+              engineRef.current?.inkManager.reconcile(serverInk.ink);
+            }
+          }
         }
       } catch (e) {
         console.error('[MapCanvas] Failed to create pin:', e);

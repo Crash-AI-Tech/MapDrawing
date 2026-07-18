@@ -1,4 +1,6 @@
 import type { NextConfig } from 'next';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 // @opennextjs/cloudflare 开发环境本地绑定模拟
 import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
@@ -7,11 +9,16 @@ if (process.env.NODE_ENV === 'development') {
   initOpenNextCloudflareForDev();
 }
 
+const projectRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: projectRoot,
 
   // Turbopack 配置 (Next.js 16 默认使用 Turbopack)
-  turbopack: {},
+  turbopack: {
+    root: projectRoot,
+  },
 
   // Transpile shared packages
   transpilePackages: ['@niubi/shared'],

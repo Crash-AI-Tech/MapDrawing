@@ -1,111 +1,77 @@
-# Map (Monorepo)
+# MapDrawing
 
-> 在真实地图上画画的全球协作平台 — Cloudflare 全家桶 Edge 架构
+一个面向旅行者、城市探索者和本地社区的地图 UGC 产品：用户在真实地图上画线、擦除内容并放置留言图钉。Web 与 iOS 共用数据协议，后端运行在 Cloudflare Workers，使用 D1、R2 和 KV。
 
 ## 项目结构
 
-本项目采用 Monorepo (单体仓库) 架构，包含以下模块：
+- `web/`：Next.js 16 App Router，同时承载页面和 Route Handlers 后端
+- `ios/`：Expo / React Native 客户端
+- `packages/shared/`：跨端类型、常量和地图瓦片算法
+- `drizzle/migrations/`：Cloudflare D1 数据库迁移
 
-- **`web/`**: Next.js 16 前端应用 (Web App)。
-- **`ios/`**: React Native (Expo) 移动端应用 (开发中)。
-- **`ios/`**: React Native (Expo) 移动端应用 (开发中)。
-- **`drizzle/`**: 数据库 Schema 定义与迁移文件。
+## 本地开发：不需要 Docker
 
-## 技术栈 (Web)
-
-| 类别 | 技术 |
-|------|------|
-| **框架** | Next.js 16 (App Router / Edge Runtime) |
-| **部署** | Cloudflare Workers (OpenNext) |
-| **数据库** | Cloudflare D1 (SQLite) |
-| **认证** | Lucia Auth v3 |
-| **地图/绘画** | MapLibre GL JS + Canvas 2D |
-
----
-
-## 本地开发指南
-
-### 前置条件
-
-- Node.js >= 20
-- pnpm (`npm i -g pnpm`)
-- Cloudflare 账号 ([免费注册](https://dash.cloudflare.com/sign-up))
-
-### 快速启动 (Web + Backend)
-
-**注意**: 所有命令请在 **根目录** 执行。
+Wrangler 会在 `web/.wrangler/` 中模拟 D1、KV 和 R2。推荐使用 Node.js 22 LTS 与 pnpm 9：
 
 ```bash
-# 1. 安装所有依赖
-pnpm install
-
-# 2. 初始化本地 D1 数据库
+nvm use
+pnpm install --frozen-lockfile
+cp web/.dev.vars.example web/.dev.vars
 pnpm --filter web db:migrate
-
-# 3. 配置本地机密 (进入 web 目录创建)
-# web/.dev.vars
-echo 'AUTH_SECRET="any-random-string-at-least-32-chars"' > web/.dev.vars
-echo 'RESEND_API_KEY="your_resend_api_key"' >> web/.dev.vars
-
-# 4. 启动 Web 前端 (默认端口 3000)
 pnpm --filter web dev
 ```
 
+`next dev` 适合日常开发，地址通常是 `http://localhost:3000`。Route Handlers 就是项目后端；`initOpenNextCloudflareForDev()` 会把本地 Wrangler bindings 注入 Next.js，因此无需另启后端容器。
+
+要验证与线上 Worker 更接近的构建、路由和 bindings，请运行：
+
+```bash
+pnpm --filter web preview
 ```
 
-# 6. 启动 iOS 应用 (可选)
+本地 D1 数据仅保存在 `web/.wrangler/`，不会读写生产数据库。iOS 默认连接已提交的 Cloudflare 测试环境；直接运行：
 
 ```bash
-# 查询可用设备
-xcrun xctrace list devices
-# 启动 iOS 模拟器或真机 (替换为你的设备 ID)
-pnpm --filter ios ios --device 00008140-000C2D3E1E63001C  # 16pro
-pnpm --filter ios ios --device 00008103-000E20503A8A001E  # ipad
-
-# 启动 Expo 开发服务器
-
----
-
-## 生产部署
-
-本项目采用 Cloudflare Workers 架构。
-
-### 资源准备
-
-如果你是第一次部署，需要创建 Cloudflare 资源：
-
-```bash
-# 1. 创建 D1 数据库
-npx wrangler d1 create map-db
-
-# 2. 创建 R2 存储桶
-npx wrangler r2 bucket create map-storage
-npx wrangler r2 bucket create map-next-cache
-
-# 3. 创建 KV (可选)
-npx wrangler kv namespace create CACHE
+pnpm --filter ios ios:staging
 ```
 
-请确保根目录 `web/wrangler.toml` 中的 `database_id` 已更新为你的 D1 ID。
-
-### 部署命令
+如需连接电脑上的 Next.js，可临时覆盖公开环境变量（不要提交本机 IP）：
 
 ```bash
-# 1. 部署前端 (Next.js)
-pnpm --filter web run deploy
+EXPO_PUBLIC_API_BASE_URL=http://192.168.x.x:3000 pnpm --filter ios ios
+```
 
-# 2. 同步数据库配置 (执行生产环境迁移)
+要明确连接生产环境则运行 `pnpm --filter ios ios:production`。`EXPO_PUBLIC_*` 只能保存公开配置，任何令牌或密钥都不得放入其中。
+
+## 质量检查
+
+```bash
+pnpm db:check
+pnpm type-check
+pnpm lint
+pnpm --filter web build
+```
+
+## Cloudflare 部署
+
+仓库包含独立测试配置 `web/wrangler.staging.toml`。其中只保存可公开的 Worker、D1、R2、KV 名称和 ID，确保不同电脑拉取代码后使用相同 bindings；真实密钥使用 Cloudflare Secrets。测试环境部署命令：
+
+测试站地址：<https://map-staging.privacy2privacy.workers.dev>
+
+```bash
+pnpm --filter web db:migrate:staging
+pnpm --filter web deploy:staging
+```
+
+测试环境资源均以 `-staging` 结尾，不包含生产用户或作品数据。测试账号由管理员直接写入测试 D1，密码不进入 GitHub。
+
+生产环境迁移和部署是显式操作，不会在本地开发时自动执行。新版本依赖最新 D1 表结构，因此上线顺序是：
+
+```bash
 pnpm --filter web db:migrate:prod
+pnpm --filter web deploy
 ```
 
----
+先在 Cloudflare 控制台或备份流程中保留 D1 恢复点，再应用生产迁移。`AUTH_SECRET` 和 `RESEND_API_KEY` 应使用 `wrangler secret put` 管理，不要写入仓库。实时光标功能默认关闭，因为 KV 不适合高频 presence 写入；将来需要实时协作时应迁移到 Durable Objects。
 
-## 常用命令汇总
-
-| 命令 | 说明 |
-|------|------|
-| `pnpm install` | 安装所有项目的依赖 (Web + iOS + Root) |
-| `pnpm --filter web dev` | 启动 Web 前端开发服务器 |
-| `pnpm --filter web db:migrate` | 本地数据库迁移 |
-| `pnpm --filter web db:migrate:prod` | 生产数据库迁移 |
-| `pnpm --filter web deploy` | 部署 Web 前端 |
+只读地图接口已经使用 D1 Sessions API。发布后可在 D1 数据库的 Settings 中启用 Read Replication；未启用时 Sessions API 仍可正常工作，只是查询继续由主实例处理。

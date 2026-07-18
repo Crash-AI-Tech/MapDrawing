@@ -1,5 +1,5 @@
 import { OfflineQueue } from './OfflineQueue';
-import { saveDrawings, deleteStroke } from '../../lib/api';
+import { ApiError, saveDrawings, deleteStroke } from '../../lib/api';
 import type { StrokeData, DrawEvent, SyncState } from '../types';
 
 export type SyncStateListener = (state: SyncState) => void;
@@ -8,6 +8,8 @@ interface SyncManagerConfig {
     userId: string;
     onRemoteStroke?: (stroke: StrokeData) => void;
     onRemoteDelete?: (strokeId: string) => void;
+    onInkBalance?: (ink: number) => void;
+    onStrokeRejected?: (strokeId: string) => void;
 }
 
 /**
@@ -22,10 +24,15 @@ export class SyncManager {
     private state: SyncState = 'connected';
     private stateListeners = new Set<SyncStateListener>();
     private flushTimer: ReturnType<typeof setInterval> | null = null;
+    private isFlushing = false;
+    private onInkBalance?: (ink: number) => void;
+    private onStrokeRejected?: (strokeId: string) => void;
 
     constructor(config: SyncManagerConfig) {
         this.userId = config.userId;
-        this.offlineQueue = new OfflineQueue();
+        this.offlineQueue = new OfflineQueue(config.userId);
+        this.onInkBalance = config.onInkBalance;
+        this.onStrokeRejected = config.onStrokeRejected;
 
         // Simple retry mechanism
         this.flushTimer = setInterval(() => {
@@ -43,9 +50,15 @@ export class SyncManager {
 
         try {
             this.setState('connecting');
-            await saveDrawings(stroke);
+            const response = await saveDrawings(stroke);
+            if (typeof response.ink === 'number') this.onInkBalance?.(response.ink);
             this.setState('connected');
         } catch (e) {
+            if (!this.shouldRetry(e)) {
+                this.onStrokeRejected?.(stroke.id);
+                this.setState(e instanceof ApiError && e.status === 401 ? 'error' : 'connected');
+                return;
+            }
             console.warn('[SyncManager] Failed to save stroke, queuing:', e);
             this.setState('disconnected');
             await this.offlineQueue.enqueue(event);
@@ -67,6 +80,11 @@ export class SyncManager {
             await deleteStroke(strokeId);
             this.setState('connected');
         } catch (e) {
+            if (!this.shouldRetry(e)) {
+                // A missing stroke is already deleted; other 4xx responses are permanent.
+                this.setState(e instanceof ApiError && e.status === 401 ? 'error' : 'connected');
+                return;
+            }
             console.warn('[SyncManager] Failed to delete stroke, queuing:', e);
             this.setState('disconnected');
             await this.offlineQueue.enqueue(event);
@@ -110,22 +128,45 @@ export class SyncManager {
     }
 
     private async flushOfflineQueue(): Promise<void> {
-        if (!this.offlineQueue.hasEvents) return;
+        if (this.isFlushing) return;
+        this.isFlushing = true;
 
-        const events = await this.offlineQueue.drain();
-        for (const event of events) {
-            try {
-                if (event.type === 'STROKE_ADD' && event.stroke) {
-                    await saveDrawings(event.stroke);
-                } else if (event.type === 'STROKE_DELETE') {
-                    await deleteStroke(event.strokeId);
+        try {
+            const events = await this.offlineQueue.peek();
+            if (events.length === 0) return;
+            let processedCount = 0;
+            for (const event of events) {
+                try {
+                    if (event.type === 'STROKE_ADD' && event.stroke) {
+                        const response = await saveDrawings(event.stroke);
+                        if (typeof response.ink === 'number') this.onInkBalance?.(response.ink);
+                    } else if (event.type === 'STROKE_DELETE') {
+                        await deleteStroke(event.strokeId);
+                    }
+                    processedCount += 1;
+                } catch (e) {
+                    if (!this.shouldRetry(e)) {
+                        if (event.type === 'STROKE_ADD') {
+                            this.onStrokeRejected?.(event.stroke.id);
+                        }
+                        processedCount += 1;
+                        continue;
+                    }
+                    console.error('[SyncManager] Failed to flush offline event:', e);
+                    break;
                 }
-            } catch (e) {
-                console.error('[SyncManager] Failed to flush offline event:', e);
-                return; // Stop flushing, stay offline
             }
+            if (processedCount > 0) {
+                await this.offlineQueue.removeProcessed(processedCount);
+            }
+            if (processedCount === events.length) this.setState('connected');
+        } finally {
+            this.isFlushing = false;
         }
-        // All flushed successfully → back online
-        this.setState('connected');
+    }
+
+    private shouldRetry(error: unknown): boolean {
+        if (!(error instanceof ApiError)) return true;
+        return error.status === 408 || error.status === 429 || error.status >= 500;
     }
 }

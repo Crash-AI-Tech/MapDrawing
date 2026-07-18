@@ -68,7 +68,6 @@ export default function PinPlacer({
       onPanResponderGrant: (e) => {
         hueBarRef.current?.measure((_x, _y, w, _h, px) => {
           const h = Math.max(0, Math.min(360, ((e.nativeEvent.pageX - px) / w) * 360));
-          // eslint-disable-next-line react-compiler/react-compiler
           hueRef.current = h;
           const hex = hsvToHex(h, 1, 1);
           setHue(h);

@@ -334,7 +334,9 @@ export class TileRenderer {
     }
     if (strokes.length === 0) return null;
 
-    strokes.sort((a, b) => a.data.createdAt - b.data.createdAt);
+    strokes.sort((a, b) =>
+      a.data.createdAt - b.data.createdAt || a.data.id.localeCompare(b.data.id)
+    );
 
     // Render all visible strokes into a single picture
     const scale = Math.pow(2, zoom - BASE_ZOOM);

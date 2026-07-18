@@ -1,6 +1,8 @@
 /**
- * 基于 Cloudflare KV 的 API 限流器
- * 使用滑动窗口计数器实现
+ * 基于 D1 单语句 UPSERT 的固定窗口限流器。
+ *
+ * Workers KV 是最终一致存储，read-modify-write 无法作为并发安全的计数器。
+ * D1 对单条 SQL 语句串行执行，因此同一 key 的递增是原子的。
  */
 
 import { getCloudflareContext } from '@opennextjs/cloudflare';
@@ -24,43 +26,45 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   try {
     const { env } = getCloudflareContext();
-    const kvKey = `rl:${key}`;
-
     const now = Date.now();
-    const stored = await env.CACHE.get(kvKey, 'json') as { count: number; windowStart: number } | null;
+    const cutoff = now - windowMs;
+    const expiresAt = now + windowMs;
 
-    if (!stored || now - stored.windowStart > windowMs) {
-      // New window
-      await env.CACHE.put(kvKey, JSON.stringify({ count: 1, windowStart: now }), {
-        expirationTtl: Math.ceil(windowMs / 1000) + 1,
-      });
-      return { allowed: true, remaining: maxRequests - 1, resetAt: now + windowMs };
-    }
+    const row = await env.DB.prepare(
+      `INSERT INTO api_rate_limits (key, window_start, request_count, expires_at)
+       VALUES (?1, ?2, 1, ?3)
+       ON CONFLICT(key) DO UPDATE SET
+         window_start = CASE
+           WHEN api_rate_limits.window_start <= ?4 THEN excluded.window_start
+           ELSE api_rate_limits.window_start
+         END,
+         request_count = CASE
+           WHEN api_rate_limits.window_start <= ?4 THEN 1
+           ELSE api_rate_limits.request_count + 1
+         END,
+         expires_at = CASE
+           WHEN api_rate_limits.window_start <= ?4 THEN excluded.expires_at
+           ELSE api_rate_limits.expires_at
+         END
+       RETURNING window_start, request_count`
+    )
+      .bind(key, now, expiresAt, cutoff)
+      .first<{ window_start: number; request_count: number }>();
 
-    if (stored.count >= maxRequests) {
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAt: stored.windowStart + windowMs,
-      };
-    }
+    if (!row) throw new Error('Rate limit counter did not return a row');
 
-    // Increment
-    await env.CACHE.put(
-      kvKey,
-      JSON.stringify({ count: stored.count + 1, windowStart: stored.windowStart }),
-      { expirationTtl: Math.ceil((stored.windowStart + windowMs - now) / 1000) + 1 }
-    );
+    const allowed = row.request_count <= maxRequests;
+    const resetAt = row.window_start + windowMs;
 
     return {
-      allowed: true,
-      remaining: maxRequests - stored.count - 1,
-      resetAt: stored.windowStart + windowMs,
+      allowed,
+      remaining: Math.max(0, maxRequests - row.request_count),
+      resetAt,
     };
   } catch (e) {
-    // If KV fails, allow the request (fail open)
-    console.error('[RateLimit] KV error:', e);
-    return { allowed: true, remaining: maxRequests, resetAt: Date.now() };
+    // Mutating endpoints must not become unlimited when the limiter is unavailable.
+    console.error('[RateLimit] D1 error:', e);
+    return { allowed: false, remaining: 0, resetAt: Date.now() + windowMs };
   }
 }
 

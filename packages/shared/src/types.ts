@@ -122,13 +122,55 @@ export type SyncState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 /** Get tile key string for room naming */
 export function getTileKey(lat: number, lng: number, zoom: number = 14): string {
+  const { x, y } = latLngToTile(lat, lng, zoom);
+  return `${zoom}/${x}/${y}`;
+}
+
+/** Convert a coordinate to a clamped Web Mercator tile coordinate. */
+export function latLngToTile(
+  lat: number,
+  lng: number,
+  zoom: number,
+): { x: number; y: number } {
   const n = Math.pow(2, zoom);
-  const x = Math.floor(((lng + 180) / 360) * n);
-  const latRad = (lat * Math.PI) / 180;
+  const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+  const clampedLng = Math.max(-180, Math.min(180 - Number.EPSILON, lng));
+  const x = Math.floor(((clampedLng + 180) / 360) * n);
+  const latRad = (clampedLat * Math.PI) / 180;
   const y = Math.floor(
     ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
   );
-  return `${zoom}/${x}/${y}`;
+  return {
+    x: Math.max(0, Math.min(n - 1, x)),
+    y: Math.max(0, Math.min(n - 1, y)),
+  };
+}
+
+/** Return every tile intersecting a non-antimeridian geographic bounds. */
+export function tilesForBounds(
+  bounds: GeoBounds,
+  zoom: number,
+  maxTiles = 64,
+): Array<{ z: number; x: number; y: number }> {
+  if (bounds.minLng > bounds.maxLng) {
+    throw new Error('Antimeridian bounds are not supported');
+  }
+  const topLeft = latLngToTile(bounds.maxLat, bounds.minLng, zoom);
+  const bottomRight = latLngToTile(bounds.minLat, bounds.maxLng, zoom);
+  const count =
+    (bottomRight.x - topLeft.x + 1) *
+    (bottomRight.y - topLeft.y + 1);
+  if (count > maxTiles) {
+    throw new Error(`Bounds intersects too many tiles (${count})`);
+  }
+
+  const result: Array<{ z: number; x: number; y: number }> = [];
+  for (let x = topLeft.x; x <= bottomRight.x; x += 1) {
+    for (let y = topLeft.y; y <= bottomRight.y; y += 1) {
+      result.push({ z: zoom, x, y });
+    }
+  }
+  return result;
 }
 
 /** Convert tile coordinates to lat/lng bounds */

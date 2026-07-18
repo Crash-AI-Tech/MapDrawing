@@ -6,6 +6,7 @@ import { getDBClient } from '@/lib/db/client';
 import { eq } from 'drizzle-orm';
 import { users } from '../../../../../../../drizzle/schema';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { readJsonBody, RequestBodyError } from '@/lib/http/body';
 function generateId(length: number): string {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const arr = new Uint8Array(length);
@@ -26,7 +27,11 @@ interface AppleUser {
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as { identityToken: string; user?: string }; // user is JSON string from ASAuthorizationAppleIDCredential
+        const { env } = getCloudflareContext();
+        const body = await readJsonBody(request, 32 * 1024) as {
+            identityToken?: string;
+            user?: string;
+        }; // user is JSON string from ASAuthorizationAppleIDCredential
         const { identityToken, user: userJson } = body;
 
         if (!identityToken) {
@@ -34,10 +39,15 @@ export async function POST(request: Request) {
         }
 
         // Verify Apple Token
-        const { payload } = await jwtVerify(identityToken, APPLE_JWKS, {
-            issuer: 'https://appleid.apple.com',
-            // audience: process.env.ios_bundle_id // Optional: verify if you want strict checks
-        });
+        let payload;
+        try {
+            ({ payload } = await jwtVerify(identityToken, APPLE_JWKS, {
+                issuer: 'https://appleid.apple.com',
+                audience: env.APPLE_CLIENT_ID,
+            }));
+        } catch {
+            return NextResponse.json({ error: 'Invalid Apple identity token' }, { status: 401 });
+        }
 
         const appleId = payload.sub;
         const email = payload.email as string | undefined;
@@ -46,7 +56,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid token: missing sub' }, { status: 400 });
         }
 
-        const { env } = getCloudflareContext();
         const db = getDBClient();
 
         // Check if user exists
@@ -92,7 +101,7 @@ export async function POST(request: Request) {
                     if (appleUser.name?.firstName) {
                         userName = `${appleUser.name.firstName} ${appleUser.name.lastName || ''}`.trim();
                     }
-                } catch (e) {
+                } catch {
                     // ignore json parse error
                 }
             }
@@ -136,6 +145,9 @@ export async function POST(request: Request) {
         });
 
     } catch (e) {
+        if (e instanceof RequestBodyError) {
+            return NextResponse.json({ error: e.message }, { status: e.status });
+        }
         console.error('Apple Login Error:', e);
         return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
     }

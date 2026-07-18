@@ -1,8 +1,7 @@
-import type { DrawEvent, StrokeData } from '../types';
-import { get, set, del, keys } from 'idb-keyval';
+import type { DrawEvent } from '../types';
+import { get, set, del } from 'idb-keyval';
 
 const STORE_PREFIX = 'map_offline_';
-const QUEUE_KEY = `${STORE_PREFIX}queue`;
 
 interface QueueItem {
   id: string;
@@ -17,11 +16,19 @@ interface QueueItem {
 export class OfflineQueue {
   private queue: QueueItem[] = [];
   private loaded = false;
+  private queueKey: string;
+  private loadPromise: Promise<void>;
+
+  constructor(userId: string) {
+    // An offline write must never be replayed under a different signed-in user.
+    this.queueKey = `${STORE_PREFIX}queue_${userId}`;
+    this.loadPromise = this.load();
+  }
 
   /** Load the queue from IndexedDB */
   async load(): Promise<void> {
     try {
-      const stored = await get<QueueItem[]>(QUEUE_KEY);
+      const stored = await get<QueueItem[]>(this.queueKey);
       this.queue = stored ?? [];
       this.loaded = true;
     } catch {
@@ -32,7 +39,7 @@ export class OfflineQueue {
 
   /** Add an event to the offline queue */
   async enqueue(event: DrawEvent): Promise<void> {
-    if (!this.loaded) await this.load();
+    await this.ensureLoaded();
 
     const item: QueueItem = {
       id: crypto.randomUUID(),
@@ -46,7 +53,7 @@ export class OfflineQueue {
 
   /** Get all queued events sorted by timestamp without removing them */
   async peek(): Promise<DrawEvent[]> {
-    if (!this.loaded) await this.load();
+    await this.ensureLoaded();
 
     return this.queue
       .sort((a, b) => a.timestamp - b.timestamp)
@@ -55,27 +62,10 @@ export class OfflineQueue {
 
   /** Remove the first N processed events from the queue */
   async removeProcessed(count: number): Promise<void> {
-    if (!this.loaded) await this.load();
+    await this.ensureLoaded();
     this.queue.sort((a, b) => a.timestamp - b.timestamp);
     this.queue = this.queue.slice(count);
     await this.persist();
-  }
-
-  /**
-   * Get all queued events, sorted by timestamp.
-   * @deprecated Use peek() + removeProcessed() for safe processing
-   */
-  async drain(): Promise<DrawEvent[]> {
-    if (!this.loaded) await this.load();
-
-    const events = this.queue
-      .sort((a, b) => a.timestamp - b.timestamp)
-      .map((item) => item.event);
-
-    this.queue = [];
-    await this.persist();
-
-    return events;
   }
 
   /** Get the number of queued events */
@@ -91,14 +81,18 @@ export class OfflineQueue {
   /** Clear all queued events */
   async clear(): Promise<void> {
     this.queue = [];
-    await del(QUEUE_KEY);
+    await del(this.queueKey);
   }
 
   private async persist(): Promise<void> {
     try {
-      await set(QUEUE_KEY, this.queue);
+      await set(this.queueKey, this.queue);
     } catch (e) {
       console.error('[OfflineQueue] Failed to persist:', e);
     }
+  }
+
+  private async ensureLoaded(): Promise<void> {
+    if (!this.loaded) await this.loadPromise;
   }
 }

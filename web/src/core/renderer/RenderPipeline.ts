@@ -1,4 +1,3 @@
-import type { StrokeData, GeoBounds } from '../types';
 import type { BrushRegistry } from '../brushes';
 import { StrokeRenderer } from './StrokeRenderer';
 import { OverlayManager } from './OverlayManager';
@@ -39,7 +38,6 @@ export class RenderPipeline {
   private tmpCanvasH = 0;
 
   private rafId: number | null = null;
-  private needsRender = true;
 
   /** When true, strokes are rendered at 50% opacity to reveal map underneath */
   strokesTransparent = false;
@@ -76,7 +74,7 @@ export class RenderPipeline {
     const actCtx = activeCanvas.getContext('2d');
     if (actCtx) actCtx.scale(dpr, dpr);
 
-    this.startRenderLoop();
+    this.requestRender();
   }
 
   /** Get the active canvas context for live drawing */
@@ -86,7 +84,11 @@ export class RenderPipeline {
 
   /** Request a re-render on the next frame */
   requestRender(): void {
-    this.needsRender = true;
+    if (this.rafId !== null) return;
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null;
+      this.render();
+    });
   }
 
   /** Force immediate render */
@@ -113,19 +115,18 @@ export class RenderPipeline {
     // Safety cap: degrade rendering when too many strokes.
     // At high counts, only render the most recent strokes to prevent freeze.
     const SOFT_CAP = 3000;
-    const HARD_CAP = 8000;
-    if (visibleStrokes.length > HARD_CAP) {
-      this.needsRender = false;
-      return;
-    }
     if (visibleStrokes.length > SOFT_CAP) {
       // Keep only the most recent strokes
-      visibleStrokes.sort((a, b) => b.createdAt - a.createdAt);
+      visibleStrokes.sort((a, b) =>
+        b.createdAt - a.createdAt || b.id.localeCompare(a.id)
+      );
       visibleStrokes = visibleStrokes.slice(0, SOFT_CAP);
     }
 
     // Sort by createdAt ascending so newer strokes render on top of older ones
-    visibleStrokes.sort((a, b) => a.createdAt - b.createdAt);
+    visibleStrokes.sort((a, b) =>
+      a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+    );
 
     // Build transform: geo → screen
     const transform = (geoX: number, geoY: number) => {
@@ -173,7 +174,6 @@ export class RenderPipeline {
       this.compositeCtx.drawImage(this.activeCanvas, 0, 0);
     }
 
-    this.needsRender = false;
   }
 
   /** Handle window/container resize */
@@ -213,13 +213,4 @@ export class RenderPipeline {
     this.tmpCtx = null;
   }
 
-  private startRenderLoop(): void {
-    const loop = () => {
-      if (this.needsRender) {
-        this.render();
-      }
-      this.rafId = requestAnimationFrame(loop);
-    };
-    this.rafId = requestAnimationFrame(loop);
-  }
 }

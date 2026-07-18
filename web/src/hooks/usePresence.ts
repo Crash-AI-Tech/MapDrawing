@@ -14,7 +14,8 @@ export interface RemoteCursor {
   ts: number;
 }
 
-const POLL_INTERVAL = 3000; // 3 seconds
+const PRESENCE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PRESENCE === 'true';
+const POLL_INTERVAL = 120_000;
 
 /**
  * usePresence — reports own cursor position and fetches remote cursors.
@@ -60,7 +61,7 @@ export function usePresence(engine: DrawingEngine | null) {
   }, [engine, user, activeColor]);
 
   useEffect(() => {
-    if (!engine || !user) {
+    if (!PRESENCE_ENABLED || !engine || !user) {
       setCursors([]);
       return;
     }

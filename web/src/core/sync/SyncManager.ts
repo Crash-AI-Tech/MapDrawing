@@ -1,8 +1,19 @@
-import type { DrawEvent, StrokeData, SyncState, GeoBounds } from '../types';
+import type { DrawEvent, StrokeData, SyncState } from '../types';
 import { OfflineQueue } from './OfflineQueue';
 import type { DrawingEngine } from '../engine/DrawingEngine';
 
 export type SyncStateListener = (state: SyncState) => void;
+
+class ApiSyncError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+  }
+
+  get retryable(): boolean {
+    return this.status === 401 || this.status === 402 || this.status === 408 ||
+      this.status === 429 || this.status >= 500;
+  }
+}
 
 export interface SyncManagerConfig {
   /** Session token for authentication */
@@ -29,9 +40,10 @@ export class SyncManager {
 
   // Timer for retrying offline queue
   private retryTimer: ReturnType<typeof setInterval> | null = null;
+  private isFlushing = false;
 
   constructor(config: SyncManagerConfig) {
-    this.offlineQueue = new OfflineQueue();
+    this.offlineQueue = new OfflineQueue(config.userId);
     this.apiBaseUrl = config.apiBaseUrl ?? '/api';
 
     // Listen for online/offline events
@@ -72,7 +84,7 @@ export class SyncManager {
   }
 
   /** Update access token */
-  updateToken(token: string): void {
+  updateToken(_token: string): void {
     // We don't store token in class prop but if needed for headers in future
     // For now API calls rely on Cookies or we could add Authorization header logic here
   }
@@ -99,11 +111,15 @@ export class SyncManager {
     const event: DrawEvent = { type: 'STROKE_ADD', stroke };
 
     if (this.isOnline) {
-      this.persistStrokeToApi(stroke).catch(() => {
-        this.offlineQueue.enqueue(event);
+      this.persistStrokeToApi(stroke).catch((error: unknown) => {
+        if (error instanceof ApiSyncError && !error.retryable) {
+          this.engine?.rejectStroke(stroke.id);
+          return;
+        }
+        void this.offlineQueue.enqueue(event);
       });
     } else {
-      this.offlineQueue.enqueue(event);
+      void this.offlineQueue.enqueue(event);
     }
   }
 
@@ -114,9 +130,9 @@ export class SyncManager {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(stroke),
     });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
+    if (!res.ok) throw new ApiSyncError(res.status);
+    const data = await res.json() as { ink?: number };
+    if (typeof data.ink === 'number') this.engine?.inkManager.reconcile(data.ink);
   }
 
   private persistDelete(strokeId: string): void {
@@ -128,10 +144,10 @@ export class SyncManager {
 
     if (this.isOnline) {
       this.deleteStrokeFromApi(strokeId).catch(() => {
-        this.offlineQueue.enqueue(event);
+        void this.offlineQueue.enqueue(event);
       });
     } else {
-      this.offlineQueue.enqueue(event);
+      void this.offlineQueue.enqueue(event);
     }
   }
 
@@ -141,34 +157,45 @@ export class SyncManager {
       method: 'DELETE',
     });
     if (!res.ok && res.status !== 404) {
-      throw new Error(`HTTP ${res.status}`);
+      throw new ApiSyncError(res.status);
     }
   }
 
   private async flushOfflineQueue(): Promise<void> {
-    if (!this.offlineQueue.hasEvents) return;
+    if (this.isFlushing) return;
+    this.isFlushing = true;
 
-    const events = await this.offlineQueue.peek();
-    let processedCount = 0;
+    try {
+      const events = await this.offlineQueue.peek();
+      if (events.length === 0) return;
+      let processedCount = 0;
 
-    for (const event of events) {
-      try {
-        if (event.type === 'STROKE_ADD' && event.stroke) {
-          await this.persistStrokeToApi(event.stroke);
-        } else if (event.type === 'STROKE_DELETE') {
-          await this.deleteStrokeFromApi(event.strokeId);
+      for (const event of events) {
+        try {
+          if (event.type === 'STROKE_ADD' && event.stroke) {
+            await this.persistStrokeToApi(event.stroke);
+          } else if (event.type === 'STROKE_DELETE') {
+            await this.deleteStrokeFromApi(event.strokeId);
+          }
+          processedCount++;
+        } catch (e) {
+          if (e instanceof ApiSyncError && !e.retryable) {
+            if (event.type === 'STROKE_ADD') this.engine?.rejectStroke(event.stroke.id);
+            processedCount++;
+            continue;
+          }
+          // Stop processing on first failure — remaining events stay in queue
+          console.error('[SyncManager] Failed to flush event, will retry later:', e);
+          break;
         }
-        processedCount++;
-      } catch (e) {
-        // Stop processing on first failure — remaining events stay in queue
-        console.error('[SyncManager] Failed to flush event, will retry later:', e);
-        break;
       }
-    }
 
-    // Only remove successfully processed events
-    if (processedCount > 0) {
-      await this.offlineQueue.removeProcessed(processedCount);
+      // Only remove successfully processed events
+      if (processedCount > 0) {
+        await this.offlineQueue.removeProcessed(processedCount);
+      }
+    } finally {
+      this.isFlushing = false;
     }
   }
 

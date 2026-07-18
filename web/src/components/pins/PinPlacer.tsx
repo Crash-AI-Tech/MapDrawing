@@ -24,7 +24,7 @@ interface PinPlacerProps {
  * PinPlacer — floating input panel shown when placing a new map pin.
  * Allows user to type a message (max 50 chars) and pick a color.
  */
-export default function PinPlacer({ lng, lat, onConfirm, onCancel, ink }: PinPlacerProps) {
+export default function PinPlacer({ onConfirm, onCancel, ink }: PinPlacerProps) {
   const [message, setMessage] = useState('');
   const [color, setColor] = useState<string>(PIN_COLORS[0]);
   const [customColor, setCustomColor] = useState('#FF6600');
@@ -88,7 +88,7 @@ export default function PinPlacer({ lng, lat, onConfirm, onCancel, ink }: PinPla
               }}
               className={cn(
                 'h-6 w-6 cursor-pointer rounded-full border-2 p-0 transition-all',
-                !PIN_COLORS.includes(color as any) ? 'border-violet-500 scale-125 shadow-sm' : 'border-dashed border-gray-300'
+                !PIN_COLORS.some((preset) => preset === color) ? 'border-violet-500 scale-125 shadow-sm' : 'border-dashed border-gray-300'
               )}
               title="自定义颜色"
             />

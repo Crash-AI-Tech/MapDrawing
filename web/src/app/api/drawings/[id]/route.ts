@@ -1,4 +1,3 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { getDrawingById, deleteDrawing } from '@/lib/db/queries';
 
@@ -20,7 +19,7 @@ export async function GET(
 
     const stroke = {
       id: data.id,
-      userId: data.user_id,
+      userId: data.user_id ?? '',
       userName: data.user_name,
       brushId: data.brush_id,
       color: data.color,
@@ -37,7 +36,7 @@ export async function GET(
         maxLat: data.max_lat,
       },
       createdZoom: data.created_zoom,
-      createdAt: data.created_at * 1000,
+      createdAt: data.created_at_ms ?? data.created_at * 1000,
       meta: data.meta ? JSON.parse(data.meta) : null,
     };
 
@@ -52,13 +51,13 @@ export async function GET(
  * DELETE /api/drawings/[id] — delete a stroke by ID (仅限本人).
  */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
   try {
-    const result = await validateSession();
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

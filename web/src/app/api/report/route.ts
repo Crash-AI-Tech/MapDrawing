@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const csrfError = validateCsrf(request);
     if (csrfError) return csrfError;
 
-    const result = await validateSession();
+    const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

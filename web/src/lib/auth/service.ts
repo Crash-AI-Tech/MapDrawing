@@ -5,7 +5,11 @@
  * Edge Runtime without relying on Node.js core modules.
  */
 
-export async function verifyUserCredentialsEdge(email: string, password: string, env: any) {
+export async function verifyUserCredentialsEdge(
+    email: string,
+    password: string,
+    env: { DB: D1Database },
+) {
     const user = await env.DB.prepare('SELECT id, email, user_name, password_hash, avatar_url, email_verified FROM users WHERE email = ?')
         .bind(email)
         .first() as { id: string, email: string, user_name: string, password_hash: string, avatar_url: string | null, email_verified: number } | null;

@@ -42,10 +42,6 @@ import {
   Paint,
   Skia,
   Picture,
-  PaintStyle,
-  StrokeCap,
-  StrokeJoin,
-  BlendMode,
   type SkPath,
   type SkPicture,
 } from '@shopify/react-native-skia';
@@ -58,17 +54,18 @@ import PinPlacer from '@/components/PinPlacer';
 import MapPinOverlay, { MapPinTooltip, type PinData } from '@/components/MapPinOverlay';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
-  fetchDrawings,
   fetchPins,
   saveDrawings,
+  fetchInk,
   createPin,
   getToken,
   fetchProfile,
+  fetchBlockedUsers,
   type MapPin,
   type PinCluster,
   type PinItem,
-  type PageCursor,
 } from '@/lib/api';
+import { Compliance } from '@/utils/compliance';
 import { API_BASE_URL } from '@/lib/config';
 import { SyncManager } from '@/core/sync/SyncManager';
 import { TileManager } from '@/core/sync/TileManager';
@@ -85,15 +82,12 @@ import {
   MIN_DATA_ZOOM,
   PIN_INK_COST,
   STROKE_HIDE_ZOOM_DIFF,
-  VIEWPORT_LOAD_DEBOUNCE,
 } from '@niubi/shared';
 import {
   MercatorProjection,
   InkManager,
   HistoryManager,
   TileRenderer,
-  buildBezierPath,
-  buildLinearPath,
   generateId,
   BASE_ZOOM,
 } from '@/core';
@@ -127,7 +121,6 @@ type SkBlendMode =
   | 'hue' | 'saturation' | 'color' | 'luminosity';
 
 interface ActiveBrushConfig {
-  buildPath: (points: { x: number; y: number }[]) => SkPath;
   strokeWidth: (baseSize: number) => number;
   opacity: number;
   blendMode: SkBlendMode;
@@ -142,34 +135,34 @@ function getActiveBrushConfig(brushId: string): ActiveBrushConfig {
   switch (brushId) {
     case BRUSH_IDS.PENCIL:
       return {
-        buildPath: buildBezierPath, strokeWidth: (s) => s,
+        strokeWidth: (s) => s,
         opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
       };
     case BRUSH_IDS.MARKER:
       return {
-        buildPath: buildLinearPath, strokeWidth: (s) => s * 3,
+        strokeWidth: (s) => s * 3,
         opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
         useLayer: true, layerOpacity: 0.3,
       };
     case BRUSH_IDS.HIGHLIGHTER:
       return {
-        buildPath: buildLinearPath, strokeWidth: (s) => s * 2.5,
+        strokeWidth: (s) => s * 2.5,
         opacity: 0.4, blendMode: 'multiply', strokeCap: 'butt', strokeJoin: 'bevel',
       };
     case BRUSH_IDS.ERASER:
       return {
-        buildPath: buildLinearPath, strokeWidth: (s) => s * 5,
+        strokeWidth: (s) => s * 5,
         opacity: 1.0, blendMode: 'clear', strokeCap: 'round', strokeJoin: 'round',
       };
     case BRUSH_IDS.SPRAY:
       return {
-        buildPath: buildLinearPath, strokeWidth: (s) => s,
+        strokeWidth: (s) => s,
         opacity: 0.5, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
         isSpray: true,
       };
     default:
       return {
-        buildPath: buildBezierPath, strokeWidth: (s) => s,
+        strokeWidth: (s) => s,
         opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
       };
   }
@@ -179,8 +172,6 @@ function getActiveBrushConfig(brushId: string): ActiveBrushConfig {
 // Pagination & Interaction Constants
 // ========================
 
-const DRAWINGS_PAGE_SIZE = 250;
-const DRAWINGS_MAX_PAGES = 6;
 const DRAWINGS_MAX_CACHE = 2500;
 const PINS_PAGE_SIZE = 120;
 const PINS_MAX_PAGES = 4;
@@ -188,6 +179,8 @@ const PINS_MAX_CACHE = 600;
 const CAMERA_UPDATE_THROTTLE_MS = 16;
 const INTERACTION_SETTLE_MS = 120;
 const MIN_PINS_FETCH_ZOOM = 8; // Don't fetch pins when zoomed out below this
+const MIN_POINT_DISTANCE_PX = 1;
+const MAX_POINTS_PER_STROKE = 1000;
 
 // ========================
 // Main Component
@@ -272,7 +265,7 @@ export default function MapScreen() {
         }
       }
     })();
-  }, []);
+  }, [authSignOut]);
 
   // Re-fetch profile avatar when returning from profile screen
   useFocusEffect(
@@ -300,17 +293,32 @@ export default function MapScreen() {
   useEffect(() => {
     if (!session) return;
 
-    syncManagerRef.current = new SyncManager({
+    const syncManager = new SyncManager({
       userId: session.userId,
+      onInkBalance: (serverInk) => inkManagerRef.current?.reconcile(serverInk),
+      onStrokeRejected: (strokeId) => {
+        strokesRef.current.delete(strokeId);
+        tileRendererRef.current.removeStroke(strokeId);
+        loadedStrokeIdsRef.current.delete(strokeId);
+        bumpStrokeVersion();
+      },
     });
-    syncManagerRef.current.onStateChange((state) => {
+    syncManagerRef.current = syncManager;
+    syncManager.onStateChange((state) => {
       setSyncState(state);
     });
+    fetchInk()
+      .then(({ ink: serverInk }) => inkManagerRef.current?.reconcile(serverInk))
+      .catch(() => undefined);
+    fetchBlockedUsers()
+      .then(({ items }) => Compliance.setBlockedUsers(items.map((item) => item.userId)))
+      .catch(() => undefined);
 
     return () => {
-      syncManagerRef.current?.dispose();
+      syncManager.dispose();
+      if (syncManagerRef.current === syncManager) syncManagerRef.current = null;
     };
-  }, [session]);
+  }, [session, bumpStrokeVersion]);
 
 
   // ===== Pin State (flat arrays for MapPinOverlay) =====
@@ -342,7 +350,7 @@ export default function MapScreen() {
       return;
     }
     setMode(newMode);
-  }, [session, router]);
+  }, [session, router, lang]);
 
   // ===== Remote Data Loading =====
   const loadedStrokeIdsRef = useRef<Set<string>>(new Set());
@@ -379,6 +387,7 @@ export default function MapScreen() {
     { x: number; y: number; pressure: number; timestamp: number }[]
   >([]);
   const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
+  const currentPathRef = useRef<SkPath | null>(null);
   const inkAccumulatorRef = useRef(0);
 
   // ===== Refs for Gesture Callbacks =====
@@ -398,14 +407,17 @@ export default function MapScreen() {
 
   // ===== Initialize Managers =====
   useEffect(() => {
-    inkManagerRef.current = new InkManager((inkValue) => setInk(inkValue));
+    const inkManager = new InkManager((inkValue) => setInk(inkValue));
+    const tileRenderer = tileRendererRef.current;
+    inkManagerRef.current = inkManager;
     historyRef.current = new HistoryManager(100, (canU, canR) => {
       setCanUndo(canU);
       setCanRedo(canR);
     });
     return () => {
-      inkManagerRef.current?.dispose();
-      tileRendererRef.current.clear();
+      inkManager.dispose();
+      tileRenderer.clear();
+      if (inkManagerRef.current === inkManager) inkManagerRef.current = null;
     };
   }, []);
 
@@ -464,10 +476,12 @@ export default function MapScreen() {
         if (newStrokes.length > 0) {
           console.log(`[loadViewport] Got ${newStrokes.length} new strokes (total: ${strokesRef.current.size + newStrokes.length})`);
           for (const stroke of newStrokes) {
+            if (Compliance.isBlocked(stroke.userId)) continue;
             if (!strokesRef.current.has(stroke.id)) newStrokesAdded = true;
             strokesRef.current.set(stroke.id, stroke);
             loadedStrokeIdsRef.current.add(stroke.id);
             touchStroke(stroke.id);
+            tileRendererRef.current.addStroke(stroke);
           }
         }
       }
@@ -488,10 +502,14 @@ export default function MapScreen() {
         }
       }
 
-      // Update tile renderer incrementally
-      tileRendererRef.current.updateStrokes(
-        Array.from(strokesRef.current.values())
-      );
+      // Remove content blocked since the previous viewport load.
+      for (const [strokeId, stroke] of strokesRef.current) {
+        if (!Compliance.isBlocked(stroke.userId)) continue;
+        strokesRef.current.delete(strokeId);
+        strokeLruRef.current.delete(strokeId);
+        loadedStrokeIdsRef.current.delete(strokeId);
+        tileRendererRef.current.removeStroke(strokeId);
+      }
       if (newStrokesAdded) bumpStrokeVersion();
 
 
@@ -540,7 +558,7 @@ export default function MapScreen() {
             pinPageCount += 1;
           }
 
-          rawPins.forEach((pin) => {
+          rawPins.filter((pin) => !Compliance.isBlocked(pin.userId)).forEach((pin) => {
             pinCacheRef.current.set(pin.id, pin);
             touchPin(pin.id);
           });
@@ -587,7 +605,7 @@ export default function MapScreen() {
         console.warn('[loadViewport] Failed:', e);
       }
     }
-  }, [bumpStrokeVersion]);
+  }, [bumpStrokeVersion, lang]);
 
   // Initial load
   useEffect(() => {
@@ -672,6 +690,7 @@ export default function MapScreen() {
     const points = currentPointsRef.current;
     if (points.length < 2) {
       currentPointsRef.current = [];
+      currentPathRef.current = null;
       setCurrentPath(null);
       return;
     }
@@ -730,13 +749,18 @@ export default function MapScreen() {
     if (syncManagerRef.current) {
       syncManagerRef.current.broadcastStroke(stroke);
     } else {
-      saveDrawings(stroke).catch((e) =>
-        console.warn('[saveDrawings] Failed:', e)
-      );
+      saveDrawings(stroke)
+        .then((response) => {
+          if (typeof response.ink === 'number') {
+            inkManagerRef.current?.reconcile(response.ink);
+          }
+        })
+        .catch((e) => console.warn('[saveDrawings] Failed:', e));
     }
 
     currentPointsRef.current = [];
     inkAccumulatorRef.current = 0;
+    currentPathRef.current = null;
     setCurrentPath(null);
   }, [bumpStrokeVersion]);
 
@@ -753,9 +777,10 @@ export default function MapScreen() {
       ];
       inkAccumulatorRef.current = 0;
 
-      const config = getActiveBrushConfig(currentBrushRef.current);
-      const path = config.buildPath([{ x: g.x, y: g.y }]);
-      setCurrentPath(path);
+      const path = Skia.Path.Make();
+      path.moveTo(g.x, g.y);
+      currentPathRef.current = path;
+      setCurrentPath(path.copy());
     })
     .onUpdate((g) => {
       if (!currentPointsRef.current.length) return;
@@ -767,6 +792,17 @@ export default function MapScreen() {
         pressure: 0.5,
         timestamp: Date.now(),
       };
+
+      const previousPoint = points[points.length - 1];
+      const sampleDistance = Math.hypot(
+        newPoint.x - previousPoint.x,
+        newPoint.y - previousPoint.y,
+      );
+      if (sampleDistance < MIN_POINT_DISTANCE_PX) return;
+      if (points.length >= MAX_POINTS_PER_STROKE) {
+        finishStroke();
+        return;
+      }
 
       // Calculate ink cost
       if (inkManagerRef.current && points.length > 0) {
@@ -795,10 +831,22 @@ export default function MapScreen() {
 
       points.push(newPoint);
 
-      // Rebuild Skia path from all points (Bézier or linear based on brush)
-      const config = getActiveBrushConfig(currentBrushRef.current);
-      const path = config.buildPath(points);
-      setCurrentPath(path);
+      // Append one segment instead of rebuilding the full path on every move.
+      const path = currentPathRef.current;
+      if (path) {
+        if (currentBrushRef.current === BRUSH_IDS.PENCIL && points.length > 2) {
+          const previous = points[points.length - 2];
+          path.quadTo(
+            previous.x,
+            previous.y,
+            (previous.x + newPoint.x) / 2,
+            (previous.y + newPoint.y) / 2,
+          );
+        } else {
+          path.lineTo(newPoint.x, newPoint.y);
+        }
+        setCurrentPath(path.copy());
+      }
     })
     .onEnd(() => {
       finishStroke();
@@ -886,7 +934,7 @@ export default function MapScreen() {
         // Ignore
       }
     },
-    [mode, cameraState.zoom]
+    [mode, cameraState.zoom, lang]
   );
 
   // Clear selection when touching map (if not hitting a pin)
@@ -913,6 +961,9 @@ export default function MapScreen() {
           message: data.message,
           color: data.color,
         });
+        if (typeof pin.ink === 'number') {
+          inkManagerRef.current.reconcile(pin.ink);
+        }
         pinCacheRef.current.set(pin.id, pin);
         lruTickRef.current += 1;
         pinLruRef.current.set(pin.id, lruTickRef.current);
@@ -933,14 +984,16 @@ export default function MapScreen() {
         ]);
         setPinClickCoords(null);
       } catch (e: any) {
-        // Refund ink on failure
-        inkManagerRef.current?.forceConsume(-PIN_INK_COST);
+        // Reconcile from the server; refund locally only if it is unreachable.
+        fetchInk()
+          .then(({ ink: serverInk }) => inkManagerRef.current?.reconcile(serverInk))
+          .catch(() => inkManagerRef.current?.forceConsume(-PIN_INK_COST));
         Alert.alert(ts('placeFailed', lang), e.message || '');
       } finally {
         setPinLoading(false);
       }
     },
-    [pinClickCoords]
+    [pinClickCoords, lang]
   );
 
   const handlePinCancel = useCallback(() => {

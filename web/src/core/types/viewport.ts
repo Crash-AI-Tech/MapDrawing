@@ -1,7 +1,7 @@
 import type { GeoBounds } from './stroke';
 
 // Re-export shared tile utilities
-export { getTileKey, tileToBounds } from '@niubi/shared';
+export { getTileKey, latLngToTile, tileToBounds, tilesForBounds } from '@niubi/shared';
 
 /** Viewport state — represents what the user currently sees */
 export interface ViewState {
@@ -42,15 +42,4 @@ export interface TileCoord {
   z: number;
   x: number;
   y: number;
-}
-
-/** Convert lat/lng to tile coordinates at given zoom */
-export function latLngToTile(lat: number, lng: number, zoom: number): TileCoord {
-  const n = Math.pow(2, zoom);
-  const x = Math.floor(((lng + 180) / 360) * n);
-  const latRad = (lat * Math.PI) / 180;
-  const y = Math.floor(
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
-  );
-  return { z: zoom, x, y };
 }

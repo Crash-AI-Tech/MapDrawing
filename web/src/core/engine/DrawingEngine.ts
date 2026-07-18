@@ -12,6 +12,9 @@ import type {
 } from '../types';
 import { v7 as uuidv7 } from 'uuid';
 
+const MIN_POINT_DISTANCE_PX = 0.75;
+const MAX_POINTS_PER_STROKE = 1000;
+
 // ========================
 // Event Types
 // ========================
@@ -98,6 +101,11 @@ export class DrawingEngine {
     this.activeCtx = ctx;
   }
 
+  setUser(userId: string, userName: string): void {
+    this.userId = userId;
+    this.userName = userName;
+  }
+
   setBrush(brushId: string): void {
     this.activeBrushId = brushId;
   }
@@ -163,6 +171,16 @@ export class DrawingEngine {
   moveStroke(screenX: number, screenY: number, pressure: number = 0.5): void {
     if (!this.currentStroke || !this.activeCtx) return;
 
+    const prevPoint = this.currentStroke.points[this.currentStroke.points.length - 1];
+    const dx = screenX - prevPoint.x;
+    const dy = screenY - prevPoint.y;
+    const pixelDistance = Math.hypot(dx, dy);
+    if (pixelDistance < MIN_POINT_DISTANCE_PX) return;
+    if (this.currentStroke.points.length >= MAX_POINTS_PER_STROKE) {
+      this.endStroke();
+      return;
+    }
+
     const point: StrokePoint = {
       x: screenX,
       y: screenY,
@@ -173,11 +191,6 @@ export class DrawingEngine {
     this.currentStroke.points.push(point);
 
     // Calculate pixel distance from previous point for area-based ink cost
-    const prevPoint = this.currentStroke.points[this.currentStroke.points.length - 2];
-    const dx = point.x - prevPoint.x;
-    const dy = point.y - prevPoint.y;
-    const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-
     // Accumulate fractional ink cost based on covered area
     const segmentCost = this.inkManager.calculateSegmentCost(this.activeSize, pixelDistance, this.viewport.zoom);
     this.currentStroke.inkAccumulator += segmentCost;
@@ -297,6 +310,12 @@ export class DrawingEngine {
     this.emit({ type: 'render:request' });
   }
 
+  pruneLoadedStrokes(bounds: GeoBounds, maxCount: number, blockedUserIds: ReadonlySet<string>): void {
+    const removedBlocked = this.strokes.removeByUsers(blockedUserIds);
+    const evicted = this.strokes.evictOutsideBounds(bounds, maxCount);
+    if (removedBlocked + evicted > 0) this.emit({ type: 'render:request' });
+  }
+
   /** Delete a stroke by ID */
   deleteStroke(strokeId: string): StrokeData | null {
     const stroke = this.strokes.remove(strokeId);
@@ -306,6 +325,12 @@ export class DrawingEngine {
     this.emit({ type: 'stroke:deleted', strokeId });
     this.emit({ type: 'render:request' });
     return stroke;
+  }
+
+  /** Remove a locally optimistic stroke rejected by server validation/quota. */
+  rejectStroke(strokeId: string): void {
+    if (!this.strokes.remove(strokeId)) return;
+    this.emit({ type: 'render:request' });
   }
 
   // ========================

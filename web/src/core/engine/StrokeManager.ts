@@ -15,6 +15,7 @@ export class StrokeManager {
 
   /** Add a stroke */
   add(stroke: StrokeData): void {
+    if (this.strokes.has(stroke.id)) return;
     this.strokes.set(stroke.id, stroke);
     const item = this.toRTreeItem(stroke);
     this.rtreeItems.set(stroke.id, item);
@@ -73,10 +74,44 @@ export class StrokeManager {
     return this.strokes.size;
   }
 
+  /** Remove cached strokes authored by locally blocked users. */
+  removeByUsers(userIds: ReadonlySet<string>): number {
+    if (userIds.size === 0) return 0;
+    const ids = [...this.strokes.values()]
+      .filter((stroke) => userIds.has(stroke.userId))
+      .map((stroke) => stroke.id);
+    for (const id of ids) this.remove(id);
+    return ids.length;
+  }
+
+  /**
+   * Bound exploration memory by evicting oldest strokes outside the current
+   * viewport. Visible content is never removed by this method.
+   */
+  evictOutsideBounds(bounds: GeoBounds, maxCount: number): number {
+    if (this.strokes.size <= maxCount) return 0;
+    const outside = [...this.strokes.values()]
+      .filter((stroke) =>
+        stroke.bounds.maxLng < bounds.minLng ||
+        stroke.bounds.minLng > bounds.maxLng ||
+        stroke.bounds.maxLat < bounds.minLat ||
+        stroke.bounds.minLat > bounds.maxLat
+      )
+      .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+
+    let removed = 0;
+    for (const stroke of outside) {
+      if (this.strokes.size <= maxCount) break;
+      if (this.remove(stroke.id)) removed += 1;
+    }
+    return removed;
+  }
+
   /** Load multiple strokes at once (bulk insert) */
   bulkLoad(strokes: StrokeData[]): void {
     const items: StrokeRTreeItem[] = [];
     for (const stroke of strokes) {
+      if (this.strokes.has(stroke.id)) continue;
       this.strokes.set(stroke.id, stroke);
       const item = this.toRTreeItem(stroke);
       this.rtreeItems.set(stroke.id, item);

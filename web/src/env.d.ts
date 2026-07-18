@@ -13,18 +13,14 @@ declare global {
     // R2 存储桶
     BUCKET: R2Bucket;
 
-    // Durable Objects
-    DRAWING_ROOM: DurableObjectNamespace;
-
     // KV 缓存
     CACHE: KVNamespace;
-
-    // Queues
-    STROKE_QUEUE: Queue<import('@/core/types/stroke').StrokeData>;
 
     // 环境变量
     AUTH_SECRET: string;
     RESEND_API_KEY: string;
+    APPLE_CLIENT_ID: string;
+    ENABLE_PRESENCE: string;
   }
 }
 
