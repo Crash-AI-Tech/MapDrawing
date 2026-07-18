@@ -1,6 +1,9 @@
 import type { StrokeData, GeoBounds } from '../types';
 import { getTileKey, tileToBounds } from '../types';
-import { fetchDrawings } from '../../lib/api';
+import { fetchDrawings, type PageCursor } from '../../lib/api';
+
+const DRAWINGS_PAGE_SIZE = 1000;
+const MAX_MERGED_FETCH_ITEMS = 5000;
 
 export interface TileManagerConfig {
     /** Tile zoom level for caching (default: 14) */
@@ -89,24 +92,39 @@ export class TileManager {
         }
 
         try {
-            const data = await fetchDrawings({
-                minLat: mergedMinLat,
-                maxLat: mergedMaxLat,
-                minLng: mergedMinLng,
-                maxLng: mergedMaxLng,
-                zoom: this.zoomLevel,
-                limit: 5000,
-                signal: controller.signal,
-            });
+            const items = new Map<string, StrokeData>();
+            let cursor: PageCursor | null = null;
 
-            const items = data.items || [];
+            do {
+                const remaining = MAX_MERGED_FETCH_ITEMS - items.size;
+                if (remaining <= 0) {
+                    break;
+                }
+
+                const data = await fetchDrawings({
+                    minLat: mergedMinLat,
+                    maxLat: mergedMaxLat,
+                    minLng: mergedMinLng,
+                    maxLng: mergedMaxLng,
+                    zoom: this.zoomLevel,
+                    limit: Math.min(DRAWINGS_PAGE_SIZE, remaining),
+                    cursor,
+                    signal: controller.signal,
+                });
+
+                for (const stroke of data.items || []) {
+                    items.set(stroke.id, stroke);
+                }
+
+                cursor = data.nextCursor;
+            } while (cursor);
 
             // Mark all missing tiles as loaded
             for (const key of missingTiles) {
                 this.tiles.set(key, { loadedAt: Date.now(), loading: false });
             }
 
-            return items;
+            return Array.from(items.values());
         } catch (e: any) {
             if (e?.name === 'AbortError') return [];
             console.error(`[TileManager] Failed to fetch merged tiles:`, e?.message);

@@ -31,12 +31,19 @@ export const Compliance = {
      */
     blockUser: async (userId: string) => {
         try {
-            await blockUserApi(userId);
+            await blockUserApi(userId, { silent: true });
             Alert.alert('User Blocked', 'This user has been blocked. You will no longer see their content.', [{ text: 'OK' }]);
             return true;
         } catch (e: any) {
+            const isSelfBlock = e?.status === 400 && /cannot block yourself/i.test(e?.message || '');
+
+            if (isSelfBlock) {
+                Alert.alert('无法拉黑自己', '不能拉黑自己的账号。', [{ text: '确定' }]);
+                return false;
+            }
+
             console.error('[Block] Failed to block user', e);
-            Alert.alert('Error', 'Failed to block user. Please try again.');
+            Alert.alert('拉黑失败', '请稍后再试。');
             return false;
         }
     },

@@ -244,7 +244,7 @@ export default function ProfileScreen() {
                             </Text>
                         </TouchableOpacity>
 
-                        <Text style={styles.versionText}>NiubiAgent v1.0.0 (Build 15)</Text>
+                        <Text style={styles.versionText}>DrawMaps v1.1.0</Text>
                     </View>
                 </ScrollView>
             </SafeAreaView>

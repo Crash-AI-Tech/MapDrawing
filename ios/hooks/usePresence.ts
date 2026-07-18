@@ -46,13 +46,14 @@ export function usePresence(options: PresenceOptions) {
       await apiFetch('/api/presence', {
         method: 'PUT',
         auth: true,
+        silent: true,
         body: JSON.stringify({ lat, lng, color }),
       });
 
       // Fetch remote cursors
       const data = await apiFetch<{ cursors: RemoteCursor[] }>(
         `/api/presence?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
-        { auth: true }
+        { auth: true, silent: true }
       );
       setCursors(data.cursors ?? []);
     } catch {

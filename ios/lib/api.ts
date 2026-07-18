@@ -24,6 +24,7 @@ export async function getToken(): Promise<string | null> {
 
 interface FetchOptions extends Omit<RequestInit, 'headers'> {
   auth?: boolean;
+  silent?: boolean;
   headers?: Record<string, string>;
   signal?: AbortSignal;
 }
@@ -37,7 +38,7 @@ export async function apiFetch<T = any>(
   path: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { auth = false, headers = {}, signal, ...rest } = options;
+  const { auth = false, silent = false, headers = {}, signal, ...rest } = options;
 
   const finalHeaders: Record<string, string> = {
     ...headers,
@@ -78,7 +79,7 @@ export async function apiFetch<T = any>(
     return response.json();
   } catch (error: any) {
     // Don't log intentionally aborted requests or expected auth failures
-    if (error?.name !== 'AbortError' && error?.status !== 401) {
+    if (!silent && error?.name !== 'AbortError' && error?.status !== 401) {
       console.error(`[apiFetch] ${url} failed:`, error?.message || error);
     }
     throw error;
@@ -313,10 +314,14 @@ export async function fetchBlockedUsers(): Promise<{ items: BlockedUser[] }> {
  * POST /api/block — block a user by ID.
  * Auth required.
  */
-export async function blockUserApi(blockedId: string): Promise<void> {
+export async function blockUserApi(
+  blockedId: string,
+  options: { silent?: boolean } = {}
+): Promise<void> {
   return apiFetch('/api/block', {
     method: 'POST',
     auth: true,
+    silent: options.silent,
     body: JSON.stringify({ blockedId }),
   });
 }
