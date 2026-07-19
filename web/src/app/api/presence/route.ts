@@ -1,5 +1,7 @@
 import { validateSession } from '@/lib/auth/session';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { validateCsrf } from '@/lib/csrf';
+import { readJsonBody, RequestBodyError } from '@/lib/http/body';
 
 /**
  * Presence API — lightweight KV-based cursor sharing.
@@ -36,6 +38,8 @@ export interface CursorEntry {
 
 export async function PUT(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
     const { env } = getCloudflareContext();
     if (env.ENABLE_PRESENCE !== 'true') {
       return Response.json({ error: 'Presence is disabled' }, { status: 404 });
@@ -45,7 +49,7 @@ export async function PUT(request: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = (await request.json()) as {
+    const body = await readJsonBody(request, 4 * 1024) as {
       lat?: number;
       lng?: number;
       color?: string;
@@ -77,6 +81,9 @@ export async function PUT(request: Request) {
 
     return Response.json({ ok: true, tile: tileKey });
   } catch (e) {
+    if (e instanceof RequestBodyError) {
+      return Response.json({ error: e.message }, { status: e.status });
+    }
     console.error('[API /presence PUT]:', e);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }

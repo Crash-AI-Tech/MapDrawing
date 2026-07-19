@@ -1,5 +1,6 @@
 import { validateSession } from '@/lib/auth/session';
 import { getDrawingById, deleteDrawing } from '@/lib/db/queries';
+import { validateCsrf } from '@/lib/csrf';
 
 /**
  * GET /api/drawings/[id] — fetch a single stroke by ID (D1).
@@ -57,6 +58,8 @@ export async function DELETE(
   const { id } = await params;
 
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });

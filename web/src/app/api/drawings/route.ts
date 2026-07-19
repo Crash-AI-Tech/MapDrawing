@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       `INSERT INTO drawings (id, user_id, user_name, brush_id, color, opacity, size,
                              points, point_count, min_lat, max_lat, min_lng, max_lng,
                              created_zoom, meta, created_at_ms, updated_at_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
 
     const nowMs = Date.now();
