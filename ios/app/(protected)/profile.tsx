@@ -10,7 +10,6 @@ import { fetchProfile, fetchProfileStats, apiFetch, deleteAccount as deleteAccou
 import type { UserProfileStats } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
 import { useLang, ts, type Lang } from '@/lib/i18n';
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@niubi/shared';
 
 const LANG_LABELS: Record<Lang, string> = { zh: '中文', en: 'English', ja: '日本語' };
 const LANG_ORDER: Lang[] = ['en', 'zh', 'ja'];
@@ -144,7 +143,7 @@ export default function ProfileScreen() {
             icon: 'document-text-outline',
             color: '#007AFF',
             onPress: () => {
-                void Linking.openURL(`${TERMS_OF_SERVICE_URL}?lang=${lang}`);
+                void Linking.openURL(`${API_BASE_URL}/legal/terms?lang=${lang}`);
             }
         },
         {
@@ -152,7 +151,7 @@ export default function ProfileScreen() {
             icon: 'shield-checkmark-outline',
             color: '#34C759',
             onPress: () => {
-                void Linking.openURL(`${PRIVACY_POLICY_URL}?lang=${lang}`);
+                void Linking.openURL(`${API_BASE_URL}/legal/privacy?lang=${lang}`);
             }
         },
         {

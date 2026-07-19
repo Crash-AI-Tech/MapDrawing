@@ -20,8 +20,6 @@ import {
   Camera,
 } from 'lucide-react';
 import {
-  PRIVACY_POLICY_URL,
-  TERMS_OF_SERVICE_URL,
   type BlockedUser,
   type BlockedUsersResponse,
   type UserProfileStats,
@@ -276,12 +274,12 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
           <MenuItem
             icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
             label={t('menuTerms')}
-            onClick={() => window.open(`${TERMS_OF_SERVICE_URL}?lang=${lang}`, '_blank', 'noopener,noreferrer')}
+            onClick={() => window.open(`/legal/terms?lang=${lang}`, '_blank', 'noopener,noreferrer')}
           />
           <MenuItem
             icon={<ShieldCheck className="h-3.5 w-3.5 text-green-500" />}
             label={t('menuPrivacy')}
-            onClick={() => window.open(`${PRIVACY_POLICY_URL}?lang=${lang}`, '_blank', 'noopener,noreferrer')}
+            onClick={() => window.open(`/legal/privacy?lang=${lang}`, '_blank', 'noopener,noreferrer')}
           />
           <MenuItem
             icon={<UserX className="h-3.5 w-3.5 text-orange-500" />}

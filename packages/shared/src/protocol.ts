@@ -52,11 +52,6 @@ export interface BlockedUsersResponse {
   items: BlockedUser[];
 }
 
-export const TERMS_OF_SERVICE_URL =
-  'https://map.wisebamboo.fun/legal/terms';
-export const PRIVACY_POLICY_URL =
-  'https://map.wisebamboo.fun/legal/privacy';
-
 export const SUPPORTED_LANGUAGES = ['zh', 'en', 'ja'] as const;
 export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 

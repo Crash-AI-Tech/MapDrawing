@@ -24,8 +24,6 @@ export {
     OFFLINE_QUEUE_VERSION,
     OFFLINE_QUEUE_MAX_AGE_MS,
     parseOfflineQueue,
-    TERMS_OF_SERVICE_URL,
-    PRIVACY_POLICY_URL,
     SUPPORTED_LANGUAGES,
 } from './protocol';
 export type {
