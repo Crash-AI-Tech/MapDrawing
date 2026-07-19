@@ -22,3 +22,6 @@ export const API_BASE_URL = (
 ).replace(/\/$/, '');
 
 export const API_ENVIRONMENT = apiEnvironment;
+
+export const MAP_STYLE_URL = process.env.EXPO_PUBLIC_MAP_STYLE_URL?.trim() ||
+  'https://tiles.openfreemap.org/styles/liberty';

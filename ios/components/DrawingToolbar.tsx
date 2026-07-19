@@ -20,12 +20,12 @@ import {
   Pressable,
   Alert,
   Dimensions,
-  Modal,
   ScrollView,
   Platform,
+  PanResponder,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { MIN_DRAW_ZOOM, MIN_PIN_ZOOM } from '@niubi/shared';
+import { INK_REGEN_INTERVAL_SECONDS, MIN_DRAW_ZOOM, MIN_PIN_ZOOM } from '@niubi/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Feather,
@@ -41,12 +41,11 @@ import {
   OPACITY_STEP,
 } from '@niubi/shared';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PanResponder, type GestureResponderEvent } from 'react-native';
 import { useLang, ts, tf } from '@/lib/i18n';
+import { PlatformGlassView } from '@/components/ui/PlatformGlassView';
 
 const RECENT_COLORS_KEY = 'niubi-recent-colors';
 const MAX_RECENT_COLORS = 6;
-const REGEN_INTERVAL_S = 18;
 
 // ---------- HSV ↔ Hex helpers ----------
 function hexToHsv(hex: string): [number, number, number] {
@@ -110,9 +109,6 @@ const BRUSH_ICONS: Record<string, { lib: 'feather' | 'mci'; name: string }> = {
   [BRUSH_IDS.ERASER]: { lib: 'mci', name: 'eraser' },
 } as const;
 
-/** Only these two brushes are supported */
-const SUPPORTED_BRUSHES: BrushId[] = [BRUSH_IDS.PENCIL, BRUSH_IDS.ERASER];
-
 export default function DrawingToolbar({
   currentMode,
   onModeChange,
@@ -140,7 +136,7 @@ export default function DrawingToolbar({
   const [showColorPanel, setShowColorPanel] = useState(false);
   const [customHex, setCustomHex] = useState(currentColor);
   const [recentColors, setRecentColors] = useState<string[]>([]);
-  const [countdown, setCountdown] = useState(REGEN_INTERVAL_S);
+  const [countdown, setCountdown] = useState(INK_REGEN_INTERVAL_SECONDS);
 
   // HSV state for visual color picker
   const [hsv, setHsv] = useState<[number, number, number]>(() => hexToHsv(currentColor));
@@ -152,12 +148,12 @@ export default function DrawingToolbar({
   // Ink recovery countdown
   useEffect(() => {
     if (ink >= maxInk) {
-      setCountdown(REGEN_INTERVAL_S);
+      setCountdown(INK_REGEN_INTERVAL_SECONDS);
       return;
     }
-    setCountdown(REGEN_INTERVAL_S);
+    setCountdown(INK_REGEN_INTERVAL_SECONDS);
     const timer = setInterval(() => {
-      setCountdown((c) => (c <= 1 ? REGEN_INTERVAL_S : c - 1));
+      setCountdown((c) => (c <= 1 ? INK_REGEN_INTERVAL_SECONDS : c - 1));
     }, 1000);
     return () => clearInterval(timer);
   }, [ink, maxInk]);
@@ -276,11 +272,6 @@ export default function DrawingToolbar({
     setShowColorPanel(!showColorPanel);
   };
 
-  const adjustOpacity = (delta: number) => {
-    const newOpacity = Math.max(MIN_OPACITY, Math.min(1, currentOpacity + delta));
-    onOpacityChange(Math.round(newOpacity * 100) / 100);
-  };
-
   // Ink bar color: green → yellow → red
   const inkPercent = Math.max(0, Math.min(1, ink / maxInk));
   const inkColor =
@@ -318,7 +309,13 @@ export default function DrawingToolbar({
 
       <SafeAreaView style={styles.safeArea} edges={['bottom']} pointerEvents="box-none">
         {/* Brush Panel */}
-        <View style={styles.container}>
+        <PlatformGlassView
+          testID="drawing-toolbar-glass"
+          style={styles.container}
+          fallbackStyle={styles.containerFallback}
+          glassEffectStyle="clear"
+          isInteractive
+        >
           {/* Group 1: Modes */}
           <View style={styles.group}>
             <TouchableOpacity
@@ -444,11 +441,15 @@ export default function DrawingToolbar({
               </TouchableOpacity>
             </>
           )}
-        </View>
+        </PlatformGlassView>
 
         {/* Ink Droplet hovering above toolbar */}
         <View style={styles.inkDropletContainer}>
-          <View style={styles.inkDroplet}>
+          <PlatformGlassView
+            style={styles.inkDroplet}
+            fallbackStyle={styles.inkDropletFallback}
+            glassEffectStyle="regular"
+          >
             <MaterialCommunityIcons name="water" size={12} color={inkColor} />
             <Text style={[styles.inkDropletText, { color: inkColor }]}>
               {Math.round(inkPercent * 100)}%
@@ -458,7 +459,7 @@ export default function DrawingToolbar({
                 {countdown}s
               </Text>
             )}
-          </View>
+          </PlatformGlassView>
           {/* Sync status dot */}
           <View style={[
             styles.syncDot,
@@ -470,7 +471,12 @@ export default function DrawingToolbar({
 
         {/* ===== Color Panel (bottom sheet style) with custom color, recent, size/opacity sliders ===== */}
         {showColorPanel && (
-          <View style={styles.panel}>
+          <PlatformGlassView
+            testID="drawing-options-glass"
+            style={styles.panel}
+            fallbackStyle={styles.panelFallback}
+            glassEffectStyle="regular"
+          >
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
               {/* Recent colors */}
               {recentColors.length > 0 && (
@@ -652,7 +658,7 @@ export default function DrawingToolbar({
                 <Text style={styles.sliderValue}>{Math.round(currentOpacity * 100)}%</Text>
               </View>
             </ScrollView>
-          </View>
+          </PlatformGlassView>
         )}
       </SafeAreaView>
     </>
@@ -680,8 +686,8 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 24,
+    overflow: 'hidden',
     padding: 6,
     marginTop: 10,
     shadowColor: '#000',
@@ -693,6 +699,9 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
+  },
+  containerFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
   },
   group: {
     flexDirection: 'row',
@@ -751,7 +760,6 @@ const styles = StyleSheet.create({
   inkDroplet: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 12,
@@ -763,6 +771,10 @@ const styles = StyleSheet.create({
     gap: 2,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.5)',
+    overflow: 'hidden',
+  },
+  inkDropletFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
   },
   inkDropletText: {
     fontSize: 10,
@@ -786,8 +798,8 @@ const styles = StyleSheet.create({
   panel: {
     position: 'absolute',
     bottom: 80,
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderRadius: 16,
+    overflow: 'hidden',
     padding: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -795,6 +807,9 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
     width: 290,
+  },
+  panelFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   panelTitle: {
     fontSize: 12,

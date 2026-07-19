@@ -7,11 +7,13 @@
  * - Lower zoom = expensive (discourages large-area coverage)
  */
 
-const MAX_INK = 100;
-const REGEN_INTERVAL_MS = 18_000; // 18 seconds
-const REGEN_AMOUNT = 1;
-const INK_COST_K = 20;
-const ZOOM_BASE = 18;
+import {
+  MAX_INK,
+  INK_REGEN_AMOUNT,
+  INK_REGEN_INTERVAL_MS,
+  calculateInkSegmentCost,
+  clampInk,
+} from '@niubi/shared';
 
 export class InkManager {
   private ink = MAX_INK;
@@ -49,8 +51,7 @@ export class InkManager {
     pixelDistance: number,
     zoom: number
   ): number {
-    const zoomFactor = Math.pow(2, 2 * (ZOOM_BASE - zoom));
-    return (brushSize * pixelDistance * zoomFactor) / INK_COST_K;
+    return calculateInkSegmentCost(brushSize, pixelDistance, zoom);
   }
 
   /**
@@ -80,7 +81,7 @@ export class InkManager {
 
   reconcile(serverInk: number): void {
     if (!Number.isFinite(serverInk)) return;
-    this.ink = Math.max(0, Math.min(MAX_INK, serverInk));
+    this.ink = clampInk(serverInk);
     this.onChange?.(this.ink);
   }
 
@@ -97,9 +98,9 @@ export class InkManager {
   private startRegen(): void {
     this.regenTimer = setInterval(() => {
       if (this.ink < MAX_INK) {
-        this.ink = Math.min(MAX_INK, this.ink + REGEN_AMOUNT);
+        this.ink = Math.min(MAX_INK, this.ink + INK_REGEN_AMOUNT);
         this.onChange?.(this.ink);
       }
-    }, REGEN_INTERVAL_MS);
+    }, INK_REGEN_INTERVAL_MS);
   }
 }

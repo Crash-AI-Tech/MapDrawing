@@ -7,9 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { fetchBlockedUsers, unblockUserApi, BlockedUser } from '@/lib/api';
+import { fetchBlockedUsers, unblockUserApi, type BlockedUser } from '@/lib/api';
 import { ts, useLang } from '@/lib/i18n';
 import { API_BASE_URL } from '@/lib/config';
+import { Compliance } from '@/utils/compliance';
 
 export default function BlockedUsersScreen() {
     const router = useRouter();
@@ -18,23 +19,24 @@ export default function BlockedUsersScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
-    useFocusEffect(
-        useCallback(() => {
-            loadBlocked();
-        }, [])
-    );
-
-    const loadBlocked = async () => {
+    const loadBlocked = useCallback(async () => {
         setIsLoading(true);
         try {
             const { items } = await fetchBlockedUsers();
             setBlocked(items);
+            Compliance.setBlockedUsers(items.map((item) => item.userId));
         } catch (e: any) {
             console.error('Failed to load blocked users', e);
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadBlocked();
+        }, [loadBlocked])
+    );
 
     const handleUnblock = (user: BlockedUser) => {
         Alert.alert(
@@ -49,8 +51,9 @@ export default function BlockedUsersScreen() {
                         setUnblockingId(user.userId);
                         try {
                             await unblockUserApi(user.userId);
+                            Compliance.removeBlockedUser(user.userId);
                             setBlocked((prev) => prev.filter((u) => u.userId !== user.userId));
-                        } catch (e: any) {
+                        } catch {
                             Alert.alert('Error', 'Failed to unblock user. Please try again.');
                         } finally {
                             setUnblockingId(null);

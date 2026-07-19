@@ -10,14 +10,19 @@ import {
   Trash2,
   MapPin,
   PenTool,
-  Eye,
   FileText,
   ShieldCheck,
   UserX,
   ChevronRight,
   Camera,
 } from 'lucide-react';
-import { Compliance } from '@/lib/compliance';
+import {
+  PRIVACY_POLICY_URL,
+  TERMS_OF_SERVICE_URL,
+  type BlockedUser,
+  type BlockedUsersResponse,
+  type UserProfileStats,
+} from '@niubi/shared';
 
 /** Resolve avatar URL — prefix with /api/files for R2-stored paths */
 function resolveAvatarUrl(url: string | null | undefined): string | null {
@@ -32,12 +37,6 @@ interface UserMenuProps {
   onLoginClick?: () => void;
 }
 
-interface Stats {
-  pins: number;
-  drawings: number;
-  views: number;
-}
-
 /**
  * UserMenu — rich profile popover for logged‑in users (mirrors iOS profile).
  * Shows identity card, stats, support & legal, log out, delete account.
@@ -45,9 +44,13 @@ interface Stats {
 export default function UserMenu({ onLoginClick }: UserMenuProps) {
   const { user, profile, signOut, refreshUser } = useAuth();
   const [open, setOpen] = useState(false);
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<UserProfileStats | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  const [blockedExpanded, setBlockedExpanded] = useState(false);
+  const [blockedLoading, setBlockedLoading] = useState(false);
+  const [unblockingId, setUnblockingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch stats when popover opens
@@ -102,17 +105,39 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
     signOut();
   };
 
-  const showBlockedUsers = async () => {
-    // Sync from server first
-    const blocked = await Compliance.syncBlockedUsers();
-    if (blocked.length === 0) {
-      window.alert('No users blocked yet.');
-    } else {
-      const msg = blocked.map((id, i) => `${i + 1}. ${id}`).join('\n');
-      if (window.confirm(`Blocked users:\n${msg}\n\nClick OK to unblock all.`)) {
-        await Promise.all(blocked.map((id) => Compliance.unblockUser(id)));
-        window.alert('All users have been unblocked.');
-      }
+  const toggleBlockedUsers = async () => {
+    if (blockedExpanded) {
+      setBlockedExpanded(false);
+      return;
+    }
+    setBlockedExpanded(true);
+    setBlockedLoading(true);
+    try {
+      const response = await fetch('/api/block');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json() as BlockedUsersResponse;
+      setBlockedUsers(data.items);
+    } catch {
+      setBlockedUsers([]);
+    } finally {
+      setBlockedLoading(false);
+    }
+  };
+
+  const handleUnblock = async (userId: string) => {
+    setUnblockingId(userId);
+    try {
+      const response = await fetch('/api/block', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blockedId: userId }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setBlockedUsers((users) => users.filter((user) => user.userId !== userId));
+    } catch {
+      window.alert('Failed to unblock user. Please try again.');
+    } finally {
+      setUnblockingId(null);
     }
   };
 
@@ -228,12 +253,6 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
               value={stats?.drawings ?? '–'}
               label="Drawings"
             />
-            <div className="mx-3 h-6 w-px bg-gray-200" />
-            <StatItem
-              icon={<Eye className="h-3 w-3 text-green-500" />}
-              value={stats?.views ?? '–'}
-              label="Views"
-            />
           </div>
         </div>
 
@@ -245,26 +264,53 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
           <MenuItem
             icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
             label="Terms of Service"
-            onClick={() =>
-              window.alert(
-                'Terms of Service\n\nBy using NiubiAgent, you agree to our terms.\n\n1. No hate speech or bullying.\n2. No spam or unsolicited advertising.\n3. Respect privacy of others.\n\nViolations will result in account suspension.'
-              )
-            }
+            onClick={() => window.open(TERMS_OF_SERVICE_URL, '_blank', 'noopener,noreferrer')}
           />
           <MenuItem
             icon={<ShieldCheck className="h-3.5 w-3.5 text-green-500" />}
             label="Privacy Policy"
-            onClick={() =>
-              window.alert(
-                'Privacy Policy\n\nWe collect location data only to display your position on the map. We do not sell your data.'
-              )
-            }
+            onClick={() => window.open(PRIVACY_POLICY_URL, '_blank', 'noopener,noreferrer')}
           />
           <MenuItem
             icon={<UserX className="h-3.5 w-3.5 text-orange-500" />}
             label="Blocked Users"
-            onClick={showBlockedUsers}
+            onClick={() => { void toggleBlockedUsers(); }}
           />
+          {blockedExpanded && (
+            <div className="mx-2 mb-1 max-h-36 overflow-y-auto rounded-lg bg-gray-50 p-2">
+              {blockedLoading ? (
+                <p className="py-2 text-center text-xs text-gray-400">Loading…</p>
+              ) : blockedUsers.length === 0 ? (
+                <p className="py-2 text-center text-xs text-gray-400">No users blocked yet.</p>
+              ) : blockedUsers.map((blockedUser) => {
+                const blockedAvatar = resolveAvatarUrl(blockedUser.avatarUrl);
+                return (
+                  <div key={blockedUser.userId} className="flex items-center gap-2 border-b border-gray-100 py-2 last:border-0">
+                    {blockedAvatar ? (
+                      <img src={blockedAvatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+                    ) : (
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-600">
+                        {blockedUser.userName.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-gray-700">{blockedUser.userName}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {new Date(blockedUser.blockedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      className="rounded-md bg-orange-50 px-2 py-1 text-[10px] font-medium text-orange-600 disabled:opacity-50"
+                      disabled={unblockingId === blockedUser.userId}
+                      onClick={() => { void handleUnblock(blockedUser.userId); }}
+                    >
+                      {unblockingId === blockedUser.userId ? '…' : 'Unblock'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* ===== Footer Actions ===== */}

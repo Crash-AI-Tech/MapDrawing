@@ -1,6 +1,7 @@
 import { OfflineQueue } from './OfflineQueue';
 import { ApiError, saveDrawings, deleteStroke } from '../../lib/api';
 import type { StrokeData, DrawEvent, SyncState } from '../types';
+import { shouldRetryHttpStatus } from '@niubi/shared';
 
 export type SyncStateListener = (state: SyncState) => void;
 
@@ -167,6 +168,6 @@ export class SyncManager {
 
     private shouldRetry(error: unknown): boolean {
         if (!(error instanceof ApiError)) return true;
-        return error.status === 408 || error.status === 429 || error.status >= 500;
+        return shouldRetryHttpStatus(error.status);
     }
 }

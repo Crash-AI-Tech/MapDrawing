@@ -4,8 +4,9 @@
  */
 
 import { create } from 'zustand';
+import type { AppLanguage } from '@niubi/shared';
 
-export type Lang = 'zh' | 'en' | 'ja';
+export type Lang = AppLanguage;
 
 // --------------- Language Store ---------------
 

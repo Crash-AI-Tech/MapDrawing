@@ -1,8 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 
-const MAX_INK = 100;
-const REGEN_INTERVAL_SECONDS = 18;
+import { MAX_INK, INK_REGEN_INTERVAL_SECONDS } from '@niubi/shared';
 
 export async function GET(request: Request) {
   const session = await validateSession(request);
@@ -15,7 +14,7 @@ export async function GET(request: Request) {
   const row = await env.DB.prepare(
     `SELECT MIN(
        ${MAX_INK},
-       ink + MAX(0, CAST((?2 - updated_at) / ${REGEN_INTERVAL_SECONDS} AS INTEGER))
+       ink + MAX(0, CAST((?2 - updated_at) / ${INK_REGEN_INTERVAL_SECONDS} AS INTEGER))
      ) AS ink
      FROM user_ink
      WHERE user_id = ?1`

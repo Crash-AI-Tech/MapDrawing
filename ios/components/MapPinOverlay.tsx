@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  GestureResponderEvent,
 } from 'react-native';
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { Compliance } from '@/utils/compliance';

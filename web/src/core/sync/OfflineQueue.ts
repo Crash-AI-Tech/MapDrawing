@@ -1,20 +1,19 @@
 import type { DrawEvent } from '../types';
+import {
+  normalizeOfflineQueue,
+  OFFLINE_QUEUE_VERSION,
+  type OfflineQueueItem,
+} from '@niubi/shared';
 import { get, set, del } from 'idb-keyval';
 
 const STORE_PREFIX = 'map_offline_';
-
-interface QueueItem {
-  id: string;
-  event: DrawEvent;
-  timestamp: number;
-}
 
 /**
  * OfflineQueue — stores draw events in IndexedDB when the user is offline.
  * Events are queued and flushed to the server when connectivity is restored.
  */
 export class OfflineQueue {
-  private queue: QueueItem[] = [];
+  private queue: OfflineQueueItem[] = [];
   private loaded = false;
   private queueKey: string;
   private loadPromise: Promise<void>;
@@ -28,8 +27,8 @@ export class OfflineQueue {
   /** Load the queue from IndexedDB */
   async load(): Promise<void> {
     try {
-      const stored = await get<QueueItem[]>(this.queueKey);
-      this.queue = stored ?? [];
+      const stored = await get<unknown>(this.queueKey);
+      this.queue = normalizeOfflineQueue(stored, () => crypto.randomUUID());
       this.loaded = true;
     } catch {
       this.queue = [];
@@ -41,10 +40,12 @@ export class OfflineQueue {
   async enqueue(event: DrawEvent): Promise<void> {
     await this.ensureLoaded();
 
-    const item: QueueItem = {
+    const item: OfflineQueueItem = {
+      version: OFFLINE_QUEUE_VERSION,
       id: crypto.randomUUID(),
       event,
-      timestamp: Date.now(),
+      createdAt: Date.now(),
+      attempts: 0,
     };
 
     this.queue.push(item);
@@ -56,14 +57,14 @@ export class OfflineQueue {
     await this.ensureLoaded();
 
     return this.queue
-      .sort((a, b) => a.timestamp - b.timestamp)
+      .sort((a, b) => a.createdAt - b.createdAt)
       .map((item) => item.event);
   }
 
   /** Remove the first N processed events from the queue */
   async removeProcessed(count: number): Promise<void> {
     await this.ensureLoaded();
-    this.queue.sort((a, b) => a.timestamp - b.timestamp);
+    this.queue.sort((a, b) => a.createdAt - b.createdAt);
     this.queue = this.queue.slice(count);
     await this.persist();
   }

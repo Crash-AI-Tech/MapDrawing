@@ -4,8 +4,9 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { AppLanguage } from '@niubi/shared';
 
-export type Lang = 'zh' | 'en' | 'ja';
+export type Lang = AppLanguage;
 const LANG_KEY = 'niubi-lang';
 
 // Global listeners for language changes

@@ -1,5 +1,4 @@
-const MAX_INK = 100;
-const REGEN_INTERVAL_SECONDS = 18;
+import { MAX_INK, INK_REGEN_INTERVAL_SECONDS } from '@niubi/shared';
 
 /**
  * Returns an atomic quota update suitable for inclusion in a D1 batch.
@@ -24,13 +23,13 @@ export function prepareInkConsumption(
          ${MAX_INK},
          user_ink.ink + MAX(
            0,
-           CAST((excluded.updated_at - user_ink.updated_at) / ${REGEN_INTERVAL_SECONDS} AS INTEGER)
+           CAST((excluded.updated_at - user_ink.updated_at) / ${INK_REGEN_INTERVAL_SECONDS} AS INTEGER)
          )
        ) - ?4,
        updated_at = user_ink.updated_at + MAX(
          0,
-         CAST((excluded.updated_at - user_ink.updated_at) / ${REGEN_INTERVAL_SECONDS} AS INTEGER)
-       ) * ${REGEN_INTERVAL_SECONDS}
+         CAST((excluded.updated_at - user_ink.updated_at) / ${INK_REGEN_INTERVAL_SECONDS} AS INTEGER)
+       ) * ${INK_REGEN_INTERVAL_SECONDS}
      RETURNING ink, updated_at`
   ).bind(userId, MAX_INK - amount, nowSeconds, amount);
 }

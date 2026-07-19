@@ -45,28 +45,24 @@ import {
   type SkPath,
   type SkPicture,
 } from '@shopify/react-native-skia';
-import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useAuth } from '@/context/AuthContext';
 import DrawingToolbar from '@/components/DrawingToolbar';
 import ZoomControls from '@/components/ZoomControls';
 import PinPlacer from '@/components/PinPlacer';
 import MapPinOverlay, { MapPinTooltip, type PinData } from '@/components/MapPinOverlay';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import {
   fetchPins,
   saveDrawings,
   fetchInk,
   createPin,
-  getToken,
-  fetchProfile,
   fetchBlockedUsers,
   type MapPin,
   type PinCluster,
   type PinItem,
 } from '@/lib/api';
 import { Compliance } from '@/utils/compliance';
-import { API_BASE_URL } from '@/lib/config';
+import { API_BASE_URL, MAP_STYLE_URL } from '@/lib/config';
 import { SyncManager } from '@/core/sync/SyncManager';
 import { TileManager } from '@/core/sync/TileManager';
 import {
@@ -85,9 +81,6 @@ import {
 } from '@niubi/shared';
 import {
   MercatorProjection,
-  InkManager,
-  HistoryManager,
-  TileRenderer,
   generateId,
   BASE_ZOOM,
 } from '@/core';
@@ -97,76 +90,15 @@ import ViewShot from 'react-native-view-shot';
 import { showExportMenu } from '@/utils/exportMap';
 import { usePresence } from '@/hooks/usePresence';
 import { CursorOverlay } from '@/components/CursorOverlay';
+import { getActiveBrushConfig } from '@/core/activeBrush';
+import { useDrawingRuntime } from '@/hooks/useDrawingRuntime';
+import { useMapSession } from '@/hooks/useMapSession';
 
 // ========================
 // MapLibre Configuration
 // ========================
 
 MapLibreGL.setAccessToken(null);
-const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
-
-// ========================
-// Active Brush Config (only used for the live stroke being drawn)
-// ========================
-
-type SkStrokeCap = 'butt' | 'round' | 'square';
-type SkStrokeJoin = 'bevel' | 'miter' | 'round';
-type SkBlendMode =
-  | 'clear' | 'src' | 'dst' | 'srcOver' | 'dstOver'
-  | 'srcIn' | 'dstIn' | 'srcOut' | 'dstOut'
-  | 'srcATop' | 'dstATop' | 'xor' | 'plus' | 'modulate'
-  | 'screen' | 'overlay' | 'darken' | 'lighten'
-  | 'colorDodge' | 'colorBurn' | 'hardLight' | 'softLight'
-  | 'difference' | 'exclusion' | 'multiply'
-  | 'hue' | 'saturation' | 'color' | 'luminosity';
-
-interface ActiveBrushConfig {
-  strokeWidth: (baseSize: number) => number;
-  opacity: number;
-  blendMode: SkBlendMode;
-  strokeCap: SkStrokeCap;
-  strokeJoin: SkStrokeJoin;
-  useLayer?: boolean;
-  layerOpacity?: number;
-  isSpray?: boolean;
-}
-
-function getActiveBrushConfig(brushId: string): ActiveBrushConfig {
-  switch (brushId) {
-    case BRUSH_IDS.PENCIL:
-      return {
-        strokeWidth: (s) => s,
-        opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
-      };
-    case BRUSH_IDS.MARKER:
-      return {
-        strokeWidth: (s) => s * 3,
-        opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
-        useLayer: true, layerOpacity: 0.3,
-      };
-    case BRUSH_IDS.HIGHLIGHTER:
-      return {
-        strokeWidth: (s) => s * 2.5,
-        opacity: 0.4, blendMode: 'multiply', strokeCap: 'butt', strokeJoin: 'bevel',
-      };
-    case BRUSH_IDS.ERASER:
-      return {
-        strokeWidth: (s) => s * 5,
-        opacity: 1.0, blendMode: 'clear', strokeCap: 'round', strokeJoin: 'round',
-      };
-    case BRUSH_IDS.SPRAY:
-      return {
-        strokeWidth: (s) => s,
-        opacity: 0.5, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
-        isSpray: true,
-      };
-    default:
-      return {
-        strokeWidth: (s) => s,
-        opacity: 1.0, blendMode: 'srcOver', strokeCap: 'round', strokeJoin: 'round',
-      };
-  }
-}
 
 // ========================
 // Pagination & Interaction Constants
@@ -187,7 +119,15 @@ const MAX_POINTS_PER_STROKE = 1000;
 // ========================
 
 export default function MapScreen() {
-  const { signOut: authSignOut } = useAuth();
+  const { session, avatarVersion } = useMapSession();
+  const {
+    inkManagerRef,
+    historyRef,
+    tileRendererRef,
+    ink,
+    canUndo,
+    canRedo,
+  } = useDrawingRuntime();
 
   // ===== Layout =====
   const [screenSize, setScreenSize] = useState(() => {
@@ -214,33 +154,14 @@ export default function MapScreen() {
   );
 
   // ===== Engine Managers =====
-  const inkManagerRef = useRef<InkManager | null>(null);
-  const historyRef = useRef<HistoryManager | null>(null);
   const cameraRef = useRef<CameraRef | null>(null);
   const viewShotRef = useRef<ViewShot | null>(null);
 
-  // ===== Tile Renderer (core of scheme A) =====
-  const tileRendererRef = useRef(new TileRenderer());
-
   // ===== Reactive State =====
   const [mode, setMode] = useState<'hand' | 'draw' | 'pin'>('hand');
-  const [ink, setInk] = useState(100);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
   const [strokesTransparent, setStrokesTransparent] = useState(false);
-  const prevInkRef = useRef(100);
-
-  // Haptic feedback when ink depletes to 0
-  useEffect(() => {
-    if (prevInkRef.current > 0 && ink <= 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    }
-    prevInkRef.current = ink;
-  }, [ink]);
 
   // ===== Real-time Collaboration =====
-  const [session, setSession] = useState<{ token: string; userId: string; avatar_url: string | null } | null>(null);
-  const [avatarVersion, setAvatarVersion] = useState(0);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const tileManagerRef = useRef<TileManager | null>(null);
   const [syncState, setSyncState] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connected');
@@ -249,40 +170,6 @@ export default function MapScreen() {
   const strokesRef = useRef<Map<string, StrokeData>>(new Map());
   const [strokeVersion, setStrokeVersion] = useState(0);
   const bumpStrokeVersion = useCallback(() => setStrokeVersion((v) => v + 1), []);
-
-  // 1. Initial Auth
-  useEffect(() => {
-    (async () => {
-      const token = await getToken();
-      if (!token) return;
-      try {
-        const profile = await fetchProfile();
-        setSession({ token, userId: profile.id, avatar_url: profile.avatar_url });
-      } catch (e: any) {
-        // If token is expired/invalid (401), sign out properly to update AuthContext state
-        if (e?.status === 401) {
-          await authSignOut();
-        }
-      }
-    })();
-  }, [authSignOut]);
-
-  // Re-fetch profile avatar when returning from profile screen
-  useFocusEffect(
-    useCallback(() => {
-      (async () => {
-        const token = await getToken();
-        if (!token) return;
-        try {
-          const profile = await fetchProfile();
-          setSession((prev) =>
-            prev ? { ...prev, avatar_url: profile.avatar_url } : prev
-          );
-          setAvatarVersion((v) => v + 1);
-        } catch { }
-      })();
-    }, [])
-  );
 
   // 2a. Init TileManager unconditionally (drawings API is public, no auth needed)
   useEffect(() => {
@@ -318,7 +205,7 @@ export default function MapScreen() {
       syncManager.dispose();
       if (syncManagerRef.current === syncManager) syncManagerRef.current = null;
     };
-  }, [session, bumpStrokeVersion]);
+  }, [session, bumpStrokeVersion, inkManagerRef, tileRendererRef]);
 
 
   // ===== Pin State (flat arrays for MapPinOverlay) =====
@@ -404,22 +291,6 @@ export default function MapScreen() {
   currentOpacityRef.current = currentOpacity;
   cameraZoomRef.current = cameraState.zoom;
   canDrawRef.current = mode === 'draw' && cameraState.zoom >= MIN_DRAW_ZOOM;
-
-  // ===== Initialize Managers =====
-  useEffect(() => {
-    const inkManager = new InkManager((inkValue) => setInk(inkValue));
-    const tileRenderer = tileRendererRef.current;
-    inkManagerRef.current = inkManager;
-    historyRef.current = new HistoryManager(100, (canU, canR) => {
-      setCanUndo(canU);
-      setCanRedo(canR);
-    });
-    return () => {
-      inkManager.dispose();
-      tileRenderer.clear();
-      if (inkManagerRef.current === inkManager) inkManagerRef.current = null;
-    };
-  }, []);
 
   // ===== Viewport loading: paginated fetch + TileRenderer update =====
   const loadViewport = useCallback(async () => {
@@ -605,7 +476,7 @@ export default function MapScreen() {
         console.warn('[loadViewport] Failed:', e);
       }
     }
-  }, [bumpStrokeVersion, lang]);
+  }, [bumpStrokeVersion, lang, tileRendererRef]);
 
   // Initial load
   useEffect(() => {
@@ -637,7 +508,7 @@ export default function MapScreen() {
       screenSize.height,
       cameraState.bearing
     );
-  }, [isMapInteracting, strokeVersion, strokesTransparent, cameraState.center, cameraState.zoom, cameraState.bearing, screenSize]);
+  }, [isMapInteracting, strokeVersion, strokesTransparent, cameraState.center, cameraState.zoom, cameraState.bearing, screenSize, tileRendererRef]);
 
   // ===== Stable Snapshot for Interaction =====
   useEffect(() => {
@@ -762,7 +633,7 @@ export default function MapScreen() {
     inkAccumulatorRef.current = 0;
     currentPathRef.current = null;
     setCurrentPath(null);
-  }, [bumpStrokeVersion]);
+  }, [bumpStrokeVersion, historyRef, inkManagerRef, tileRendererRef]);
 
   // ===== Gesture handler =====
   const pan = Gesture.Pan()
@@ -866,7 +737,7 @@ export default function MapScreen() {
       tileRendererRef.current.addStroke(cmd.stroke);
     }
     bumpStrokeVersion();
-  }, [bumpStrokeVersion]);
+  }, [bumpStrokeVersion, historyRef, tileRendererRef]);
 
   const handleRedo = useCallback(() => {
     const cmd = historyRef.current?.redo();
@@ -880,7 +751,7 @@ export default function MapScreen() {
       tileRendererRef.current.removeStroke(cmd.stroke.id);
     }
     bumpStrokeVersion();
-  }, [bumpStrokeVersion]);
+  }, [bumpStrokeVersion, historyRef, tileRendererRef]);
 
   // ===== Layout =====
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
@@ -993,7 +864,7 @@ export default function MapScreen() {
         setPinLoading(false);
       }
     },
-    [pinClickCoords, lang]
+    [pinClickCoords, lang, inkManagerRef]
   );
 
   const handlePinCancel = useCallback(() => {
@@ -1091,7 +962,7 @@ export default function MapScreen() {
           onPress={() => router.push(session ? '/profile' : '/login')}
         >
           <Image
-            source={session?.avatar_url ? { uri: `${API_BASE_URL}/api/files/${session.avatar_url.replace(/^\//, '')}?v=${avatarVersion}` } : require('@/assets/images/react-logo.png')}
+            source={session?.avatarUrl ? { uri: `${API_BASE_URL}/api/files/${session.avatarUrl.replace(/^\//, '')}?v=${avatarVersion}` } : require('@/assets/images/react-logo.png')}
             style={styles.avatarImage}
           />
         </TouchableOpacity>

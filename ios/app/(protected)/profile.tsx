@@ -10,6 +10,7 @@ import { fetchProfile, fetchProfileStats, apiFetch, deleteAccount as deleteAccou
 import type { UserProfileStats } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
 import { useLang, ts, type Lang } from '@/lib/i18n';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@niubi/shared';
 
 const LANG_LABELS: Record<Lang, string> = { zh: '中文', en: 'English', ja: '日本語' };
 const LANG_ORDER: Lang[] = ['en', 'zh', 'ja'];
@@ -31,13 +32,7 @@ export default function ProfileScreen() {
         setLang(next);
     }, [lang, setLang]);
 
-    useFocusEffect(
-        useCallback(() => {
-            loadProfile();
-        }, [])
-    );
-
-    const loadProfile = async () => {
+    const loadProfile = useCallback(async () => {
         if (!session) return;
         try {
             const [data, statsData] = await Promise.all([
@@ -53,7 +48,13 @@ export default function ProfileScreen() {
             }
             console.error('Failed to load profile', e);
         }
-    };
+    }, [session, signOut]);
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadProfile();
+        }, [loadProfile])
+    );
 
     const handlePickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -142,7 +143,7 @@ export default function ProfileScreen() {
             icon: 'document-text-outline',
             color: '#007AFF',
             onPress: () => {
-                Linking.openURL('https://doc-hosting.flycricket.io/drawmaps-terms-of-use/2197a713-a352-47c7-bf8f-a5a19eee3ddb/terms');
+                void Linking.openURL(TERMS_OF_SERVICE_URL);
             }
         },
         {
@@ -150,7 +151,7 @@ export default function ProfileScreen() {
             icon: 'shield-checkmark-outline',
             color: '#34C759',
             onPress: () => {
-                Linking.openURL('https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy');
+                void Linking.openURL(PRIVACY_POLICY_URL);
             }
         },
         {

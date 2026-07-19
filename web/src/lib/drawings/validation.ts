@@ -1,4 +1,13 @@
-import { tilesForBounds, type GeoBounds, type StrokePoint } from '@niubi/shared';
+import {
+  calculateStrokeInkCost,
+  INK_ZOOM_BASE,
+  isSupportedBrushId,
+  TILE_SYNC_ZOOM,
+  tilesForBounds,
+  type BrushId,
+  type GeoBounds,
+  type StrokePoint,
+} from '@niubi/shared';
 
 export const MAX_DRAWING_REQUEST_BYTES = 1024 * 1024;
 export const MAX_STROKES_PER_BATCH = 10;
@@ -7,16 +16,12 @@ export const MAX_POINTS_PER_STROKE = 1000;
 const MIN_POINTS_PER_STROKE = 2;
 const VALID_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const VALID_COLOR = /^#[0-9a-fA-F]{6}$/;
-const VALID_BRUSHES = new Set(['pencil', 'eraser']);
 const MAX_MERCATOR_LAT = 85.05112878;
 const MAX_META_BYTES = 2048;
-const TILE_SIZE = 512;
-const INK_COST_K = 20;
-const INK_ZOOM_BASE = 18;
 
 export interface ValidatedStroke {
   id: string;
-  brushId: 'pencil' | 'eraser';
+  brushId: BrushId;
   color: string;
   opacity: number;
   size: number;
@@ -87,34 +92,6 @@ function calculateBounds(points: StrokePoint[]): GeoBounds {
   return { minLng, maxLng, minLat, maxLat };
 }
 
-function lngToWorldX(lng: number, worldSize: number): number {
-  return ((lng + 180) / 360) * worldSize;
-}
-
-function latToWorldY(lat: number, worldSize: number): number {
-  const radians = (lat * Math.PI) / 180;
-  return (
-    (1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) /
-    2
-  ) * worldSize;
-}
-
-function calculateInkCost(points: StrokePoint[], size: number, zoom: number): number {
-  const worldSize = TILE_SIZE * 2 ** zoom;
-  let pixelDistance = 0;
-
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const dx = lngToWorldX(current.x, worldSize) - lngToWorldX(previous.x, worldSize);
-    const dy = latToWorldY(current.y, worldSize) - latToWorldY(previous.y, worldSize);
-    pixelDistance += Math.hypot(dx, dy);
-  }
-
-  const zoomMultiplier = 2 ** (2 * (INK_ZOOM_BASE - zoom));
-  return Math.max(0.05, (size * pixelDistance * zoomMultiplier) / INK_COST_K);
-}
-
 export function validateStrokeBatch(input: unknown): ValidatedStroke[] {
   const rawStrokes = Array.isArray(input) ? input : [input];
   if (rawStrokes.length === 0 || rawStrokes.length > MAX_STROKES_PER_BATCH) {
@@ -136,7 +113,7 @@ export function validateStrokeBatch(input: unknown): ValidatedStroke[] {
     ids.add(id);
 
     const brushId = raw.brushId ?? 'pencil';
-    if (typeof brushId !== 'string' || !VALID_BRUSHES.has(brushId)) {
+    if (!isSupportedBrushId(brushId)) {
       throw new StrokeValidationError(`strokes[${strokeIndex}].brushId is unsupported`);
     }
 
@@ -177,7 +154,7 @@ export function validateStrokeBatch(input: unknown): ValidatedStroke[] {
     const bounds = calculateBounds(points);
     let tiles: Array<{ z: number; x: number; y: number }>;
     try {
-      tiles = tilesForBounds(bounds, 14, 16);
+      tiles = tilesForBounds(bounds, TILE_SYNC_ZOOM, 16);
     } catch {
       throw new StrokeValidationError(`strokes[${strokeIndex}] covers too many tiles`);
     }
@@ -196,7 +173,7 @@ export function validateStrokeBatch(input: unknown): ValidatedStroke[] {
 
     return {
       id,
-      brushId: brushId as 'pencil' | 'eraser',
+      brushId,
       color: color.toUpperCase(),
       opacity,
       size,
@@ -204,7 +181,7 @@ export function validateStrokeBatch(input: unknown): ValidatedStroke[] {
       bounds,
       createdZoom,
       meta,
-      inkCost: calculateInkCost(points, size, createdZoom),
+      inkCost: calculateStrokeInkCost(points, size, createdZoom),
       tiles,
     };
   });

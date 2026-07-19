@@ -11,19 +11,17 @@
  * - Persists to localStorage with offline recovery
  */
 
+import {
+  MAX_INK,
+  INK_REGEN_AMOUNT,
+  INK_REGEN_INTERVAL_MS,
+  INK_ZOOM_BASE,
+  calculateInkSegmentCost,
+  clampInk,
+  regenerateInk,
+} from '@niubi/shared';
+
 const INK_STORAGE_KEY = 'niubi-ink-state';
-const MAX_INK = 100;
-const REGEN_AMOUNT = 1;
-const REGEN_INTERVAL_MS = 18_000; // 18 seconds
-
-/**
- * ★ 平衡常数 K — 调大 = 整体更便宜，调小 = 整体更贵 ★
- * 当前 K=500，可在此处手动调整，修改后刷新立即生效。
- */
-const INK_COST_K = 20;
-
-/** 基准缩放等级（也是最低可绘画缩放等级） */
-const ZOOM_BASE = 18;
 
 export type InkChangeListener = (ink: number, maxInk: number) => void;
 
@@ -69,9 +67,8 @@ export class InkManager {
    * @param currentZoom - current map zoom level
    * @returns fractional ink cost for this segment
    */
-  calculateSegmentCost(brushSize: number, pixelDistance: number, currentZoom: number = ZOOM_BASE): number {
-    const areaZoomMultiplier = Math.pow(2, 2 * (ZOOM_BASE - currentZoom));
-    return (brushSize * pixelDistance * areaZoomMultiplier) / INK_COST_K;
+  calculateSegmentCost(brushSize: number, pixelDistance: number, currentZoom: number = INK_ZOOM_BASE): number {
+    return calculateInkSegmentCost(brushSize, pixelDistance, currentZoom);
   }
 
   /**
@@ -110,7 +107,7 @@ export class InkManager {
   /** Replace the optimistic client balance with the authoritative server value. */
   reconcile(serverInk: number): void {
     if (!Number.isFinite(serverInk)) return;
-    this.ink = Math.max(0, Math.min(MAX_INK, serverInk));
+    this.ink = clampInk(serverInk);
     this.save();
     this.notifyListeners();
   }
@@ -138,11 +135,11 @@ export class InkManager {
   private startRegen(): void {
     this.regenTimer = setInterval(() => {
       if (this.ink < MAX_INK) {
-        this.ink = Math.min(MAX_INK, this.ink + REGEN_AMOUNT);
+        this.ink = Math.min(MAX_INK, this.ink + INK_REGEN_AMOUNT);
         this.save();
         this.notifyListeners();
       }
-    }, REGEN_INTERVAL_MS);
+    }, INK_REGEN_INTERVAL_MS);
   }
 
   private notifyListeners(): void {
@@ -175,10 +172,7 @@ export class InkManager {
 
       // Calculate offline regen: how many regen ticks passed since last save
       const elapsed = Date.now() - data.timestamp;
-      const regenTicks = Math.floor(elapsed / REGEN_INTERVAL_MS);
-      const recovered = Math.min(MAX_INK, data.ink + regenTicks * REGEN_AMOUNT);
-
-      return recovered;
+      return regenerateInk(data.ink, elapsed);
     } catch {
       return MAX_INK;
     }

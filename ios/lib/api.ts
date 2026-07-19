@@ -9,6 +9,15 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from './config';
 import type { StrokeData } from '@/core/types';
+import type {
+  InkBalanceResponse,
+  BlockedUsersResponse,
+  PageCursor,
+  SaveDrawingsResponse,
+  TilePage,
+  UserProfileStats,
+} from '@niubi/shared';
+export type { BlockedUser, PageCursor, UserProfileStats } from '@niubi/shared';
 
 // ========================
 // Generic fetch wrapper
@@ -125,11 +134,6 @@ export interface PinItem extends MapPin {
   type: 'pin';
 }
 
-export interface PageCursor {
-  createdAt: number;
-  id: string;
-}
-
 // ========================
 // Drawings API
 // ========================
@@ -182,7 +186,7 @@ export async function fetchDrawingTile(params: {
   limit?: number;
   cursor?: PageCursor | null;
   signal?: AbortSignal;
-}): Promise<{ items: StrokeData[]; nextCursor: PageCursor | null }> {
+}): Promise<TilePage> {
   const qs = new URLSearchParams({
     z: String(params.z),
     x: String(params.x),
@@ -204,7 +208,7 @@ export async function fetchDrawingTile(params: {
  */
 export async function saveDrawings(
   strokes: StrokeData | StrokeData[]
-): Promise<{ ok: boolean; count: number; ink?: number; duplicate?: boolean }> {
+): Promise<SaveDrawingsResponse> {
   return apiFetch('/api/drawings', {
     method: 'POST',
     auth: true,
@@ -213,7 +217,7 @@ export async function saveDrawings(
 }
 
 /** Fetch the server-authoritative, regenerated ink balance. */
-export async function fetchInk(): Promise<{ ink: number; maxInk: number }> {
+export async function fetchInk(): Promise<InkBalanceResponse> {
   return apiFetch('/api/ink', { auth: true, silent: true });
 }
 
@@ -293,11 +297,6 @@ export interface UserProfile {
   avatar_url: string | null;
 }
 
-export interface UserProfileStats {
-  pins: number;
-  drawings: number;
-}
-
 /**
  * GET /api/profile — fetch current user info.
  * Auth required.
@@ -326,19 +325,12 @@ export async function deleteAccount(): Promise<void> {
 // Block API
 // ========================
 
-export interface BlockedUser {
-  userId: string;
-  userName: string;
-  avatarUrl: string | null;
-  blockedAt: number;
-}
-
 /**
  * GET /api/block — list all blocked users.
  * Auth required.
  */
-export async function fetchBlockedUsers(): Promise<{ items: BlockedUser[] }> {
-  return apiFetch<{ items: BlockedUser[] }>('/api/block', { auth: true });
+export async function fetchBlockedUsers(): Promise<BlockedUsersResponse> {
+  return apiFetch<BlockedUsersResponse>('/api/block', { auth: true });
 }
 
 /**

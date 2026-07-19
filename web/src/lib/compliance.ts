@@ -2,6 +2,7 @@
  * Web compliance utilities — Report & Block User.
  * Uses server-side /api/block + /api/report with localStorage fallback.
  */
+import type { BlockedUsersResponse } from '@niubi/shared';
 
 const BLOCKED_USERS_KEY = 'niubi-blocked-users';
 
@@ -92,7 +93,7 @@ export const Compliance = {
     try {
       const res = await fetch('/api/block');
       if (!res.ok) return getLocalBlocked();
-      const data = (await res.json()) as { items: { userId: string }[] };
+      const data = (await res.json()) as BlockedUsersResponse;
       const ids = data.items.map((i) => i.userId);
       setLocalBlocked(ids);
       return ids;

@@ -32,6 +32,7 @@ import {
 } from './brushUtils';
 import {
   BRUSH_IDS,
+  LEGACY_BRUSH_IDS,
   STROKE_HIDE_ZOOM_DIFF,
 } from '@niubi/shared';
 
@@ -75,7 +76,7 @@ function getBrushConfig(brushId: string): BrushRenderConfig {
         strokeCap: 'round',
         strokeJoin: 'round',
       };
-    case BRUSH_IDS.MARKER:
+    case LEGACY_BRUSH_IDS.MARKER:
       return {
         buildPath: buildLinearPath,
         strokeWidth: (s) => s * 3,
@@ -86,7 +87,7 @@ function getBrushConfig(brushId: string): BrushRenderConfig {
         useLayer: true,
         layerOpacity: 0.3,
       };
-    case BRUSH_IDS.HIGHLIGHTER:
+    case LEGACY_BRUSH_IDS.HIGHLIGHTER:
       return {
         buildPath: buildLinearPath,
         strokeWidth: (s) => s * 2.5,
@@ -104,7 +105,7 @@ function getBrushConfig(brushId: string): BrushRenderConfig {
         strokeCap: 'round',
         strokeJoin: 'round',
       };
-    case BRUSH_IDS.SPRAY:
+    case LEGACY_BRUSH_IDS.SPRAY:
       return {
         buildPath: buildLinearPath,
         strokeWidth: (s) => s,

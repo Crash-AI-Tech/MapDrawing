@@ -11,6 +11,10 @@ export const Compliance = {
 
     isBlocked: (userId: string) => blockedUserIds.has(userId),
 
+    removeBlockedUser: (userId: string) => {
+        blockedUserIds.delete(userId);
+    },
+
     /**
      * Report inappropriate content (User/Pin).
      * Sends to real backend /api/report endpoint.

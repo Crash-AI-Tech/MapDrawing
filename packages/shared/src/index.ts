@@ -16,19 +16,61 @@ export type {
 } from './types';
 export { getTileKey, latLngToTile, tileToBounds, tilesForBounds } from './types';
 
+export {
+    BRUSH_IDS,
+    LEGACY_BRUSH_IDS,
+    isSupportedBrushId,
+    classifyHttpFailure,
+    shouldRetryHttpStatus,
+    OFFLINE_QUEUE_VERSION,
+    OFFLINE_QUEUE_MAX_AGE_MS,
+    normalizeOfflineQueue,
+    TERMS_OF_SERVICE_URL,
+    PRIVACY_POLICY_URL,
+    SUPPORTED_LANGUAGES,
+} from './protocol';
+export type {
+    BrushId,
+    PageCursor,
+    TilePage,
+    SaveDrawingsResponse,
+    InkBalanceResponse,
+    UserProfileStats,
+    BlockedUser,
+    BlockedUsersResponse,
+    AppLanguage,
+    HttpFailureDisposition,
+    OfflineQueueItem,
+} from './protocol';
+export {
+    MAX_INK,
+    INK_REGEN_AMOUNT,
+    INK_REGEN_INTERVAL_SECONDS,
+    INK_REGEN_INTERVAL_MS,
+    INK_COST_DIVISOR,
+    INK_ZOOM_BASE,
+    MIN_STROKE_INK_COST,
+    clampInk,
+    calculateInkSegmentCost,
+    calculateStrokeInkCost,
+    regenerateInk,
+} from './ink';
+export {
+    TILE_SYNC_ZOOM,
+    TILE_PAGE_SIZE,
+    MAX_TILE_PAGES_PER_LOAD,
+    MAX_VIEWPORT_TILES,
+    DEFAULT_TILE_CACHE_EXPIRATION_MS,
+    tileCoordinateToKey,
+    parseTileKey,
+    tileKeysForBounds,
+    dedupeById,
+} from './tileSync';
+export type { TileCoordinate } from './tileSync';
+
 // ========================
 // Drawing Tool Constants
 // ========================
-
-export const BRUSH_IDS = {
-    PENCIL: 'pencil',
-    MARKER: 'marker',
-    SPRAY: 'spray',
-    HIGHLIGHTER: 'highlighter',
-    ERASER: 'eraser',
-} as const;
-
-export type BrushId = (typeof BRUSH_IDS)[keyof typeof BRUSH_IDS];
 
 // ========================
 // Color Presets

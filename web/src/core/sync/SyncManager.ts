@@ -1,4 +1,5 @@
 import type { DrawEvent, StrokeData, SyncState } from '../types';
+import { shouldRetryHttpStatus } from '@niubi/shared';
 import { OfflineQueue } from './OfflineQueue';
 import type { DrawingEngine } from '../engine/DrawingEngine';
 
@@ -10,8 +11,7 @@ class ApiSyncError extends Error {
   }
 
   get retryable(): boolean {
-    return this.status === 401 || this.status === 402 || this.status === 408 ||
-      this.status === 429 || this.status >= 500;
+    return shouldRetryHttpStatus(this.status);
   }
 }
 
@@ -143,7 +143,8 @@ export class SyncManager {
     };
 
     if (this.isOnline) {
-      this.deleteStrokeFromApi(strokeId).catch(() => {
+      this.deleteStrokeFromApi(strokeId).catch((error: unknown) => {
+        if (error instanceof ApiSyncError && !error.retryable) return;
         void this.offlineQueue.enqueue(event);
       });
     } else {

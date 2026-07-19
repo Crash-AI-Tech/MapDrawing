@@ -1,8 +1,15 @@
 import type { StrokeData, GeoBounds } from '../types';
-import { latLngToTile } from '../types/viewport';
-
-const TILE_PAGE_SIZE = 500;
-const MAX_PAGES_PER_LOAD = 5;
+import {
+  DEFAULT_TILE_CACHE_EXPIRATION_MS,
+  MAX_TILE_PAGES_PER_LOAD,
+  TILE_PAGE_SIZE,
+  TILE_SYNC_ZOOM,
+  dedupeById,
+  parseTileKey,
+  tileKeysForBounds,
+  type PageCursor,
+  type TilePage,
+} from '@niubi/shared';
 
 export interface TileManagerConfig {
   apiBaseUrl: string;
@@ -10,21 +17,11 @@ export interface TileManagerConfig {
   cacheExpiration?: number;
 }
 
-interface TileCursor {
-  createdAt: number;
-  id: string;
-}
-
 interface TileState {
   loadedAt: number;
   loading: boolean;
   /** A cursor means the tile is only partially loaded and must resume next time. */
-  cursor: TileCursor | null;
-}
-
-interface TilePage {
-  items: StrokeData[];
-  nextCursor: TileCursor | null;
+  cursor: PageCursor | null;
 }
 
 export class TileManager {
@@ -36,8 +33,8 @@ export class TileManager {
 
   constructor(config: TileManagerConfig) {
     this.apiBaseUrl = config.apiBaseUrl;
-    this.zoomLevel = config.zoomLevel ?? 14;
-    this.cacheExpiration = config.cacheExpiration ?? 5 * 60 * 1000;
+    this.zoomLevel = config.zoomLevel ?? TILE_SYNC_ZOOM;
+    this.cacheExpiration = config.cacheExpiration ?? DEFAULT_TILE_CACHE_EXPIRATION_MS;
   }
 
   cancelInFlight(): void {
@@ -82,11 +79,7 @@ export class TileManager {
         }),
       );
 
-      const deduped = new Map<string, StrokeData>();
-      for (const strokes of pages) {
-        for (const stroke of strokes) deduped.set(stroke.id, stroke);
-      }
-      return [...deduped.values()];
+      return dedupeById(pages);
     } catch (error: unknown) {
       if ((error as { name?: string })?.name === 'AbortError') return [];
       console.error('[TileManager] Failed to fetch tiles:', error);
@@ -102,10 +95,12 @@ export class TileManager {
 
   private async fetchTile(
     key: string,
-    initialCursor: TileCursor | null,
+    initialCursor: PageCursor | null,
     signal: AbortSignal,
   ): Promise<TilePage> {
-    const [z, x, y] = key.split('/').map(Number);
+    const tile = parseTileKey(key);
+    if (!tile) throw new Error(`Invalid tile key: ${key}`);
+    const { z, x, y } = tile;
     const items = new Map<string, StrokeData>();
     let cursor = initialCursor;
     let page = 0;
@@ -127,30 +122,18 @@ export class TileManager {
       for (const stroke of data.items ?? []) items.set(stroke.id, stroke);
       cursor = data.nextCursor;
       page += 1;
-    } while (cursor && page < MAX_PAGES_PER_LOAD);
+    } while (cursor && page < MAX_TILE_PAGES_PER_LOAD);
 
     return { items: [...items.values()], nextCursor: cursor };
   }
 
   private getTilesCoveringBounds(bounds: GeoBounds): string[] {
-    const z = this.zoomLevel;
-    const topLeft = latLngToTile(bounds.maxLat, bounds.minLng, z);
-    const bottomRight = latLngToTile(bounds.minLat, bounds.maxLng, z);
-    const count =
-      (bottomRight.x - topLeft.x + 1) *
-      (bottomRight.y - topLeft.y + 1);
-    if (count > 200) {
-      console.warn(`[TileManager] Refusing to load ${count} tiles at once`);
+    try {
+      return tileKeysForBounds(bounds, this.zoomLevel);
+    } catch (error) {
+      console.warn('[TileManager] Refusing viewport tile load:', error);
       return [];
     }
-
-    const keys: string[] = [];
-    for (let x = topLeft.x; x <= bottomRight.x; x += 1) {
-      for (let y = topLeft.y; y <= bottomRight.y; y += 1) {
-        keys.push(`${z}/${x}/${y}`);
-      }
-    }
-    return keys;
   }
 
   clearCache(): void {

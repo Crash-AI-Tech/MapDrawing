@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Mail, ArrowLeft, MessageCircle, HelpCircle, Shield } from 'lucide-react';
+import { PRIVACY_POLICY_URL } from '@niubi/shared';
 
 const FONT = { fontFamily: 'Fredoka, sans-serif' };
 
@@ -127,7 +128,7 @@ export default function SupportPage() {
                                 We are committed to protecting your privacy. For full details on how we collect, use, and safeguard your data, please read our privacy policy.
                             </p>
                             <a
-                                href="https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy"
+                                href={PRIVACY_POLICY_URL}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mt-3 inline-block text-sm font-medium text-violet-600 underline underline-offset-2 hover:text-violet-800"

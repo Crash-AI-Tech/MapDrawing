@@ -5,6 +5,11 @@
     "main": "src/index.ts",
     "types": "src/index.ts",
     "scripts": {
-        "build": "tsc"
+        "build": "tsc",
+        "type-check": "tsc --noEmit",
+        "test": "pnpm build && node --test tests/*.test.mjs"
+    },
+    "devDependencies": {
+        "typescript": "^5.7.0"
     }
 }
