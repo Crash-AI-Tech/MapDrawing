@@ -14,12 +14,12 @@ binding = "ASSETS"
 binding = "WORKER_SELF_REFERENCE"
 service = "map-staging"
 
-# RELEASE BLOCKED: this is the v1 source database. Create/migrate
-# map-db-staging-v2 and replace both fields below before deploying this branch.
+# Clean v2 test database. The previous map-db-staging database is only the
+# migration source and can be deleted after the deployed environment is verified.
 [[d1_databases]]
 binding = "DB"
-database_name = "map-db-staging"
-database_id = "3c1ccc89-4fc6-478f-bc1d-2df32755a29f"
+database_name = "map-db-staging-v2"
+database_id = "b6d8b429-8e17-43db-afb1-48b3b35f3bab"
 migrations_dir = "../drizzle/migrations"
 
 [[r2_buckets]]

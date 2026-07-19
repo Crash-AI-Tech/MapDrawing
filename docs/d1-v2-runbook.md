@@ -3,7 +3,7 @@
 The v2 database is a clean baseline. Do not apply it to the existing production or staging database.
 
 1. Create a new empty D1 database for staging or production.
-2. Replace the matching `database_id` in the Wrangler config on a release branch.
+2. Replace the matching `database_name` and `database_id` in the Wrangler config on a release branch. The migration tool resolves both source and target by name from the authenticated Cloudflare account and creates a private temporary Wrangler config containing both bindings.
 3. Preview the copy plan. The command prints counts only and never prints account data:
 
    `node scripts/migrate-d1-v2.mjs --source map-db --target map-db-v2`
