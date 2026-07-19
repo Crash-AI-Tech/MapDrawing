@@ -129,7 +129,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         Desktop: top-center horizontal bar
         Mobile:  bottom-center compact bar with overflow menu
       */}
-      <div className="liquid-glass absolute bottom-4 left-1/2 z-30 flex min-h-12 -translate-x-1/2 items-center gap-1 rounded-full p-1.5 md:bottom-auto md:top-4 md:gap-1.5">
+      <div className="liquid-glass absolute bottom-4 left-1/2 z-30 flex h-10 -translate-x-1/2 items-center gap-1 rounded-full px-1 py-px md:bottom-auto md:top-4 md:gap-1.5">
         {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>
