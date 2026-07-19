@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
+import type { Lang } from '@/lib/i18n';
 
 interface LoginFormProps {
-  lang: 'zh' | 'en';
+  lang: Lang;
   onSwitchToRegister?: () => void;
   onForgotPassword?: () => void;
   onVerifyRequired?: (email: string) => void;
@@ -39,6 +40,12 @@ const t = {
     or: 'OR',
     noAccount: 'No account yet?',
     register: 'Sign up',
+  },
+  ja: {
+    email: 'メール', password: 'パスワード', forgot: 'お忘れですか？',
+    placeholderEmail: 'your@email.com', placeholderPwd: '••••••••',
+    login: 'ログイン', loggingIn: 'ログイン中…', or: 'または',
+    noAccount: 'アカウントをお持ちでないですか？', register: '新規登録',
   },
 };
 

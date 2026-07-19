@@ -59,11 +59,11 @@ export async function requestPasswordReset(
        ORDER BY created_at DESC LIMIT 1`
     )
       .bind(email, 'password_reset')
-      .first<{ created_at: string }>();
+      .first<{ created_at: number }>();
 
     if (recent) {
-      const elapsed = Date.now() - new Date(recent.created_at).getTime();
-      if (elapsed < 60_000) {
+      const elapsedSeconds = Math.floor(Date.now() / 1000) - recent.created_at;
+      if (elapsedSeconds < 60) {
         return { error: '请等待 60 秒后重试' };
       }
     }
@@ -122,8 +122,8 @@ export async function resetPassword(
     return { error: '验证码为 6 位数字' };
   }
 
-  if (password.length < 6) {
-    return { error: '密码至少需要 6 个字符' };
+  if (password.length < 8) {
+    return { error: '密码至少需要 8 个字符' };
   }
 
   try {

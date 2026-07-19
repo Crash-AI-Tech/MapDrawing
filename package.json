@@ -8,6 +8,7 @@
         "type-check": "pnpm --filter @niubi/shared type-check && pnpm --filter web type-check && pnpm --filter ios type-check",
         "lint": "pnpm --filter web lint && pnpm --filter ios lint",
         "db:check": "sh scripts/check-migrations.sh",
+        "db:migrate:v2": "node scripts/migrate-d1-v2.mjs",
         "test": "pnpm --filter @niubi/shared test",
         "check": "pnpm db:check && pnpm test && pnpm type-check && pnpm lint"
     },

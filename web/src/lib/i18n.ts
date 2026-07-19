@@ -4,6 +4,7 @@
  */
 
 import { create } from 'zustand';
+import { useCallback } from 'react';
 import type { AppLanguage } from '@niubi/shared';
 
 export type Lang = AppLanguage;
@@ -31,7 +32,9 @@ function detectLang(): Lang {
 }
 
 export const useLangStore = create<LangState>((set, get) => ({
-  lang: detectLang(),
+  // Keep the server and the first client render identical. Browser preference
+  // is applied after hydration by LanguageDocumentSync.
+  lang: 'en',
   setLang: (lang) => {
     try { localStorage.setItem(STORAGE_KEY, lang); } catch {}
     set({ lang });
@@ -44,6 +47,10 @@ export const useLangStore = create<LangState>((set, get) => ({
     set({ lang: next });
   },
 }));
+
+export function hydrateLanguageFromBrowser(): void {
+  useLangStore.setState({ lang: detectLang() });
+}
 
 // --------------- Dictionary ---------------
 
@@ -62,6 +69,15 @@ const dict = {
   toolTransparencyOn: { zh: '半透明绘制（查看地图）', en: 'Semi-transparent (reveal map)', ja: '半透明（地図を表示）' },
   toolTransparencyOff: { zh: '恢复绘制不透明度', en: 'Restore opacity', ja: '不透明度を復元' },
   toolExport: { zh: '导出 / 分享', en: 'Export / Share', ja: 'エクスポート / 共有' },
+  toolMore: { zh: '更多工具', en: 'More tools', ja: 'その他のツール' },
+  brushSettings: { zh: '颜色与笔触 (B)', en: 'Color and stroke (B)', ja: '色とストローク (B)' },
+  brushPresets: { zh: '预设颜色', en: 'Presets', ja: 'プリセット' },
+  brushCustom: { zh: '自定义', en: 'Custom', ja: 'カスタム' },
+  brushSize: { zh: '大小', en: 'Size', ja: 'サイズ' },
+  brushOpacity: { zh: '不透明度', en: 'Opacity', ja: '不透明度' },
+  inkLabel: { zh: '墨水', en: 'Ink', ja: 'インク' },
+  inkNextRegen: { zh: '{seconds}秒后恢复 +1', en: '+1 in {seconds}s', ja: '{seconds}秒後に +1' },
+  inkFull: { zh: '墨水已满', en: 'Ink is full', ja: 'インクは満タンです' },
 
   // ─── Export Menu ───
   exportDownloadPNG: { zh: '下载 PNG', en: 'Download PNG', ja: 'PNG をダウンロード' },
@@ -82,6 +98,7 @@ const dict = {
   syncError: { zh: '连接错误 — 操作已缓存', en: 'Connection error — changes cached', ja: '接続エラー — 変更はキャッシュ済み' },
   syncOnline: { zh: '在线', en: 'Online', ja: 'オンライン' },
   syncOffline: { zh: '离线', en: 'Offline', ja: 'オフライン' },
+  mapLoading: { zh: '加载地图引擎…', en: 'Loading map…', ja: '地図を読み込み中…' },
 
   // ─── Zoom Hints ───
   zoomDrawHint: { zh: '请放大到 {zoom} 级以上才能绘画（当前 {current} 级）', en: 'Zoom in to level {zoom}+ to draw (current: {current})', ja: '描画するにはレベル {zoom} 以上にズームしてください（現在: {current}）' },
@@ -103,6 +120,8 @@ const dict = {
   pinBlockUser: { zh: '屏蔽用户', en: 'Block User', ja: 'ユーザーをブロック' },
   pinReportReason: { zh: '举报原因:', en: 'Report reason:', ja: '報告理由:' },
   pinBlockConfirm: { zh: '屏蔽 {name}？他们的图钉将被隐藏。', en: 'Block {name}? Their pins will be hidden.', ja: '{name} をブロックしますか？ピンが非表示になります。' },
+  reportSubmitted: { zh: '举报已提交，我们会尽快审核。', en: 'Report submitted. We will review it as soon as practical.', ja: '通報を送信しました。可能な限り早く確認します。' },
+  reportFailed: { zh: '举报提交失败，请重试。', en: 'Failed to submit the report. Please try again.', ja: '通報の送信に失敗しました。もう一度お試しください。' },
 
   // ─── Share Page ───
   shareCreatedBy: { zh: '由 DrawMap 创建', en: 'Created with DrawMap', ja: 'DrawMap で作成' },
@@ -154,9 +173,28 @@ const dict = {
 
   // ─── User Menu ───
   menuLogin: { zh: '登录', en: 'Log In', ja: 'ログイン' },
-  menuProfile: { zh: '个人资料', en: 'Profile', ja: 'プロフィール' },
-  menuSettings: { zh: '设置', en: 'Settings', ja: '設定' },
-  menuLogout: { zh: '退出', en: 'Log Out', ja: 'ログアウト' },
+  menuUserFallback: { zh: '用户', en: 'User', ja: 'ユーザー' },
+  menuPins: { zh: '图钉', en: 'Pins', ja: 'ピン' },
+  menuDrawings: { zh: '绘画', en: 'Drawings', ja: '描画' },
+  menuSupportLegal: { zh: '帮助与法律', en: 'Support & Legal', ja: 'サポートと法務' },
+  menuTerms: { zh: '服务条款', en: 'Terms of Service', ja: '利用規約' },
+  menuPrivacy: { zh: '隐私政策', en: 'Privacy Policy', ja: 'プライバシーポリシー' },
+  menuBlockedUsers: { zh: '已屏蔽用户', en: 'Blocked Users', ja: 'ブロック中のユーザー' },
+  menuBlockedLoading: { zh: '加载中…', en: 'Loading…', ja: '読み込み中…' },
+  menuBlockedEmpty: { zh: '尚未屏蔽任何用户', en: 'No users blocked yet.', ja: 'ブロック中のユーザーはいません' },
+  menuUnblock: { zh: '解除屏蔽', en: 'Unblock', ja: 'ブロック解除' },
+  menuUnblockFailed: { zh: '解除屏蔽失败，请重试。', en: 'Failed to unblock user. Please try again.', ja: 'ブロック解除に失敗しました。もう一度お試しください。' },
+  menuLogout: { zh: '退出登录', en: 'Log Out', ja: 'ログアウト' },
+  menuDeleteAccount: { zh: '删除账号', en: 'Delete Account', ja: 'アカウントを削除' },
+  menuDeleting: { zh: '删除中…', en: 'Deleting…', ja: '削除中…' },
+  menuDeleteConfirm: { zh: '确定删除账号吗？账号、头像、绘画、图钉和其他关联数据都会被永久删除，此操作无法撤销。', en: 'Delete your account? Your account, avatar, drawings, pins, and other associated data will be permanently removed. This cannot be undone.', ja: 'アカウントを削除しますか？アカウント、アバター、描画、ピン、その他の関連データは完全に削除され、元に戻せません。' },
+  menuDeleteFailed: { zh: '账号删除失败，请重试。', en: 'Failed to delete account. Please try again.', ja: 'アカウントの削除に失敗しました。もう一度お試しください。' },
+  menuUploadTooLarge: { zh: '文件过大，最大为 2MB。', en: 'File too large (max 2MB).', ja: 'ファイルが大きすぎます（最大2MB）。' },
+  menuUploadFailed: { zh: '头像上传失败。', en: 'Avatar upload failed.', ja: 'アバターのアップロードに失敗しました。' },
+  menuChangeAvatar: { zh: '更换头像', en: 'Change avatar', ja: 'アバターを変更' },
+  close: { zh: '关闭', en: 'Close', ja: '閉じる' },
+  language: { zh: '语言', en: 'Language', ja: '言語' },
+  support: { zh: '支持', en: 'Support', ja: 'サポート' },
 
   // ─── Landing Page ───
   landingNavFeatures: { zh: '玩法', en: 'Features', ja: '機能' },
@@ -166,7 +204,7 @@ const dict = {
   landingHeroTitle1: { zh: '在真实地图上，', en: 'Draw on the ', ja: 'リアルワールドの' },
   landingHeroTitle2: { zh: '和全世界一起涂鸦', en: 'Real World Map', ja: '地図に描こう' },
   landingHeroDesc: {
-    zh: '选一支画笔，在任何城市的街道上留下你的创作——所有人都能看到、续写。一张永远不会完成的全球涂鸦墙。',
+    zh: '选一支画笔，在任何城市的街道上留下你的创作——所有人都能看到、续写。一张持续生长的全球涂鸦墙。',
     en: 'Pick a brush and leave your mark on any street in any city — everyone can see it, everyone can add to it. A never-ending global graffiti wall.',
     ja: 'ブラシを選んで、世界中のどの都市の通りにも作品を残そう — みんなが見れて、みんなが描き足せる。終わることのないグローバル落書きウォール。',
   },
@@ -187,7 +225,7 @@ type DictKey = keyof typeof dict;
 export function useI18n() {
   const { lang, setLang, toggleLang } = useLangStore();
 
-  const t = (key: DictKey, params?: Record<string, string | number>): string => {
+  const t = useCallback((key: DictKey, params?: Record<string, string | number>): string => {
     let text: string = dict[key]?.[lang] ?? dict[key]?.en ?? key;
     if (params) {
       for (const [k, v] of Object.entries(params)) {
@@ -195,7 +233,7 @@ export function useI18n() {
       }
     }
     return text;
-  };
+  }, [lang]);
 
   return { t, lang, setLang, toggleLang };
 }

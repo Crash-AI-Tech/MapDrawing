@@ -6,7 +6,7 @@ const {
   BRUSH_IDS,
   classifyHttpFailure,
   isSupportedBrushId,
-  normalizeOfflineQueue,
+  parseOfflineQueue,
   calculateInkSegmentCost,
   calculateStrokeInkCost,
   regenerateInk,
@@ -47,18 +47,18 @@ test('HTTP retry classification is identical across clients', () => {
   assert.equal(classifyHttpFailure(503), 'retry');
 });
 
-test('offline queue migrates Web and iOS legacy formats to v1', () => {
-  let sequence = 0;
+test('offline queue accepts only the current v2 contract', () => {
   const event = { type: 'STROKE_ADD', stroke };
-  const queue = normalizeOfflineQueue([
+  const queue = parseOfflineQueue([
     event,
-    { id: 'web-old', event, timestamp: 900 },
-  ], () => `new-${sequence++}`, 1000);
+    { version: 1, id: 'v1-old', event, createdAt: 900, attempts: 0 },
+    { version: 2, id: 'current', event, createdAt: 950, attempts: 0 },
+    { version: 2, id: 'legacy-brush', event: { ...event, stroke: { ...stroke, brushId: 'spray' } }, createdAt: 960, attempts: 0 },
+  ], 1000);
 
-  assert.equal(queue.length, 2);
-  assert.equal(queue[0].id, 'web-old');
-  assert.equal(queue[0].version, 1);
-  assert.equal(queue[1].event.stroke.id, 'stroke-1');
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'current');
+  assert.equal(queue[0].version, 2);
 });
 
 test('ink rules use the same constants for preview and server validation', () => {

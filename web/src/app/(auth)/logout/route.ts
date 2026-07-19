@@ -6,16 +6,19 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
 import { cookies } from 'next/headers';
+import { validateCsrf } from '@/lib/csrf';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
     const { env } = getCloudflareContext();
     const lucia = createLucia(env.DB);
 
     const sessionId = (await cookies()).get(lucia.sessionCookieName)?.value;
 
     if (sessionId) {
-      await lucia.invalidateSession(sessionId);
+      await lucia.invalidateSession(sessionId).catch(() => undefined);
     }
 
     const blankCookie = lucia.createBlankSessionCookie();

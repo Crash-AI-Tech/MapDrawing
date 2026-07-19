@@ -34,6 +34,7 @@ export default function Login() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         identityToken: credential.identityToken,
+                        authorizationCode: credential.authorizationCode,
                         user: JSON.stringify({
                             name: {
                                 firstName: credential.fullName?.givenName,

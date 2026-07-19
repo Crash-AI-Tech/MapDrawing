@@ -73,6 +73,13 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   // Derive current tool mode
   const currentMode: ToolMode = placingPin ? 'pin' : drawingMode ? 'draw' : 'hand';
   const isEraser = activeBrushId === BRUSH_IDS.ERASER;
+  const syncLabel = syncState === 'connected'
+    ? t('syncConnected')
+    : syncState === 'connecting'
+      ? t('syncConnecting')
+      : syncState === 'error'
+        ? t('syncError')
+        : t('syncDisconnected');
 
   /** Show a temporary tooltip */
   const flashTooltip = (msg: string) => {
@@ -142,6 +149,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               size="icon"
               className={cn('h-9 w-9 rounded-full', currentMode === 'hand' && ACTIVE_BTN)}
               onClick={() => switchMode('hand')}
+              aria-label={t('toolNavigation')}
             >
               <Hand className="h-4 w-4" />
             </Button>
@@ -178,6 +186,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               size="icon"
               className={cn('h-9 w-9 rounded-full', currentMode === 'pin' && ACTIVE_BTN)}
               onClick={() => switchMode('pin')}
+              aria-label={t('toolPin')}
             >
               <MapPin className="h-4 w-4" />
             </Button>
@@ -210,6 +219,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               className="h-9 w-9 rounded-full"
               onClick={undo}
               disabled={!canUndo}
+              aria-label={t('toolUndo')}
             >
               <Undo2 className="h-4 w-4" />
             </Button>
@@ -226,6 +236,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               className="h-9 w-9 rounded-full"
               onClick={redo}
               disabled={!canRedo}
+              aria-label={t('toolRedo')}
             >
               <Redo2 className="h-4 w-4" />
             </Button>
@@ -243,6 +254,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
                 size="icon"
                 className={cn('h-9 w-9 rounded-full', strokesTransparent && ACTIVE_BTN)}
                 onClick={() => setStrokesTransparent(!strokesTransparent)}
+                aria-label={strokesTransparent ? t('toolTransparencyOff') : t('toolTransparencyOn')}
               >
                 {strokesTransparent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
@@ -263,7 +275,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
           {/* Sync status indicator */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex h-5 w-5 items-center justify-center">
+              <div className="flex h-5 w-5 items-center justify-center" role="status" aria-label={syncLabel}>
                 {syncState === 'connected' && (
                   <Wifi className="h-3 w-3 text-green-500" />
                 )}
@@ -301,7 +313,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         <div className="flex items-center md:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" aria-label={t('toolMore')}>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

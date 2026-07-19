@@ -7,9 +7,5 @@ export type { StrokeData, StrokePoint, GeoBounds, CameraState } from './types';
 export {
   buildBezierPath,
   buildLinearPath,
-  generateSprayParticles,
-  buildSprayPaths,
-  hashString,
   generateId,
 } from './brushUtils';
-export type { SprayParticle } from './brushUtils';

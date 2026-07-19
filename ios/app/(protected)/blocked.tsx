@@ -8,7 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { fetchBlockedUsers, unblockUserApi, type BlockedUser } from '@/lib/api';
-import { ts, useLang } from '@/lib/i18n';
+import { tf, ts, useLang } from '@/lib/i18n';
 import { API_BASE_URL } from '@/lib/config';
 import { Compliance } from '@/utils/compliance';
 
@@ -40,12 +40,12 @@ export default function BlockedUsersScreen() {
 
     const handleUnblock = (user: BlockedUser) => {
         Alert.alert(
-            'Unblock User',
-            `Unblock ${user.userName}? You will see their pins and drawings again.`,
+            ts('unblockUser', lang),
+            tf('unblockConfirm', lang)(user.userName),
             [
                 { text: ts('cancel', lang), style: 'cancel' },
                 {
-                    text: 'Unblock',
+                    text: ts('unblock', lang),
                     style: 'destructive',
                     onPress: async () => {
                         setUnblockingId(user.userId);
@@ -54,7 +54,7 @@ export default function BlockedUsersScreen() {
                             Compliance.removeBlockedUser(user.userId);
                             setBlocked((prev) => prev.filter((u) => u.userId !== user.userId));
                         } catch {
-                            Alert.alert('Error', 'Failed to unblock user. Please try again.');
+                            Alert.alert(ts('error', lang), ts('unblockFailed', lang));
                         } finally {
                             setUnblockingId(null);
                         }
@@ -77,7 +77,9 @@ export default function BlockedUsersScreen() {
             <View style={styles.userInfo}>
                 <Text style={styles.userName}>{item.userName}</Text>
                 <Text style={styles.blockedDate}>
-                    Blocked {new Date(item.blockedAt).toLocaleDateString()}
+                    {tf('blockedOn', lang)(new Date(item.blockedAt).toLocaleDateString(
+                        lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : 'en-US'
+                    ))}
                 </Text>
             </View>
             <TouchableOpacity
@@ -88,7 +90,7 @@ export default function BlockedUsersScreen() {
                 {unblockingId === item.userId ? (
                     <ActivityIndicator size="small" color="#FF9500" />
                 ) : (
-                    <Text style={styles.unblockText}>Unblock</Text>
+                    <Text style={styles.unblockText}>{ts('unblock', lang)}</Text>
                 )}
             </TouchableOpacity>
         </View>

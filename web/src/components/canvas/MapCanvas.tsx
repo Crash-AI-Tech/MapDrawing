@@ -144,7 +144,8 @@ export default function MapCanvas() {
   const refreshBlocked = usePinStore((s) => s.refreshBlocked);
   const setSelectedPin = usePinStore((s) => s.setSelectedPin);
 
-  const userId = user?.id ?? 'anonymous';
+  const authenticatedUserId = user?.id;
+  const userId = authenticatedUserId ?? 'anonymous';
   const userName = profile?.userName ?? 'Anonymous';
 
   // 1) Drawing engine
@@ -156,11 +157,15 @@ export default function MapCanvas() {
   // 2) Sync — Use Session Cookie for auth
   const sessionToken = user?.id ? 'authenticated' : '';
 
-  const { joinRoom, loadViewport } = useSync({
+  const { loadViewport } = useSync({
     engine,
     userId,
     accessToken: sessionToken,
   });
+
+  useEffect(() => {
+    if (authenticatedUserId) void refreshBlocked();
+  }, [authenticatedUserId, refreshBlocked]);
 
   // 3) Viewport change → load strokes + pins
   const handleViewportChange = useCallback(
@@ -171,11 +176,6 @@ export default function MapCanvas() {
         return;
       }
 
-      const center = {
-        lat: (bounds.minLat + bounds.maxLat) / 2,
-        lng: (bounds.minLng + bounds.maxLng) / 2,
-      };
-      joinRoom(center.lat, center.lng);
       await loadViewport(bounds, zoom);
 
       // Load pins when zoomed in enough
@@ -203,7 +203,7 @@ export default function MapCanvas() {
         setPins([]);
       }
     },
-    [joinRoom, loadViewport, setPins]
+    [loadViewport, setPins]
   );
 
   useViewport({
@@ -408,8 +408,9 @@ export default function MapCanvas() {
           blockBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (window.confirm(getI18nText('pinBlockConfirm', { name: pin.userName || 'this user' }))) {
-              Compliance.blockUser(pin.userId);
-              refreshBlocked();
+              void Compliance.blockUser(pin.userId).then((blocked) => {
+                if (blocked) return refreshBlocked();
+              });
             }
           });
 

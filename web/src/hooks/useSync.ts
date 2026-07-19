@@ -8,7 +8,7 @@ import type { SyncState } from '@/core/types';
 import { useUIStore } from '@/stores/uiStore';
 
 import { MIN_DATA_ZOOM } from '@/constants';
-import { Compliance } from '@/lib/compliance';
+import { usePinStore } from '@/stores/pinStore';
 
 const MAX_CACHED_STROKES = 5000;
 
@@ -77,11 +77,6 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
     };
   }, []);
 
-  // === Join room (Deprecated - kept for API compatibility if needed, but does nothing now) ===
-  const joinRoom = useCallback((_lat: number, _lng: number) => {
-    // No-op in tile-based sync
-  }, []);
-
   // === Load strokes for viewport using TileManager ===
   const loadViewport = useCallback(
     async (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }, zoom: number) => {
@@ -89,7 +84,7 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
       if (zoom < MIN_DATA_ZOOM) return [];
       if (!tileManagerRef.current || !engine) return [];
 
-      const blockedUserIds = new Set(Compliance.getBlockedUsers());
+      const blockedUserIds = usePinStore.getState().blockedUserIds;
       const strokes = (await tileManagerRef.current.fetchMissingTiles(bounds))
         .filter((stroke) => !blockedUserIds.has(stroke.userId));
 
@@ -104,7 +99,6 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
 
   return {
     syncRef,
-    joinRoom,
     loadViewport,
   };
 }

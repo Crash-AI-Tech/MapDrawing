@@ -20,6 +20,9 @@ declare global {
     AUTH_SECRET: string;
     RESEND_API_KEY: string;
     APPLE_CLIENT_ID: string;
+    APPLE_TEAM_ID?: string;
+    APPLE_KEY_ID?: string;
+    APPLE_PRIVATE_KEY?: string;
     ENABLE_PRESENCE: string;
   }
 }

@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Droplets } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 const REGEN_INTERVAL_S = 18;
 
@@ -19,6 +20,7 @@ const REGEN_INTERVAL_S = 18;
  * Empty ink: shake animation.
  */
 export default function InkBar() {
+  const { t } = useI18n();
   const ink = useInkStore((s) => s.ink);
   const maxInk = useInkStore((s) => s.maxInk);
   const [countdown, setCountdown] = useState(REGEN_INTERVAL_S);
@@ -65,6 +67,11 @@ export default function InkBar() {
     <Tooltip>
       <TooltipTrigger asChild>
         <div
+          role="progressbar"
+          aria-label={t('inkLabel')}
+          aria-valuemin={0}
+          aria-valuemax={maxInk}
+          aria-valuenow={ink}
           className={cn(
             'flex items-center gap-1.5 px-1 py-0.5',
             isLow && !isEmpty && 'animate-pulse',
@@ -115,11 +122,11 @@ export default function InkBar() {
         </div>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        <p>墨水 {ink.toFixed(1)}/{maxInk} ({percent}%)</p>
+        <p>{t('inkLabel')} {ink.toFixed(1)}/{maxInk} ({percent}%)</p>
         {ink < maxInk ? (
-          <p className="text-xs text-muted-foreground">{countdown}秒后恢复+1</p>
+          <p className="text-xs text-muted-foreground">{t('inkNextRegen', { seconds: countdown })}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">墨水已满</p>
+          <p className="text-xs text-muted-foreground">{t('inkFull')}</p>
         )}
       </TooltipContent>
     </Tooltip>

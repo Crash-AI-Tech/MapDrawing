@@ -1,5 +1,9 @@
 AUTH_SECRET="replace-with-at-least-32-random-characters"
 RESEND_API_KEY=""
 APPLE_CLIENT_ID="com.niubi.agent"
+APPLE_TEAM_ID=""
+APPLE_KEY_ID=""
+# Paste the Sign in with Apple .p8 content; literal \\n sequences are supported.
+APPLE_PRIVATE_KEY=""
 ENABLE_PRESENCE="false"
 NEXT_PUBLIC_ENABLE_PRESENCE="false"

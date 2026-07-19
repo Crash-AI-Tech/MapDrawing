@@ -19,7 +19,7 @@ export async function GET(
 
     const stroke = {
       id: data.id,
-      userId: data.user_id ?? '',
+      userId: data.user_id,
       userName: data.user_name,
       brushId: data.brush_id,
       color: data.color,
@@ -36,7 +36,7 @@ export async function GET(
         maxLat: data.max_lat,
       },
       createdZoom: data.created_zoom,
-      createdAt: data.created_at_ms ?? data.created_at * 1000,
+      createdAt: data.created_at_ms,
       meta: data.meta ? JSON.parse(data.meta) : null,
     };
 

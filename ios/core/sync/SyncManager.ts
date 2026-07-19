@@ -7,8 +7,6 @@ export type SyncStateListener = (state: SyncState) => void;
 
 interface SyncManagerConfig {
     userId: string;
-    onRemoteStroke?: (stroke: StrokeData) => void;
-    onRemoteDelete?: (strokeId: string) => void;
     onInkBalance?: (ink: number) => void;
     onStrokeRejected?: (strokeId: string) => void;
 }
@@ -92,11 +90,6 @@ export class SyncManager {
         }
     }
 
-    // No-op for tile-based sync compatibility
-    joinRoom(_lat: number, _lng: number): void {
-        // do nothing
-    }
-
     getState(): SyncState {
         return this.state;
     }
@@ -105,10 +98,6 @@ export class SyncManager {
         this.stateListeners.add(listener);
         listener(this.state);
         return () => { this.stateListeners.delete(listener); };
-    }
-
-    updateToken(token: string): void {
-        // Handled by api.ts / SecureStore
     }
 
     dispose(): void {

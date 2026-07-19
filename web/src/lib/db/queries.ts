@@ -5,14 +5,12 @@
 
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
-type D1Queryable = Pick<D1Database, 'prepare'>;
-
 // =====================
 // 笔画数据类型
 // =====================
 export interface DrawingRow {
   id: string;
-  user_id: string | null;
+  user_id: string;
   user_name: string;
   brush_id: string;
   color: string;
@@ -24,19 +22,10 @@ export interface DrawingRow {
   max_lat: number;
   min_lng: number;
   max_lng: number;
-  center_lat: number;
-  center_lng: number;
   created_zoom: number;
   meta: string | null;
-  created_at: number;
-  created_at_ms: number | null;
-  updated_at: number;
-}
-
-export interface ViewportCursor {
-  /** Millisecond server timestamp (legacy rows fall back to created_at * 1000). */
-  createdAt: number;
-  id: string;
+  created_at_ms: number;
+  updated_at_ms: number;
 }
 
 export interface UserRow {
@@ -47,98 +36,12 @@ export interface UserRow {
   avatar_url: string | null;
   created_at: number;
   updated_at: number;
+  apple_refresh_token: string | null;
 }
 
 // =====================
 // 笔画查询
 // =====================
-
-/**
- * 查询视口范围内的笔画
- */
-export async function getDrawingsInViewport(
-  minLat: number,
-  maxLat: number,
-  minLng: number,
-  maxLng: number,
-  limit = 5000
-): Promise<DrawingRow[]> {
-  const { env } = getCloudflareContext();
-
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM drawings 
-     WHERE min_lng <= ?1 AND max_lng >= ?2 
-       AND min_lat <= ?3 AND max_lat >= ?4
-     ORDER BY created_at DESC
-     LIMIT ?5`
-  )
-    .bind(maxLng, minLng, maxLat, minLat, limit)
-    .all<DrawingRow>();
-
-  return results ?? [];
-}
-
-/**
- * 查询视口范围内的笔画（游标分页）
- */
-export async function getDrawingsInViewportPaginated(
-  minLat: number,
-  maxLat: number,
-  minLng: number,
-  maxLng: number,
-  options?: {
-    limit?: number;
-    cursor?: ViewportCursor;
-  },
-  database?: D1Queryable,
-): Promise<{
-  rows: DrawingRow[];
-  nextCursor: ViewportCursor | null;
-}> {
-  const db = database ?? getCloudflareContext().env.DB;
-  const limit = Math.max(1, Math.min(options?.limit ?? 300, 1000));
-  const pageSize = limit + 1;
-
-  let query = `SELECT * FROM drawings
-     WHERE min_lng <= ?1 AND max_lng >= ?2
-       AND min_lat <= ?3 AND max_lat >= ?4`;
-
-  const binds: Array<string | number> = [maxLng, minLng, maxLat, minLat];
-
-  if (options?.cursor) {
-    query += `
-       AND (
-         COALESCE(created_at_ms, created_at * 1000) < ?5
-         OR (COALESCE(created_at_ms, created_at * 1000) = ?5 AND id < ?6)
-       )`;
-    binds.push(options.cursor.createdAt, options.cursor.id);
-    query += `
-     ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
-     LIMIT ?7`;
-    binds.push(pageSize);
-  } else {
-    query += `
-     ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
-     LIMIT ?5`;
-    binds.push(pageSize);
-  }
-
-  const { results } = await db.prepare(query)
-    .bind(...binds)
-    .all<DrawingRow>();
-
-  const allRows = results ?? [];
-  const hasMore = allRows.length > limit;
-  const rows = hasMore ? allRows.slice(0, limit) : allRows;
-  const last = rows[rows.length - 1];
-
-  return {
-    rows,
-    nextCursor: hasMore && last
-      ? { createdAt: last.created_at_ms ?? last.created_at * 1000, id: last.id }
-      : null,
-  };
-}
 
 /**
  * 根据 ID 查询单条笔画
@@ -236,23 +139,29 @@ export async function updateUserProfile(
     .run();
 }
 
-/**
- * 软删除账号：匿名化所有作品后删除用户
- * drawings 和 map_pins 的 user_id 会因 FK ON DELETE SET NULL 变为 NULL，
- * user_name 字段单独更新为 'Anonymous'。
- */
-export async function deleteUserAndAnonymize(userId: string): Promise<void> {
+export async function getUserDeletionData(userId: string): Promise<{
+  avatar_url: string | null;
+  apple_refresh_token: string | null;
+} | null> {
   const { env } = getCloudflareContext();
+  return env.DB.prepare('SELECT avatar_url, apple_refresh_token FROM users WHERE id = ?')
+    .bind(userId)
+    .first();
+}
 
-  // 先把作品和图钉的 user_name 改为匿名（user_id 会在删除 user 时由 FK 自动置 NULL）
+/** Permanently delete an account and every row of user-generated content. */
+export async function deleteUserAccountData(userId: string): Promise<void> {
+  const { env } = getCloudflareContext();
   await env.DB.batch([
-    env.DB.prepare('UPDATE drawings SET user_name = ? WHERE user_id = ?')
-      .bind('Anonymous', userId),
-    env.DB.prepare('UPDATE map_pins SET user_name = ? WHERE user_id = ?')
-      .bind('Anonymous', userId),
-    // 删除用户；sessions 会由 ON DELETE CASCADE 自动删除
-    env.DB.prepare('DELETE FROM users WHERE id = ?')
+    env.DB.prepare(`DELETE FROM reports
+      WHERE reporter_id = ?1
+         OR (content_type = 'user' AND content_id = ?1)
+         OR (content_type = 'drawing' AND content_id IN (SELECT id FROM drawings WHERE user_id = ?1))
+         OR (content_type = 'pin' AND content_id IN (SELECT id FROM map_pins WHERE user_id = ?1))`)
       .bind(userId),
+    env.DB.prepare('DELETE FROM drawings WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM map_pins WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
 }
 

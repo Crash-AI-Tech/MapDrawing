@@ -14,6 +14,8 @@ binding = "ASSETS"
 binding = "WORKER_SELF_REFERENCE"
 service = "map-staging"
 
+# RELEASE BLOCKED: this is the v1 source database. Create/migrate
+# map-db-staging-v2 and replace both fields below before deploying this branch.
 [[d1_databases]]
 binding = "DB"
 database_name = "map-db-staging"
@@ -37,6 +39,9 @@ APPLE_CLIENT_ID = "com.niubi.agent"
 ENABLE_PRESENCE = "false"
 NEXT_PUBLIC_ENABLE_PRESENCE = "false"
 APP_ENV = "staging"
+
+# AUTH_SECRET, RESEND_API_KEY, APPLE_TEAM_ID, APPLE_KEY_ID and
+# APPLE_PRIVATE_KEY must be configured as secrets for this Worker.
 
 [observability]
 enabled = true

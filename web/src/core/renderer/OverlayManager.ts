@@ -1,4 +1,4 @@
-import type { ViewState, CoordinateConverter } from '../types';
+import type { CoordinateConverter } from '../types';
 
 /**
  * OverlayManager — synchronizes the Canvas overlay position with MapLibre GL.
@@ -47,7 +47,7 @@ export class OverlayManager {
    * This is a simplified overlay approach — the canvas covers the map exactly
    * and is repositioned on each map move.
    */
-  syncTransform(_viewState: ViewState): void {
+  syncTransform(): void {
     // For the overlay approach, the canvas always covers the full container.
     // Transform is handled at render time by converting geo → screen coordinates.
     // No CSS transform needed in this approach.

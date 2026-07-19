@@ -47,11 +47,11 @@ export async function POST(request: Request) {
                 `SELECT created_at FROM verification_codes
          WHERE email = ? AND type = ?
          ORDER BY created_at DESC LIMIT 1`
-            ).bind(email, 'email_verification').first<{ created_at: string }>();
+            ).bind(email, 'email_verification').first<{ created_at: number }>();
 
             if (recent) {
-                const elapsed = Date.now() - new Date(recent.created_at).getTime();
-                if (elapsed < 60_000) {
+                const elapsedSeconds = Math.floor(Date.now() / 1000) - recent.created_at;
+                if (elapsedSeconds < 60) {
                     return NextResponse.json({ error: 'Please wait 60 seconds before retrying' }, { status: 429 });
                 }
             }
@@ -83,6 +83,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid verification code' }, { status: 400 });
         }
 
+        const attemptOwner = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
+            .bind(email)
+            .first<{ id: string }>();
+        if (!attemptOwner) {
+            return NextResponse.json({ error: 'Invalid verification code' }, { status: 400 });
+        }
+
         // Rate limit: max 5 verify attempts per email per 15 minutes
         const attemptWindow = Date.now() - 15 * 60 * 1000;
         const attempts = await env.DB.prepare(
@@ -100,8 +107,8 @@ export async function POST(request: Request) {
         // Record this attempt
         await env.DB.prepare(
             `INSERT INTO verification_codes (id, user_id, email, code, type, expires_at)
-             VALUES (?, '', ?, '', 'verify_attempt', ?)`
-        ).bind(generateId(15), email, Date.now() + 15 * 60 * 1000).run();
+             VALUES (?, ?, ?, '', 'verify_attempt', ?)`
+        ).bind(generateId(15), attemptOwner.id, email, Date.now() + 15 * 60 * 1000).run();
 
         const record = await env.DB.prepare(
             `SELECT id, user_id, expires_at

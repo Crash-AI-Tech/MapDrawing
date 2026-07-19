@@ -1,5 +1,7 @@
 import { validateSession } from '@/lib/auth/session';
 import { blockUser, unblockUser, getBlockedUsers } from '@/lib/db/queries';
+import { validateCsrf } from '@/lib/csrf';
+import { readJsonBody, RequestBodyError } from '@/lib/http/body';
 
 /**
  * GET /api/block — list all users I have blocked.
@@ -35,12 +37,14 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = (await request.json()) as { blockedId?: string };
+    const body = await readJsonBody(request, 4 * 1024) as { blockedId?: string };
     if (!body.blockedId) {
       return Response.json({ error: 'blockedId is required' }, { status: 400 });
     }
@@ -53,6 +57,7 @@ export async function POST(request: Request) {
 
     return Response.json({ ok: true });
   } catch (e) {
+    if (e instanceof RequestBodyError) return Response.json({ error: e.message }, { status: e.status });
     console.error('[API /block POST]:', e);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -65,12 +70,14 @@ export async function POST(request: Request) {
  */
 export async function DELETE(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = (await request.json()) as { blockedId?: string };
+    const body = await readJsonBody(request, 4 * 1024) as { blockedId?: string };
     if (!body.blockedId) {
       return Response.json({ error: 'blockedId is required' }, { status: 400 });
     }
@@ -79,6 +86,7 @@ export async function DELETE(request: Request) {
 
     return Response.json({ ok: true });
   } catch (e) {
+    if (e instanceof RequestBodyError) return Response.json({ error: e.message }, { status: e.status });
     console.error('[API /block DELETE]:', e);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }

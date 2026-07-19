@@ -2,8 +2,11 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState, useRef } from 'react';
+import Image from 'next/image';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import { LanguageSelector } from '@/components/shared/LanguageSelector';
+import { useI18n } from '@/lib/i18n';
 import {
   LogOut,
   LogIn,
@@ -43,6 +46,7 @@ interface UserMenuProps {
  */
 export default function UserMenu({ onLoginClick }: UserMenuProps) {
   const { user, profile, signOut, refreshUser } = useAuth();
+  const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<UserProfileStats | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -80,29 +84,26 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
         onClick={onLoginClick}
       >
         <LogIn className="h-3.5 w-3.5" />
-        Log in
+        {t('menuLogin')}
       </Button>
     );
   }
 
-  const displayName = profile?.userName ?? user.userName ?? 'User';
+  const displayName = profile?.userName ?? user.userName ?? t('menuUserFallback');
   const initials = displayName.slice(0, 2).toUpperCase();
   const handle = `@${user.email?.split('@')[0] ?? user.id.slice(0, 8)}`;
 
   const handleDeleteAccount = async () => {
-    if (
-      !window.confirm(
-        'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.'
-      )
-    )
-      return;
+    if (!window.confirm(t('menuDeleteConfirm'))) return;
     setDeleting(true);
     try {
-      await fetch('/api/profile', { method: 'DELETE' });
+      const response = await fetch('/api/profile', { method: 'DELETE' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await signOut();
     } catch {
-      // ignore
+      window.alert(t('menuDeleteFailed'));
+      setDeleting(false);
     }
-    signOut();
   };
 
   const toggleBlockedUsers = async () => {
@@ -135,7 +136,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setBlockedUsers((users) => users.filter((user) => user.userId !== userId));
     } catch {
-      window.alert('Failed to unblock user. Please try again.');
+      window.alert(t('menuUnblockFailed'));
     } finally {
       setUnblockingId(null);
     }
@@ -145,7 +146,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      window.alert('File too large (max 2MB)');
+      window.alert(t('menuUploadTooLarge'));
       return;
     }
     setUploading(true);
@@ -162,7 +163,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
       });
       await refreshUser();
     } catch {
-      window.alert('Upload failed');
+      window.alert(t('menuUploadFailed'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -178,11 +179,15 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
           variant="ghost"
           size="icon"
           className="relative h-8 w-8 rounded-full border border-gray-200/60 bg-gray-100/80 backdrop-blur-md"
+          aria-label={displayName}
         >
           {avatarSrc ? (
-            <img
+            <Image
               src={avatarSrc}
               alt={displayName}
+              width={32}
+              height={32}
+              unoptimized
               className="h-8 w-8 rounded-full object-cover"
             />
           ) : (
@@ -206,11 +211,15 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
               className="group relative cursor-pointer rounded-full"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
+              aria-label={t('menuChangeAvatar')}
             >
               {avatarSrc ? (
-                <img
+                <Image
                   src={avatarSrc}
                   alt={displayName}
+                  width={64}
+                  height={64}
+                  unoptimized
                   className="h-16 w-16 rounded-full border-[3px] border-white object-cover shadow-lg"
                 />
               ) : (
@@ -245,13 +254,13 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
             <StatItem
               icon={<MapPin className="h-3 w-3 text-blue-500" />}
               value={stats?.pins ?? '–'}
-              label="Pins"
+              label={t('menuPins')}
             />
             <div className="mx-3 h-6 w-px bg-gray-200" />
             <StatItem
               icon={<PenTool className="h-3 w-3 text-purple-500" />}
               value={stats?.drawings ?? '–'}
-              label="Drawings"
+              label={t('menuDrawings')}
             />
           </div>
         </div>
@@ -259,35 +268,38 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
         {/* ===== Support & Legal ===== */}
         <div className="border-t border-gray-100 px-2 py-1.5">
           <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-            Support & Legal
+            {t('menuSupportLegal')}
           </p>
+          <div className="mx-2 mb-1 rounded-lg bg-gray-50 px-2 py-1.5">
+            <LanguageSelector compact />
+          </div>
           <MenuItem
             icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
-            label="Terms of Service"
-            onClick={() => window.open(TERMS_OF_SERVICE_URL, '_blank', 'noopener,noreferrer')}
+            label={t('menuTerms')}
+            onClick={() => window.open(`${TERMS_OF_SERVICE_URL}?lang=${lang}`, '_blank', 'noopener,noreferrer')}
           />
           <MenuItem
             icon={<ShieldCheck className="h-3.5 w-3.5 text-green-500" />}
-            label="Privacy Policy"
-            onClick={() => window.open(PRIVACY_POLICY_URL, '_blank', 'noopener,noreferrer')}
+            label={t('menuPrivacy')}
+            onClick={() => window.open(`${PRIVACY_POLICY_URL}?lang=${lang}`, '_blank', 'noopener,noreferrer')}
           />
           <MenuItem
             icon={<UserX className="h-3.5 w-3.5 text-orange-500" />}
-            label="Blocked Users"
+            label={t('menuBlockedUsers')}
             onClick={() => { void toggleBlockedUsers(); }}
           />
           {blockedExpanded && (
             <div className="mx-2 mb-1 max-h-36 overflow-y-auto rounded-lg bg-gray-50 p-2">
               {blockedLoading ? (
-                <p className="py-2 text-center text-xs text-gray-400">Loading…</p>
+                <p className="py-2 text-center text-xs text-gray-400">{t('menuBlockedLoading')}</p>
               ) : blockedUsers.length === 0 ? (
-                <p className="py-2 text-center text-xs text-gray-400">No users blocked yet.</p>
+                <p className="py-2 text-center text-xs text-gray-400">{t('menuBlockedEmpty')}</p>
               ) : blockedUsers.map((blockedUser) => {
                 const blockedAvatar = resolveAvatarUrl(blockedUser.avatarUrl);
                 return (
                   <div key={blockedUser.userId} className="flex items-center gap-2 border-b border-gray-100 py-2 last:border-0">
                     {blockedAvatar ? (
-                      <img src={blockedAvatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+                      <Image src={blockedAvatar} alt="" width={28} height={28} unoptimized className="h-7 w-7 rounded-full object-cover" />
                     ) : (
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-600">
                         {blockedUser.userName.slice(0, 2).toUpperCase()}
@@ -296,7 +308,9 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium text-gray-700">{blockedUser.userName}</p>
                       <p className="text-[10px] text-gray-400">
-                        {new Date(blockedUser.blockedAt).toLocaleDateString()}
+                        {new Date(blockedUser.blockedAt).toLocaleDateString(
+                          lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : 'en-US',
+                        )}
                       </p>
                     </div>
                     <button
@@ -304,7 +318,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
                       disabled={unblockingId === blockedUser.userId}
                       onClick={() => { void handleUnblock(blockedUser.userId); }}
                     >
-                      {unblockingId === blockedUser.userId ? '…' : 'Unblock'}
+                      {unblockingId === blockedUser.userId ? '…' : t('menuUnblock')}
                     </button>
                   </div>
                 );
@@ -317,10 +331,10 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
         <div className="border-t border-gray-100 px-2 py-1.5">
           <button
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50"
-            onClick={() => { setOpen(false); signOut(); }}
+            onClick={() => { setOpen(false); void signOut(); }}
           >
             <LogOut className="h-3.5 w-3.5" />
-            Log Out
+            {t('menuLogout')}
           </button>
           <button
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
@@ -328,7 +342,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
             disabled={deleting}
           >
             <Trash2 className="h-3.5 w-3.5" />
-            {deleting ? 'Deleting…' : 'Delete Account'}
+            {deleting ? t('menuDeleting') : t('menuDeleteAccount')}
           </button>
         </div>
       </PopoverContent>

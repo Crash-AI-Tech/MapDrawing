@@ -145,39 +145,6 @@ interface ViewportParams {
   maxLng: number;
 }
 
-/**
- * GET /api/drawings — load strokes within viewport bounds.
- * No auth required.
- */
-export async function fetchDrawings(
-  params: ViewportParams & {
-    zoom?: number;
-    limit?: number;
-    cursor?: PageCursor | null;
-    signal?: AbortSignal;
-  }
-): Promise<{
-  items: StrokeData[];
-  nextCursor: PageCursor | null;
-}> {
-  const qs = new URLSearchParams({
-    minLat: String(params.minLat),
-    maxLat: String(params.maxLat),
-    minLng: String(params.minLng),
-    maxLng: String(params.maxLng),
-    ...(params.zoom != null ? { zoom: String(params.zoom) } : {}),
-    ...(params.limit != null ? { limit: String(params.limit) } : {}),
-    ...(params.cursor
-      ? {
-        cursorCreatedAt: String(params.cursor.createdAt),
-        cursorId: params.cursor.id,
-      }
-      : {}),
-  }).toString();
-
-  return apiFetch(`/api/drawings?${qs}`, { signal: params.signal });
-}
-
 /** Fetch one exact server-side drawing tile with cursor pagination. */
 export async function fetchDrawingTile(params: {
   z: number;
@@ -314,7 +281,7 @@ export async function fetchProfileStats(): Promise<UserProfileStats> {
 }
 
 /**
- * DELETE /api/profile — anonymize + permanently delete the current user account.
+ * DELETE /api/profile — permanently delete the account and associated data.
  * Auth required.
  */
 export async function deleteAccount(): Promise<void> {

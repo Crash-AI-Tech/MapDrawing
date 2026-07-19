@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Mail, Lock, ArrowRight } from 'lucide-react';
+import type { Lang } from '@/lib/i18n';
 
 interface RegisterFormProps {
-  lang: 'zh' | 'en';
+  lang: Lang;
   onSwitchToLogin?: () => void;
   onVerifyRequired?: (email: string) => void;
 }
@@ -20,7 +21,7 @@ const t = {
     password: '密码',
     placeholderUser: '你的名字',
     placeholderEmail: 'your@email.com',
-    placeholderPwd: '至少6位',
+    placeholderPwd: '至少8位',
     register: '注册',
     registering: '注册中...',
     or: '或者',
@@ -33,12 +34,18 @@ const t = {
     password: 'Password',
     placeholderUser: 'Your name',
     placeholderEmail: 'your@email.com',
-    placeholderPwd: 'Min 6 chars',
+    placeholderPwd: 'Min 8 chars',
     register: 'Sign up',
     registering: 'Signing up...',
     or: 'OR',
     hasAccount: 'Already have an account?',
     login: 'Log in',
+  },
+  ja: {
+    username: 'ユーザー名', email: 'メール', password: 'パスワード',
+    placeholderUser: 'お名前', placeholderEmail: 'your@email.com',
+    placeholderPwd: '8文字以上', register: '新規登録', registering: '登録中…',
+    or: 'または', hasAccount: 'すでにアカウントをお持ちですか？', login: 'ログイン',
   },
 };
 
@@ -105,7 +112,7 @@ export default function RegisterForm({
               type="password"
               placeholder={d.placeholderPwd}
               required
-              minLength={6}
+              minLength={8}
               className="h-11 rounded-xl border-white/60 bg-white/50 pl-10 shadow-sm backdrop-blur-sm placeholder:text-gray-300 focus:border-gray-300 focus:bg-white/80 focus:ring-1 focus:ring-gray-200"
             />
           </div>

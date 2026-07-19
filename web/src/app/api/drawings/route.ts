@@ -1,6 +1,5 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
-import { getDrawingsInViewportPaginated, getBlockedUsers } from '@/lib/db/queries';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { validateCsrf } from '@/lib/csrf';
 import { readJsonBody, RequestBodyError } from '@/lib/http/body';
@@ -10,96 +9,6 @@ import {
   validateStrokeBatch,
 } from '@/lib/drawings/validation';
 import { isInsufficientInkError, prepareInkConsumption } from '@/lib/ink/server';
-import {
-  parseCursor,
-  parseInteger,
-  parseViewport,
-  QueryValidationError,
-} from '@/lib/http/query';
-
-/**
- * GET /api/drawings — fetch strokes within a viewport bounds (D1).
- * Query params: minLat, maxLat, minLng, maxLng
- */
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-
-  try {
-    const { minLat, maxLat, minLng, maxLng } = parseViewport(url.searchParams, 2);
-    // Older released clients request 1,000 (iOS) or 5,000 (Web). Accept those
-    // values during the synchronized rollout; the query helper still caps one
-    // response page at 1,000 rows to protect D1 and Worker memory.
-    const limit = parseInteger(url.searchParams, 'limit', 300, 1, 5000);
-    const cursor = parseCursor(url.searchParams);
-    const { env } = getCloudflareContext();
-    const database = env.DB.withSession();
-    // Optionally get blocked users if authenticated (gracefully degrade if table not yet migrated)
-    let blockedIds: string[] = [];
-    try {
-      const sessionResult = await validateSession(request).catch(() => null);
-      if (sessionResult) {
-        const blockedRows = await getBlockedUsers(sessionResult.user.id);
-        blockedIds = blockedRows.map((r) => r.blocked_id);
-      }
-    } catch {
-      // blocked_users table may not exist in local dev — skip filtering
-    }
-
-    const { rows, nextCursor } = await getDrawingsInViewportPaginated(
-      minLat,
-      maxLat,
-      minLng,
-      maxLng,
-      {
-        limit,
-        cursor,
-      },
-      database,
-    );
-
-    // Filter out drawings from blocked users
-    const filteredRows = blockedIds.length > 0
-      ? rows.filter((r) => !r.user_id || !blockedIds.includes(r.user_id))
-      : rows;
-
-    // Transform DB rows to StrokeData format
-    const strokes = filteredRows.map((row) => ({
-      id: row.id,
-      userId: row.user_id ?? '',
-      userName: row.user_name ?? 'Unknown',
-      brushId: row.brush_id,
-      color: row.color,
-      opacity: row.opacity,
-      size: row.size,
-      points:
-        typeof row.points === 'string' ? JSON.parse(row.points) : row.points,
-      bounds: {
-        minLng: row.min_lng,
-        maxLng: row.max_lng,
-        minLat: row.min_lat,
-        maxLat: row.max_lat,
-      },
-      createdZoom: row.created_zoom,
-      createdAt: row.created_at_ms ?? row.created_at * 1000,
-      meta: row.meta ? JSON.parse(row.meta) : null,
-    }));
-
-    return Response.json(
-      { items: strokes, nextCursor },
-      { headers: { 'x-d1-bookmark': database.getBookmark() ?? '' } },
-    );
-  } catch (e: unknown) {
-    if (e instanceof QueryValidationError) {
-      return Response.json({ error: e.message }, { status: 400 });
-    }
-    console.error('[API /drawings] Server error:', e);
-    return Response.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
 /**
  * POST /api/drawings — persist new strokes (batch insert to D1).
  */
@@ -128,7 +37,7 @@ export async function POST(request: Request) {
       `SELECT id, user_id FROM drawings WHERE id IN (${placeholders})`
     )
       .bind(...strokes.map((stroke) => stroke.id))
-      .all<{ id: string; user_id: string | null }>();
+      .all<{ id: string; user_id: string }>();
 
     if ((existing.results?.length ?? 0) > 0) {
       const ownedIds = new Set(
@@ -145,9 +54,8 @@ export async function POST(request: Request) {
     const stmt = env.DB.prepare(
       `INSERT INTO drawings (id, user_id, user_name, brush_id, color, opacity, size,
                              points, point_count, min_lat, max_lat, min_lng, max_lng,
-                             center_lat, center_lng, created_zoom, meta,
-                             created_at, created_at_ms, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                             created_zoom, meta, created_at_ms, updated_at_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
 
     const nowMs = Date.now();
@@ -168,13 +76,10 @@ export async function POST(request: Request) {
         stroke.bounds.maxLat,
         stroke.bounds.minLng,
         stroke.bounds.maxLng,
-        (stroke.bounds.minLat + stroke.bounds.maxLat) / 2,
-        (stroke.bounds.minLng + stroke.bounds.maxLng) / 2,
         stroke.createdZoom,
         stroke.meta ? JSON.stringify(stroke.meta) : null,
-        nowSeconds,
         nowMs + index,
-        nowSeconds,
+        nowMs + index,
       )
     );
 

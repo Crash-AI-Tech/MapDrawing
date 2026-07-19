@@ -1,5 +1,5 @@
 import { Redirect, Stack } from 'expo-router';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
 
@@ -9,7 +9,7 @@ export default function ProtectedLayout() {
     if (isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Loading...</Text>
+                <ActivityIndicator accessibilityLabel="Loading" />
             </View>
         );
     }

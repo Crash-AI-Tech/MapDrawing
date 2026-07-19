@@ -13,7 +13,6 @@
  * - Spatial tile cache: only dirty tiles re-render, not all O(N) strokes
  * - Incremental stroke cache: SkPath computed once per stroke
  * - Paint reuse: no per-frame Paint construction
- * - Spray progressive degradation
  * - Strokes in ref (not state): no React reconciliation for large arrays
  */
 
@@ -39,7 +38,6 @@ import {
   Canvas,
   Path,
   Group,
-  Paint,
   Skia,
   Picture,
   type SkPath,
@@ -1034,36 +1032,18 @@ export default function MapScreen() {
             )}
 
             {/* Current active stroke */}
-            {currentPath &&
-              (activeBrushConfig.useLayer ? (
-                <Group
-                  layer={
-                    <Paint opacity={(activeBrushConfig.layerOpacity ?? 0.3) * (strokesTransparent ? 0.3 : 1)} />
-                  }
-                >
-                  <Path
-                    path={currentPath}
-                    color={currentColor}
-                    style="stroke"
-                    strokeWidth={activeBrushConfig.strokeWidth(currentSize)}
-                    strokeCap={activeBrushConfig.strokeCap}
-                    strokeJoin={activeBrushConfig.strokeJoin}
-                    opacity={1.0}
-                    blendMode={activeBrushConfig.blendMode}
-                  />
-                </Group>
-              ) : (
-                <Path
-                  path={currentPath}
-                  color={currentColor}
-                  style="stroke"
-                  strokeWidth={activeBrushConfig.strokeWidth(currentSize)}
-                  strokeCap={activeBrushConfig.strokeCap}
-                  strokeJoin={activeBrushConfig.strokeJoin}
-                  opacity={currentOpacity * activeBrushConfig.opacity * (strokesTransparent ? 0.3 : 1)}
-                  blendMode={activeBrushConfig.blendMode}
-                />
-              ))}
+            {currentPath && (
+              <Path
+                path={currentPath}
+                color={currentColor}
+                style="stroke"
+                strokeWidth={activeBrushConfig.strokeWidth(currentSize)}
+                strokeCap={activeBrushConfig.strokeCap}
+                strokeJoin={activeBrushConfig.strokeJoin}
+                opacity={currentOpacity * activeBrushConfig.opacity * (strokesTransparent ? 0.3 : 1)}
+                blendMode={activeBrushConfig.blendMode}
+              />
+            )}
           </Canvas>
         </View>
       </GestureDetector>

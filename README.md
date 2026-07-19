@@ -21,7 +21,7 @@ pnpm --filter web db:migrate
 pnpm --filter web dev
 ```
 
-`next dev` 适合日常开发，地址通常是 `http://localhost:3000`。Route Handlers 就是项目后端；`initOpenNextCloudflareForDev()` 会把本地 Wrangler bindings 注入 Next.js，因此无需另启后端容器。
+`next dev` 适合日常开发，地址通常是 `http://localhost:3000`。Route Handlers 就是项目后端；`initOpenNextCloudflareForDev()` 会把本地 Wrangler bindings 注入 Next.js，因此无需另启后端容器。多语言服务条款和隐私政策位于 `/legal/terms` 和 `/legal/privacy`。
 
 要验证与线上 Worker 更接近的构建、路由和 bindings，请运行：
 
@@ -54,24 +54,22 @@ pnpm --filter web build
 
 ## Cloudflare 部署
 
-仓库包含独立测试配置 `web/wrangler.staging.toml`。其中只保存可公开的 Worker、D1、R2、KV 名称和 ID，确保不同电脑拉取代码后使用相同 bindings；真实密钥使用 Cloudflare Secrets。测试环境部署命令：
+仓库包含独立测试配置 `web/wrangler.staging.toml`。其中只保存可公开的 Worker、D1、R2、KV 名称和 ID，确保不同电脑拉取代码后使用相同 bindings；真实密钥使用 Cloudflare Secrets。
 
 测试站地址：<https://map-staging.privacy2privacy.workers.dev>
 
+当前 `wrangler*.toml` 故意保留旧 D1 作为数据源，因此部署命令会主动拒绝运行。不要将 `0001_v2_baseline.sql` 应用到旧测试库或生产库。正确的发布流程是：
+
+1. 新建空的 `map-db-staging-v2` / `map-db-v2` D1。
+2. 按 [D1 v2 迁移手册](docs/d1-v2-runbook.md) 只复制用户和有效会话。
+3. 将新库名称和 ID 写入对应 Wrangler 配置并提交。
+4. 先发布和验证测试环境，再执行生产发布。
+
 ```bash
-pnpm --filter web db:migrate:staging
 pnpm --filter web deploy:staging
-```
-
-测试环境资源均以 `-staging` 结尾，不包含生产用户或作品数据。测试账号由管理员直接写入测试 D1，密码不进入 GitHub。
-
-生产环境迁移和部署是显式操作，不会在本地开发时自动执行。新版本依赖最新 D1 表结构，因此上线顺序是：
-
-```bash
-pnpm --filter web db:migrate:prod
 pnpm --filter web deploy
 ```
 
-先在 Cloudflare 控制台或备份流程中保留 D1 恢复点，再应用生产迁移。`AUTH_SECRET` 和 `RESEND_API_KEY` 应使用 `wrangler secret put` 管理，不要写入仓库。实时光标功能默认关闭，因为 KV 不适合高频 presence 写入；将来需要实时协作时应迁移到 Durable Objects。
+测试环境资源不包含生产用户或作品数据。生产切换前保留旧 D1 恢复点。`AUTH_SECRET`、`RESEND_API_KEY`、`APPLE_TEAM_ID`、`APPLE_KEY_ID` 和 `APPLE_PRIVATE_KEY` 使用 `wrangler secret put` 管理，不写入仓库。实时光标功能默认关闭，因为 KV 不适合高频 presence 写入；将来需要实时协作时应迁移到 Durable Objects。
 
 只读地图接口已经使用 D1 Sessions API。发布后可在 D1 数据库的 Settings 中启用 Read Replication；未启用时 Sessions API 仍可正常工作，只是查询继续由主实例处理。

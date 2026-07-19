@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { LanguageDocumentSync } from '@/components/shared/LanguageDocumentSync';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://map.wisebamboo.fun'),
@@ -53,6 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background antialiased">
+        <LanguageDocumentSync />
         {children}
       </body>
     </html>

@@ -40,11 +40,11 @@ export async function POST(request: Request) {
             `SELECT created_at FROM verification_codes
        WHERE email = ? AND type = ?
        ORDER BY created_at DESC LIMIT 1`
-        ).bind(email, 'password_reset').first<{ created_at: string }>();
+        ).bind(email, 'password_reset').first<{ created_at: number }>();
 
         if (recent) {
-            const elapsed = Date.now() - new Date(recent.created_at).getTime();
-            if (elapsed < 60_000) {
+            const elapsedSeconds = Math.floor(Date.now() / 1000) - recent.created_at;
+            if (elapsedSeconds < 60) {
                 return NextResponse.json({ error: 'Please wait 60 seconds before retrying' }, { status: 429 });
             }
         }

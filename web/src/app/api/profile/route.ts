@@ -1,5 +1,8 @@
 import { validateSession } from '@/lib/auth/session';
-import { getUserProfile, updateUserProfile, deleteUserAndAnonymize } from '@/lib/db/queries';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { getUserProfile, updateUserProfile, getUserDeletionData, deleteUserAccountData } from '@/lib/db/queries';
+import { revokeAppleAuthorization } from '@/lib/auth/apple';
+import { validateCsrf } from '@/lib/csrf';
 
 /**
  * GET /api/profile — fetch the current user's profile (D1).
@@ -34,6 +37,8 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -48,13 +53,31 @@ export async function PATCH(request: Request) {
       }
       updates.userName = body.userName.trim();
     }
-    if (body.avatarUrl !== undefined) updates.avatarUrl = body.avatarUrl;
+    if (body.avatarUrl !== undefined) {
+      if (typeof body.avatarUrl !== 'string' || !body.avatarUrl.startsWith(`/avatars/${result.user.id}/`)) {
+        return Response.json({ error: 'Invalid avatar URL' }, { status: 400 });
+      }
+      updates.avatarUrl = body.avatarUrl;
+    }
 
     if (Object.keys(updates).length === 0) {
       return Response.json({ error: 'No fields to update' }, { status: 400 });
     }
 
+    const previousProfile = updates.avatarUrl ? await getUserProfile(result.user.id) : null;
     await updateUserProfile(result.user.id, updates);
+
+    if (updates.avatarUrl && previousProfile?.avatar_url && previousProfile.avatar_url !== updates.avatarUrl) {
+      const oldKey = previousProfile.avatar_url.replace(/^\//, '');
+      if (oldKey.startsWith(`avatars/${result.user.id}/`)) {
+        try {
+          const { env } = getCloudflareContext();
+          await env.BUCKET.delete(oldKey);
+        } catch (error) {
+          console.error('[API /profile PATCH]: Failed to delete previous avatar', error);
+        }
+      }
+    }
 
     const profile = await getUserProfile(result.user.id);
 
@@ -70,17 +93,41 @@ export async function PATCH(request: Request) {
 }
 
 /**
- * DELETE /api/profile — anonymize and permanently delete the current user account.
- * All drawings and pins remain, but user_id is nulled and user_name becomes 'Anonymous'.
+ * DELETE /api/profile — permanently delete the account and associated data.
  */
 export async function DELETE(request: Request) {
   try {
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
     const result = await validateSession(request);
     if (!result) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await deleteUserAndAnonymize(result.user.id);
+    const { env } = getCloudflareContext();
+    const deletionData = await getUserDeletionData(result.user.id);
+    if (!deletionData) return Response.json({ error: 'Profile not found' }, { status: 404 });
+
+    // Remove every avatar object, including older uploads with a different extension.
+    let cursor: string | undefined;
+    do {
+      const page = await env.BUCKET.list({ prefix: `avatars/${result.user.id}/`, cursor });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.BUCKET.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+
+    // Apple revocation is best effort: a provider outage must not prevent account deletion.
+    if (deletionData.apple_refresh_token) {
+      try {
+        const revoked = await revokeAppleAuthorization(deletionData.apple_refresh_token, env);
+        if (!revoked) console.error('[API /profile DELETE]: Apple authorization revocation was rejected');
+      } catch (error) {
+        console.error('[API /profile DELETE]: Apple authorization revocation failed', error);
+      }
+    }
+
+    await deleteUserAccountData(result.user.id);
 
     return Response.json({ ok: true });
   } catch (e) {

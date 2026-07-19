@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Globe } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,8 @@ import RegisterForm from './RegisterForm';
 import VerifyEmailForm from './VerifyEmailForm';
 import ForgotPasswordForm from './ForgotPasswordForm';
 import ResetPasswordForm from './ResetPasswordForm';
+import { LanguageSelector } from '@/components/shared/LanguageSelector';
+import { useI18n } from '@/lib/i18n';
 
 export type AuthMode =
   | 'login'
@@ -60,11 +61,27 @@ const t = {
       description: 'Enter code and new password',
     },
   },
+  ja: {
+    login: { title: 'おかえりなさい', description: 'ログインして地図に描画やピンを追加しましょう' },
+    register: { title: 'アカウントを作成', description: '参加して創作を始めましょう' },
+    'verify-email': {
+      title: 'メールを確認',
+      description: 'メールに6桁の確認コードを送信しました',
+    },
+    'forgot-password': {
+      title: 'パスワードをお忘れですか',
+      description: '登録メールアドレスに確認コードを送信します',
+    },
+    'reset-password': {
+      title: 'パスワードをリセット',
+      description: '確認コードと新しいパスワードを入力してください',
+    },
+  },
 };
 
 export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [mode, setMode] = useState<AuthMode>('login');
-  const [lang, setLang] = useState<'zh' | 'en'>('en');
+  const { lang } = useI18n();
   const [verifyEmail, setVerifyEmail] = useState('');
   const [resetEmail, setResetEmail] = useState('');
 
@@ -99,13 +116,7 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-[420px] border-white/40 bg-white/70 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-2xl sm:rounded-2xl">
         {/* Language Switcher */}
-        <button
-          onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-          className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-          title={lang === 'zh' ? 'Switch to English' : '切换到中文'}
-        >
-          <Globe className="h-4 w-4" />
-        </button>
+        <LanguageSelector className="absolute left-4 top-4" compact showIcon={false} />
 
         <DialogHeader className="text-center">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 text-xl text-white shadow-lg">

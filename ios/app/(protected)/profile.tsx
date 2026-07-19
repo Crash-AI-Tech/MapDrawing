@@ -118,11 +118,12 @@ export default function ProfileScreen() {
                         setIsDeleting(true);
                         try {
                             await deleteAccountApi();
+                            await signOut();
                         } catch (e: any) {
                             console.error('Failed to delete account', e);
+                            Alert.alert(ts('deleteTitle', lang), e?.message || ts('unknownError', lang));
                         } finally {
-                            // Sign out regardless — session is gone after deletion
-                            await signOut();
+                            setIsDeleting(false);
                         }
                     }
                 }
@@ -143,7 +144,7 @@ export default function ProfileScreen() {
             icon: 'document-text-outline',
             color: '#007AFF',
             onPress: () => {
-                void Linking.openURL(TERMS_OF_SERVICE_URL);
+                void Linking.openURL(`${TERMS_OF_SERVICE_URL}?lang=${lang}`);
             }
         },
         {
@@ -151,7 +152,7 @@ export default function ProfileScreen() {
             icon: 'shield-checkmark-outline',
             color: '#34C759',
             onPress: () => {
-                void Linking.openURL(PRIVACY_POLICY_URL);
+                void Linking.openURL(`${PRIVACY_POLICY_URL}?lang=${lang}`);
             }
         },
         {

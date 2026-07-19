@@ -47,7 +47,7 @@ export async function validateSession(request?: Request) {
 
 /**
  * 在 Route Handler 中通过 Request 对象验证 Session
- * 适用于不方便使用 cookies() 的场景（如 Durable Object Token 验证）
+ * 适用于仅持有 Request 与 D1 binding 的边缘路由。
  */
 export async function validateSessionForRequest(
   request: Request,

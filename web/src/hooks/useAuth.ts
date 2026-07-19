@@ -4,6 +4,57 @@ import { useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import type { AppUser } from '@/stores/authStore';
 
+let profileRequest: Promise<void> | null = null;
+let authInitialized = false;
+
+/**
+ * Multiple UI components consume useAuth. Keep one shared request so mounting the
+ * canvas, toolbar, and user menu does not fan out duplicate /api/profile calls.
+ */
+function loadCurrentUser(force = false): Promise<void> {
+  if (!force && authInitialized) return Promise.resolve();
+  if (profileRequest) return profileRequest;
+
+  profileRequest = (async () => {
+    const store = useAuthStore.getState();
+    try {
+      const res = await fetch('/api/profile');
+      if (!res.ok) {
+        store.clear();
+        return;
+      }
+
+      const data = (await res.json()) as {
+        id: string;
+        email?: string;
+        user_name?: string;
+        avatar_url?: string | null;
+      };
+      const appUser: AppUser = {
+        id: data.id,
+        email: data.email ?? '',
+        userName: data.user_name ?? 'Anonymous',
+        avatarUrl: data.avatar_url ?? null,
+      };
+      store.setUser(appUser);
+      store.setProfile({
+        id: data.id,
+        userName: data.user_name ?? 'Anonymous',
+        avatarUrl: data.avatar_url ?? null,
+      });
+    } catch {
+      store.clear();
+    } finally {
+      useAuthStore.getState().setLoading(false);
+    }
+  })().finally(() => {
+    authInitialized = true;
+    profileRequest = null;
+  });
+
+  return profileRequest;
+}
+
 /**
  * useAuth — 管理 Lucia Auth 会话生命周期。
  *
@@ -12,51 +63,17 @@ import type { AppUser } from '@/stores/authStore';
  * 客户端只负责获取当前用户信息和登出。
  */
 export function useAuth() {
-  const { user, profile, isLoading, setUser, setProfile, setLoading, clear } =
-    useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const clear = useAuthStore((state) => state.clear);
 
   // === 初始化：获取当前用户信息 ===
   useEffect(() => {
-    fetchCurrentUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadCurrentUser();
   }, []);
 
-  /**
-   * 从 /api/profile 获取当前登录用户信息
-   * Cookie 会自动携带，服务端验证 Session
-   */
-  const fetchCurrentUser = useCallback(async () => {
-    try {
-      const res = await fetch('/api/profile');
-      if (res.ok) {
-        const data = (await res.json()) as {
-          id: string;
-          email?: string;
-          user_name?: string;
-          avatar_url?: string | null;
-        };
-        const appUser: AppUser = {
-          id: data.id,
-          email: data.email ?? '',
-          userName: data.user_name ?? 'Anonymous',
-          avatarUrl: data.avatar_url ?? null,
-        };
-        setUser(appUser);
-        setProfile({
-          id: data.id,
-          userName: data.user_name ?? 'Anonymous',
-          avatarUrl: data.avatar_url ?? null,
-        });
-      } else {
-        // 未登录或 Session 过期
-        clear();
-      }
-    } catch {
-      clear();
-    } finally {
-      setLoading(false);
-    }
-  }, [setUser, setProfile, setLoading, clear]);
+  const refreshUser = useCallback(() => loadCurrentUser(true), []);
 
   // === 登录（通过 Server Action 表单提交，不需要客户端方法） ===
   // LoginForm 直接使用 form action 提交到 Server Action
@@ -78,6 +95,6 @@ export function useAuth() {
     profile,
     isLoading,
     signOut,
-    refreshUser: fetchCurrentUser,
+    refreshUser,
   };
 }

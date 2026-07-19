@@ -83,12 +83,6 @@ export class SyncManager {
     return () => this.stateListeners.delete(listener);
   }
 
-  /** Update access token */
-  updateToken(_token: string): void {
-    // We don't store token in class prop but if needed for headers in future
-    // For now API calls rely on Cookies or we could add Authorization header logic here
-  }
-
   /** Clean up everything */
   dispose(): void {
     this.unsubscribeEngine?.();

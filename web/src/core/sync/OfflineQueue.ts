@@ -1,12 +1,12 @@
 import type { DrawEvent } from '../types';
 import {
-  normalizeOfflineQueue,
+  parseOfflineQueue,
   OFFLINE_QUEUE_VERSION,
   type OfflineQueueItem,
 } from '@niubi/shared';
 import { get, set, del } from 'idb-keyval';
 
-const STORE_PREFIX = 'map_offline_';
+const STORE_PREFIX = 'map_offline_v2_';
 
 /**
  * OfflineQueue — stores draw events in IndexedDB when the user is offline.
@@ -28,7 +28,7 @@ export class OfflineQueue {
   async load(): Promise<void> {
     try {
       const stored = await get<unknown>(this.queueKey);
-      this.queue = normalizeOfflineQueue(stored, () => crypto.randomUUID());
+      this.queue = parseOfflineQueue(stored);
       this.loaded = true;
     } catch {
       this.queue = [];

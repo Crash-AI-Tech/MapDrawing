@@ -46,7 +46,7 @@ export default function ForgotPassword() {
             Alert.alert(ts('error', lang), ts('enterCode', lang));
             return;
         }
-        if (newPassword.length < 6) {
+        if (newPassword.length < 8) {
             Alert.alert(ts('error', lang), ts('passwordTooShort', lang));
             return;
         }
@@ -65,7 +65,7 @@ export default function ForgotPassword() {
                 Alert.alert(ts('error', lang), data.error || ts('failedToResetPassword', lang));
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert(ts('networkError', lang), e.message);
         } finally {
             setLoading(false);
         }
@@ -113,7 +113,7 @@ export default function ForgotPassword() {
                         />
                         <TextInput
                             style={styles.input}
-                            placeholder={ts('newPasswordMin6', lang)}
+                            placeholder={ts('newPasswordMin8', lang)}
                             placeholderTextColor="#999"
                             value={newPassword}
                             onChangeText={setNewPassword}

@@ -1,4 +1,4 @@
-import { BRUSH_IDS, LEGACY_BRUSH_IDS } from '@niubi/shared';
+import { BRUSH_IDS } from '@niubi/shared';
 
 export type SkStrokeCap = 'butt' | 'round' | 'square';
 export type SkStrokeJoin = 'bevel' | 'miter' | 'round';
@@ -17,11 +17,8 @@ export interface ActiveBrushConfig {
   blendMode: SkBlendMode;
   strokeCap: SkStrokeCap;
   strokeJoin: SkStrokeJoin;
-  useLayer?: boolean;
-  layerOpacity?: number;
-  isSpray?: boolean;
 }
-/** Live-stroke rendering contract; legacy cases are read-only compatibility. */
+/** Live-stroke rendering contract for the current protocol. */
 export function getActiveBrushConfig(brushId: string): ActiveBrushConfig {
   switch (brushId) {
     case BRUSH_IDS.PENCIL:
@@ -39,33 +36,6 @@ export function getActiveBrushConfig(brushId: string): ActiveBrushConfig {
         blendMode: 'clear',
         strokeCap: 'round',
         strokeJoin: 'round',
-      };
-    case LEGACY_BRUSH_IDS.MARKER:
-      return {
-        strokeWidth: (size) => size * 3,
-        opacity: 1,
-        blendMode: 'srcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
-        useLayer: true,
-        layerOpacity: 0.3,
-      };
-    case LEGACY_BRUSH_IDS.HIGHLIGHTER:
-      return {
-        strokeWidth: (size) => size * 2.5,
-        opacity: 0.4,
-        blendMode: 'multiply',
-        strokeCap: 'butt',
-        strokeJoin: 'bevel',
-      };
-    case LEGACY_BRUSH_IDS.SPRAY:
-      return {
-        strokeWidth: (size) => size,
-        opacity: 0.5,
-        blendMode: 'srcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
-        isSpray: true,
       };
     default:
       return {

@@ -1,4 +1,4 @@
-import type { StrokeData, GeoBounds } from '../types';
+import type { StrokeData } from '../types';
 import type { BrushRegistry } from '../brushes';
 
 /**

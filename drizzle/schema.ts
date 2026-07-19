@@ -20,6 +20,7 @@ export const users = sqliteTable('users', {
   userName: text('user_name').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   appleId: text('apple_id').unique(), // For Sign in with Apple
+  appleRefreshToken: text('apple_refresh_token'),
   emailVerified: integer('email_verified', { mode: 'boolean' })
     .notNull()
     .default(false),
@@ -49,7 +50,8 @@ export const sessions = sqliteTable('sessions', {
 export const drawings = sqliteTable('drawings', {
   id: text('id').primaryKey(), // UUID v7
   userId: text('user_id')
-    .references(() => users.id, { onDelete: 'set null' }),
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   userName: text('user_name').notNull(),
   brushId: text('brush_id').notNull().default('pencil'),
   color: text('color').notNull().default('#000000'),
@@ -66,19 +68,14 @@ export const drawings = sqliteTable('drawings', {
   minLng: real('min_lng').notNull(),
   maxLng: real('max_lng').notNull(),
 
-  // 中心点 (用于聚类)
-  centerLat: real('center_lat').notNull(),
-  centerLng: real('center_lng').notNull(),
-
   createdZoom: integer('created_zoom').notNull().default(18),
   meta: text('meta'), // JSON string
-  createdAt: integer('created_at', { mode: 'number' })
+  createdAtMs: integer('created_at_ms', { mode: 'number' })
     .notNull()
-    .$defaultFn(() => Math.floor(Date.now() / 1000)),
-  createdAtMs: integer('created_at_ms', { mode: 'number' }),
-  updatedAt: integer('updated_at', { mode: 'number' })
+    .$defaultFn(() => Date.now()),
+  updatedAtMs: integer('updated_at_ms', { mode: 'number' })
     .notNull()
-    .$defaultFn(() => Math.floor(Date.now() / 1000)),
+    .$defaultFn(() => Date.now()),
 });
 
 // =====================
@@ -86,15 +83,14 @@ export const drawings = sqliteTable('drawings', {
 // =====================
 export const mapPins = sqliteTable('map_pins', {
   id: text('id').primaryKey(),
-  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   userName: text('user_name').notNull().default('Anonymous'),
   lng: real('lng').notNull(),
   lat: real('lat').notNull(),
   message: text('message').notNull().default(''),
   color: text('color').notNull().default('#E63946'),
-  createdAt: integer('created_at', { mode: 'number' }).notNull(),
-  createdAtMs: integer('created_at_ms', { mode: 'number' }),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+  updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
 });
 
 // =====================

@@ -51,7 +51,7 @@ export function buildBezierPath(
 }
 
 /**
- * Build a straight-line path (for Marker, Highlighter, Eraser).
+ * Build a straight-line path for the eraser.
  * Connects points with simple line segments.
  */
 export function buildLinearPath(
@@ -66,99 +66,6 @@ export function buildLinearPath(
   }
 
   return path;
-}
-
-// ========================
-// Spray Particle Generation
-// ========================
-
-export interface SprayParticle {
-  x: number;
-  y: number;
-  alpha: number;
-}
-
-/**
- * Generate spray particles with Gaussian density falloff.
- * Uses deterministic PRNG seeded by stroke ID hash for reproducible rendering
- * (same algorithm as web SprayBrush.ts renderFullStroke).
- */
-export function generateSprayParticles(
-  points: { x: number; y: number; pressure: number }[],
-  radius: number,
-  seed: number
-): SprayParticle[] {
-  const DENSITY = 30;
-  const particles: SprayParticle[] = [];
-
-  let s = seed;
-  const random = () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-
-  for (const point of points) {
-    const count = Math.floor(DENSITY * (point.pressure || 0.5));
-    for (let i = 0; i < count; i++) {
-      const angle = random() * Math.PI * 2;
-      const r = random() * radius;
-      const gaussR =
-        r * Math.sqrt(-2 * Math.log(Math.max(random(), 0.001)));
-      const effectiveR = Math.min(gaussR, radius);
-      particles.push({
-        x: point.x + Math.cos(angle) * effectiveR,
-        y: point.y + Math.sin(angle) * effectiveR,
-        alpha: (1 - effectiveR / radius) * 0.6,
-      });
-    }
-  }
-
-  return particles;
-}
-
-/**
- * Build Skia paths for spray particles, grouped by alpha buckets
- * for efficient rendering (5 paths instead of thousands of circles).
- */
-export function buildSprayPaths(
-  particles: SprayParticle[]
-): { path: SkPath; alpha: number }[] {
-  const ALPHA_BUCKETS = [0.1, 0.25, 0.4, 0.55, 0.7];
-  const buckets = new Map<number, SkPath>();
-
-  for (const p of particles) {
-    // Find nearest bucket
-    let bucketAlpha = ALPHA_BUCKETS[0];
-    for (const ba of ALPHA_BUCKETS) {
-      if (Math.abs(p.alpha - ba) < Math.abs(p.alpha - bucketAlpha)) {
-        bucketAlpha = ba;
-      }
-    }
-
-    if (!buckets.has(bucketAlpha)) {
-      buckets.set(bucketAlpha, Skia.Path.Make());
-    }
-    buckets.get(bucketAlpha)!.addCircle(p.x, p.y, 0.75);
-  }
-
-  return Array.from(buckets.entries()).map(([alpha, path]) => ({
-    path,
-    alpha,
-  }));
-}
-
-// ========================
-// Utilities
-// ========================
-
-/** Hash a string to a positive integer (for deterministic PRNG seed) */
-export function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
-  }
-  return Math.abs(hash) || 1;
 }
 
 /** Generate a simple unique ID (timestamp + random) */

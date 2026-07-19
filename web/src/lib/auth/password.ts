@@ -1,22 +1,11 @@
 /**
  * 密码哈希工具
- * 使用 Argon2id (OWASP 推荐)
- *
- * 注意: @node-rs/argon2 在 Edge Runtime 中可能不可用，
- * 备选方案: 使用 Web Crypto API 实现 PBKDF2
+ * 使用 Cloudflare Workers Web Crypto 支持的 PBKDF2。
  */
-
-// Argon2 配置 (OWASP 推荐参数)
-const ARGON2_OPTIONS = {
-  memoryCost: 19456, // 19 MB
-  timeCost: 2,
-  outputLen: 32,
-  parallelism: 1,
-};
 
 /**
  * 哈希密码
- * 优先使用 Argon2，降级到 PBKDF2
+ * 生成 PBKDF2 密码哈希。
  */
 export async function hashPassword(password: string): Promise<string> {
   // 直接使用 Web Crypto PBKDF2 (Edge Runtime 兼容)
@@ -41,7 +30,7 @@ export async function verifyPassword(
 }
 
 // ==========================================
-// PBKDF2 备选方案 (Edge Runtime 兼容)
+// PBKDF2 (Edge Runtime 兼容)
 // ==========================================
 
 const PBKDF2_ITERATIONS = 100_000; // Cloudflare Workers 上限为 100,000

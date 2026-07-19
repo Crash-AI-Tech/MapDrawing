@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 
     const items = rows.map((row) => ({
       id: row.id,
-      userId: row.user_id ?? '',
+      userId: row.user_id,
       userName: row.user_name ?? 'Anonymous',
       brushId: row.brush_id,
       color: row.color,
@@ -81,13 +81,13 @@ export async function GET(request: Request) {
         maxLat: row.max_lat,
       },
       createdZoom: row.created_zoom,
-      createdAt: row.created_at_ms ?? row.created_at * 1000,
+      createdAt: row.created_at_ms,
       meta: row.meta ? JSON.parse(row.meta) : undefined,
     }));
     const last = rows[rows.length - 1];
     const nextCursor = hasMore && last
       ? {
-          createdAt: last.created_at_ms ?? last.created_at * 1000,
+          createdAt: last.created_at_ms,
           id: last.id,
         }
       : null;

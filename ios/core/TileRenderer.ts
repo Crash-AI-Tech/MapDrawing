@@ -26,13 +26,9 @@ import { MercatorProjection, BASE_ZOOM } from './MercatorProjection';
 import {
   buildBezierPath,
   buildLinearPath,
-  generateSprayParticles,
-  buildSprayPaths,
-  hashString,
 } from './brushUtils';
 import {
   BRUSH_IDS,
-  LEGACY_BRUSH_IDS,
   STROKE_HIDE_ZOOM_DIFF,
 } from '@niubi/shared';
 
@@ -42,12 +38,6 @@ import {
 
 /** World-pixel size of each tile at BASE_ZOOM (14) — used for spatial indexing */
 const TILE_WORLD_SIZE = 512;
-
-/** Spray degrade threshold: above this many visible spray strokes, simplify */
-const SPRAY_DEGRADE_THRESHOLD = 8;
-
-/** Spray disable threshold: above this, render spray as simple lines */
-const SPRAY_DISABLE_THRESHOLD = 20;
 
 // ========================
 // Brush Config (shared with index.tsx — kept in sync)
@@ -60,9 +50,6 @@ interface BrushRenderConfig {
   blendMode: keyof typeof BlendMode;
   strokeCap: 'butt' | 'round' | 'square';
   strokeJoin: 'bevel' | 'miter' | 'round';
-  useLayer?: boolean;
-  layerOpacity?: number;
-  isSpray?: boolean;
 }
 
 function getBrushConfig(brushId: string): BrushRenderConfig {
@@ -76,26 +63,6 @@ function getBrushConfig(brushId: string): BrushRenderConfig {
         strokeCap: 'round',
         strokeJoin: 'round',
       };
-    case LEGACY_BRUSH_IDS.MARKER:
-      return {
-        buildPath: buildLinearPath,
-        strokeWidth: (s) => s * 3,
-        opacity: 1.0,
-        blendMode: 'SrcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
-        useLayer: true,
-        layerOpacity: 0.3,
-      };
-    case LEGACY_BRUSH_IDS.HIGHLIGHTER:
-      return {
-        buildPath: buildLinearPath,
-        strokeWidth: (s) => s * 2.5,
-        opacity: 0.4,
-        blendMode: 'Multiply',
-        strokeCap: 'butt',
-        strokeJoin: 'bevel',
-      };
     case BRUSH_IDS.ERASER:
       return {
         buildPath: buildLinearPath,
@@ -104,16 +71,6 @@ function getBrushConfig(brushId: string): BrushRenderConfig {
         blendMode: 'Clear',
         strokeCap: 'round',
         strokeJoin: 'round',
-      };
-    case LEGACY_BRUSH_IDS.SPRAY:
-      return {
-        buildPath: buildLinearPath,
-        strokeWidth: (s) => s,
-        opacity: 0.5,
-        blendMode: 'SrcOver',
-        strokeCap: 'round',
-        strokeJoin: 'round',
-        isSpray: true,
       };
     default:
       return {
@@ -205,8 +162,6 @@ interface StrokeRenderData {
   /** Stroke width in world pixels at BASE_ZOOM */
   baseSize: number;
   config: BrushRenderConfig;
-  /** Spray particle paths (if spray brush) */
-  sprayPaths?: { path: SkPath; alpha: number }[];
   /** Set of tile keys this stroke touches */
   tileKeys: Set<string>;
 }
@@ -346,8 +301,6 @@ export class TileRenderer {
       Skia.XYWHRect(0, 0, screenW, screenH)
     );
 
-    const sprayCount = strokes.filter((s) => s.config.isSpray).length;
-
     for (const rs of strokes) {
       // Convert stroke anchor to screen position
       const screenPos = TileRenderer.proj.geoToScreen(
@@ -369,40 +322,8 @@ export class TileRenderer {
         rs.config.blendMode
       );
 
-      if (rs.config.isSpray && rs.sprayPaths) {
-        if (sprayCount > SPRAY_DISABLE_THRESHOLD) {
-          paint.setStyle(PaintStyle.Stroke);
-          paint.setAlphaf(rs.data.opacity * 0.3 * alphaMul);
-          canvas.drawPath(rs.path, paint);
-        } else if (sprayCount > SPRAY_DEGRADE_THRESHOLD) {
-          paint.setStyle(PaintStyle.Fill);
-          const subset = rs.sprayPaths.slice(0, 2);
-          for (const sp of subset) {
-            const spPaint = paint.copy();
-            spPaint.setAlphaf(rs.data.opacity * sp.alpha * alphaMul);
-            canvas.drawPath(sp.path, spPaint);
-          }
-        } else {
-          paint.setStyle(PaintStyle.Fill);
-          for (const sp of rs.sprayPaths) {
-            const spPaint = paint.copy();
-            spPaint.setAlphaf(rs.data.opacity * sp.alpha * alphaMul);
-            canvas.drawPath(sp.path, spPaint);
-          }
-        }
-      } else {
-        paint.setStyle(PaintStyle.Stroke);
-        if (rs.config.useLayer) {
-          const layerPaint = Skia.Paint();
-          layerPaint.setAlphaf((rs.config.layerOpacity ?? 0.3) * alphaMul);
-          canvas.saveLayer(layerPaint);
-          paint.setAlphaf(1.0);
-          canvas.drawPath(rs.path, paint);
-          canvas.restore();
-        } else {
-          canvas.drawPath(rs.path, paint);
-        }
-      }
+      paint.setStyle(PaintStyle.Stroke);
+      canvas.drawPath(rs.path, paint);
 
       canvas.restore();
     }
@@ -484,7 +405,7 @@ export class TileRenderer {
       }
     }
 
-    const rd: StrokeRenderData = {
+    return {
       id: s.id,
       data: s,
       path,
@@ -494,15 +415,6 @@ export class TileRenderer {
       config,
       tileKeys,
     };
-
-    // Generate spray paths
-    if (config.isSpray) {
-      const radius = s.size * baseScale * 0.75;
-      const particles = generateSprayParticles(relPoints, radius, hashString(s.id));
-      rd.sprayPaths = buildSprayPaths(particles);
-    }
-
-    return rd;
   }
 
   private getVisibleTiles(

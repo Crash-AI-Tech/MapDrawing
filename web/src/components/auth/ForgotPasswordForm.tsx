@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mail, ArrowLeft, Send } from 'lucide-react';
+import type { Lang } from '@/lib/i18n';
 
 interface ForgotPasswordFormProps {
-  lang: 'zh' | 'en';
+  lang: Lang;
   onCodeSent?: (email: string) => void;
   onBack?: () => void;
 }
@@ -30,6 +31,10 @@ const t = {
     sending: 'Sending...',
     send: 'Send Code',
     back: 'Back to Login',
+  },
+  ja: {
+    label: '登録メールアドレス', placeholder: 'your@email.com',
+    sending: '送信中…', send: '確認コードを送信', back: 'ログインに戻る',
   },
 };
 

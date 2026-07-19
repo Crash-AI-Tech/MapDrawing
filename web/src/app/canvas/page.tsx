@@ -7,7 +7,6 @@ import Toolbar from '@/components/toolbar/Toolbar';
 import UserMenu from '@/components/auth/UserMenu';
 import AuthDialog from '@/components/auth/AuthDialog';
 import { useAuth } from '@/hooks/useAuth';
-import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useI18n } from '@/lib/i18n';
 
@@ -19,8 +18,7 @@ const LazyMapCanvas = lazy(() => import('@/components/canvas/MapCanvas'));
  * Guests can view the map; auth dialog pops up when they try to draw.
  */
 export default function CanvasPage() {
-  const { isLoading } = useAuth();
-  const user = useAuthStore((s) => s.user);
+  useAuth();
   const syncState = useUIStore((s) => s.syncState);
   const { t } = useI18n();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -34,11 +32,11 @@ export default function CanvasPage() {
       <div className="relative h-screen w-screen overflow-hidden">
         {/* Map + Canvas */}
         {mounted ? (
-          <Suspense fallback={<LoadingOverlay visible message="加载地图引擎..." />}>
+          <Suspense fallback={<LoadingOverlay visible message={t('mapLoading')} />}>
             <LazyMapCanvas />
           </Suspense>
         ) : (
-          <LoadingOverlay visible message="加载地图引擎..." />
+          <LoadingOverlay visible message={t('mapLoading')} />
         )}
 
         {/* Toolbar (left) — passes auth gate callback */}

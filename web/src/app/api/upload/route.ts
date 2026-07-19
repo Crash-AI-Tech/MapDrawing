@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     if (!ALLOWED_EXTS.has(ext)) {
       return Response.json({ error: 'Invalid file extension' }, { status: 400 });
     }
-    const key = `avatars/${result.user.id}/avatar.${ext}`;
+    const key = `avatars/${result.user.id}/${crypto.randomUUID()}.${ext}`;
 
     const buffer = await file.arrayBuffer();
     await env.BUCKET.put(key, buffer, {

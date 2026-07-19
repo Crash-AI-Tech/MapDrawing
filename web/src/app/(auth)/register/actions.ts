@@ -32,8 +32,8 @@ export async function register(
   if (!email || !password) {
     return { error: '请填写邮箱和密码' };
   }
-  if (password.length < 6) {
-    return { error: '密码至少需要 6 个字符' };
+  if (password.length < 8) {
+    return { error: '密码至少需要 8 个字符' };
   }
 
   try {

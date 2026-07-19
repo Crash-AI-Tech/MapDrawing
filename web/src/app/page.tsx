@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { MapPin, Palette, Sparkles, ArrowRight, Droplets, Users, Globe } from 'lucide-react';
-
-type Lang = 'zh' | 'en';
+import Image from 'next/image';
+import { MapPin, Palette, Sparkles, ArrowRight, Droplets, Users } from 'lucide-react';
+import { LanguageSelector } from '@/components/shared/LanguageSelector';
+import { useI18n } from '@/lib/i18n';
 
 /* ================================
    i18n dictionary
@@ -17,7 +18,6 @@ const t = {
     navInk: '墨水',
     navVision: '愿景',
     navCta: '开始探索',
-    langBtn: 'EN',
     // hero
     heroTag: '在真实地图上画画 🌍',
     heroTitle1: '在真实地图上，',
@@ -28,32 +28,33 @@ const t = {
     featTitle: '玩法介绍',
     featSubtitle: '三种方式，让你在这颗星球上留下独一无二的印记。基于 Cloudflare 边缘计算，无论身在何处，创作即同步。',
     feat1Title: '无限地图涂鸦',
-    feat1Desc: '提供铅笔、马尔克笔、喷枪、荧光笔四种专业工具。每一笔都实时对应地理坐标。支持 R-tree 空间索引，即使累计千万级笔画也能瞬时加载。从小巷到珠峰，每一处都是您的。',
+    feat1Desc: '使用铅笔留下细腻笔触，也可以随时切换橡皮擦。每一笔都对应真实地理坐标，并通过地理瓦片按需加载，让地图保持轻快。',
     feat2Title: '全球定位留言',
     feat2Desc: '在地图任意位置放置彩色图钉并留言。支持 10 种主题颜色，50 字以内精炼表达。路过同一坐标的玩家将发现您的故事。图钉点击即展开，全量保留历史。',
-    feat3Title: '实时共同创作',
-    feat3Desc: '全球玩家共享同一张画布。基于 Durable Objects 技术，每房间支持 500+ 连接。路过异国他乡时，您能看到当地正在发生的艺术创作。零延迟感受来自全球的笔触。',
+    feat3Title: '跨设备共同创作',
+    feat3Desc: 'Web 与 iOS 共享同一张全球画布。创作安全保存到 Cloudflare 边缘服务，并在重新连接后继续同步。',
     // steps
     stepsTitle: '如何快速上手',
     stepsSubtitle: '三步开启您的全球艺术之旅。Tip: 建议使用双指缩放地图以获得更佳体验。',
     step1Title: '漫游并精确定位',
     step1Desc: '浏览全世界地图，定位到您心仪的角落。放大至 18 级以上即可开始绘图，20 级以上可放置高精度图钉。Tip: 地图基于矢量瓦片，缩放平滑无损。',
     step2Title: '定制化艺术工具',
-    step2Desc: '从侧栏调出画笔或图钉。您可以根据创作需要调节尺寸、颜色和透明度。Tip: 荧光笔采用乘法混合，喷枪则能制造柔美的渐变阴影。',
+    step2Desc: '从工具栏选择画笔或图钉，并按创作需要调节尺寸、颜色和透明度。再次点击画笔即可切换橡皮擦。',
     step3Title: '留下持久化印记',
     step3Desc: '开始绘画或放置留言。系统采用 UUID v7 时间有序存储，确保您的每一秒创作都有迹可循。Tip: 墨水每 18 秒自动恢复，断网期间仍会计秒，重连后自动同步。',
     // ink
-    inkTitle: '公平公平的墨水系统',
+    inkTitle: '公平透明的墨水系统',
     inkDesc: 'Map 采用独特的面积-缩放成本模型。您的初始储备为 100 点。关键设计：缩放级别(zoom)每降低一级，同等屏幕长度的笔画消耗翻 4 倍。这种机制鼓励玩家在高缩放级别进行精细化微观创作，同时有效防止了低等级下的恶意覆盖。',
     inkDetail1: '📏 zoom 越低消耗越高 — 保护大尺度地图景观',
     inkDetail2: '⚡ 18秒/+1 自动回墨 — 即使离线重连也不中断',
     inkDetail3: '🎨 画笔尺寸影响消耗 — 鼓励用更细致的笔触叙事',
     // vision
     visionTitle: '我们的愿景',
-    visionDesc: '每个人都能在这颗星球上留下自己的印记。一笔一画，连接不同时空的你我。我们致力于构建一个永不消失的、全人类共同打造的数字地球。',
+    visionDesc: '每个人都能在这颗星球上留下自己的印记。一笔一画，连接不同时空的你我。我们希望构建一颗由大家共同创作、持续生长的数字地球。',
     visionCta: '前往创作之门 →',
     // footer
     footer: 'Map — 全球实时协作绘画平台',
+    support: '支持', privacy: '隐私政策', terms: '服务条款',
   },
   en: {
     navFeatures: 'Features',
@@ -61,26 +62,25 @@ const t = {
     navInk: 'Ink',
     navVision: 'Vision',
     navCta: 'Start Exploring',
-    langBtn: '中文',
     heroTag: 'DRAW ON THE REAL WORLD 🌍',
     heroTitle1: 'Draw on the',
     heroTitle2: 'Real World Map',
-    heroDesc: 'Pick a brush, leave your mark on any street in any city. Driven by MapLibre GL for smooth 60fps. Drop a pin, write a message only passers-by can read. This is everyone\'s global canvas, where every stroke is persisted forever as digital heritage.',
+    heroDesc: 'Pick a brush and leave your mark on any street in any city. Drop a pin with a short message and build one shared global canvas across Web and iOS.',
     heroCta: 'Start Exploring →',
     featTitle: 'How It Works',
     featSubtitle: 'Three ways to leave your unique mark on planet Earth. Built with Cloudflare edge, your creativity syncs instantly from anywhere.',
     feat1Title: 'Infinite Map Graffiti',
-    feat1Desc: 'Use 4 pro brushes: Pencil, Marker, Spray, and Highlighter. Every stroke is tied to a lat/lng. Spatial R-tree indexing ensures instant loading of even millions of strokes. From backyards to Mt. Everest, it\'s all yours.',
+    feat1Desc: 'Use a precise pencil and switch to the eraser at any time. Every stroke is tied to real coordinates and loaded on demand through geographic tiles.',
     feat2Title: 'Global Location Pins',
     feat2Desc: 'Plant a colored pin and share your story. Support for 10 themes and 50-character messages. People passing through the same coordinates will discover your tale. Click to expand and view history.',
-    feat3Title: 'Real-time Co-creation',
-    feat3Desc: 'A single global canvas for everyone. Built with Durable Objects, supporting 500+ concurrent artists per room. Roam to distant lands and watch art happen live. Feel the strokes of the world with zero latency.',
+    feat3Title: 'Create Across Devices',
+    feat3Desc: 'Web and iOS share one global canvas. Creations are stored on Cloudflare edge services and continue syncing after a connection returns.',
     stepsTitle: 'Start Your Journey',
     stepsSubtitle: 'Three easy steps to begin. Tip: Use 2-finger pinch-to-zoom for the best experience on mobile.',
     step1Title: 'Locate Your Spot',
     step1Desc: 'Browse the Earth to find that one coordinate that matters. Zoom level 18+ to draw, 20+ to drop high-precision pins. Tip: Vector-tile map engine ensures lossless zooming.',
     step2Title: 'Choose Your Tools',
-    step2Desc: 'Pick Brush or Pin from the sidebar. Adjust size, color, and opacity to fit your vision. Tip: Try Highlighter for multiplicative blending and Spray for soft gradients.',
+    step2Desc: 'Choose Pencil or Pin from the toolbar, then adjust size, color, and opacity. Click Pencil again to switch to the eraser.',
     step3Title: 'Persist Your Creativity',
     step3Desc: 'Every stroke counts. Strokes are stored chronologically using UUID v7. Tip: Ink regenerates 1 unit every 18s even offline; the system auto-flushes events upon reconnection.',
     inkTitle: 'Fair & Transparent Ink',
@@ -92,10 +92,37 @@ const t = {
     visionDesc: 'Everyone can leave their mark on this planet. Stroke by stroke, connecting souls across time and space. We aim to build a digital Earth created by everyone, for everyone.',
     visionCta: 'Enter Canvas →',
     footer: 'Map — Global Collaborative Art Platform',
+    support: 'Support', privacy: 'Privacy Policy', terms: 'Terms of Service',
+  },
+  ja: {
+    navFeatures: '機能', navSteps: '使い方', navInk: 'インク', navVision: 'ビジョン', navCta: '探索を始める',
+    heroTag: '現実の地図に描こう 🌍', heroTitle1: 'リアルワールドの', heroTitle2: '地図に描こう',
+    heroDesc: '好きな街や通りを選び、地図の上に作品を残しましょう。ピンに短いメッセージを添え、世界中の人と一枚のキャンバスを共有できます。',
+    heroCta: '探索を始める →', featTitle: '楽しみ方',
+    featSubtitle: '地球上に自分だけの印を残す三つの方法。Cloudflare のエッジ基盤から安全に同期します。',
+    feat1Title: '地図への自由な描画',
+    feat1Desc: '精密な鉛筆を使い、いつでも消しゴムに切り替えられます。すべての線は実際の座標に結び付けられ、地理タイル単位で必要な分だけ読み込まれます。',
+    feat2Title: '位置にメッセージを残す',
+    feat2Desc: '地図上に色付きのピンと短いメッセージを残せます。同じ場所を訪れた人があなたの物語を見つけます。',
+    feat3Title: 'デバイスを越えて共同制作',
+    feat3Desc: 'Web と iOS は同じグローバルキャンバスを共有します。作品はエッジサービスに保存され、再接続後も同期を続けます。',
+    stepsTitle: 'はじめ方', stepsSubtitle: '三つの手順で創作を始められます。モバイルでは二本指で地図を拡大してください。',
+    step1Title: '場所を見つける', step1Desc: '世界地図を移動し、描きたい場所を見つけます。描画はズーム18以上、ピンはズーム20以上で利用できます。',
+    step2Title: 'ツールを整える', step2Desc: '鉛筆またはピンを選び、サイズ、色、不透明度を調整します。鉛筆をもう一度押すと消しゴムに切り替わります。',
+    step3Title: '作品を残す', step3Desc: '描画やメッセージは安全に保存されます。インクは18秒ごとに回復し、オフライン操作は再接続後に同期されます。',
+    inkTitle: '公平で透明なインク',
+    inkDesc: '100ポイントのインクを使う面積・ズーム連動モデルです。広い範囲を覆うほどコストが高くなり、細かな創作を促します。',
+    inkDetail1: '📏 低いズームほど高コスト — 広域の上書きを防止',
+    inkDetail2: '⚡ 18秒ごとに1回復 — オフライン中も継続',
+    inkDetail3: '🎨 太さもコストに反映 — 丁寧な表現を応援',
+    visionTitle: '私たちのビジョン',
+    visionDesc: '誰もがこの地球に自分の印を残せること。一本の線から、時間と場所を越えて人々をつなぐデジタル地球を目指します。',
+    visionCta: 'キャンバスを開く →', footer: 'Map — グローバル共同アートプラットフォーム',
+    support: 'サポート', privacy: 'プライバシーポリシー', terms: '利用規約',
   },
 } as const;
 
-const FONT = { fontFamily: 'Fredoka, sans-serif' };
+const FONT = { fontFamily: 'ui-rounded, "SF Pro Rounded", system-ui, sans-serif' };
 
 const NAV_ITEMS = [
   { key: 'navFeatures' as const, href: '#features' },
@@ -108,7 +135,7 @@ const NAV_ITEMS = [
  * Landing page — bold, colorful, cartoon-ish, with language toggle.
  */
 export default function HomePage() {
-  const [lang, setLang] = useState<Lang>('en');
+  const { lang } = useI18n();
   const [scrolled, setScrolled] = useState(false);
   const d = t[lang];
 
@@ -125,13 +152,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen overflow-hidden font-sans">
-      {/* Google Font */}
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap"
-        rel="stylesheet"
-      />
-
       {/* ====== Floating glass topbar ====== */}
       <nav
         className={`fixed left-1/2 top-4 z-50 flex w-[90%] max-w-6xl -translate-x-1/2 items-center justify-between rounded-full border px-5 py-3 transition-all duration-300 sm:w-[85%] sm:px-8 sm:py-3.5 ${scrolled
@@ -142,7 +162,7 @@ export default function HomePage() {
       >
         {/* Logo — left edge */}
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Logo" className="h-8 w-8 rounded-lg" />
+          <Image src="/logo.png" alt="DrawMaps" width={32} height={32} className="h-8 w-8 rounded-lg" priority />
           <span className="text-lg font-bold tracking-tight sm:text-xl">Map</span>
         </div>
 
@@ -162,13 +182,7 @@ export default function HomePage() {
         {/* Right Actions */}
         <div className="flex items-center gap-2">
           {/* Language toggle — right */}
-          <button
-            onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-            className="flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1.5 text-sm font-bold text-violet-700 transition-colors hover:bg-violet-200 sm:px-4 sm:py-2 sm:text-base"
-          >
-            <Globe className="h-4 w-4" />
-            {d.langBtn}
-          </button>
+          <LanguageSelector className="rounded-full bg-violet-50 px-2 py-1" compact showIcon={false} />
 
           {/* Start Exploring Button — rightmost */}
           <Link
@@ -243,10 +257,13 @@ export default function HomePage() {
           {/* Right: Illustration */}
           <div className="flex items-center justify-center">
             <div className="animate-float relative overflow-hidden rounded-[2.5rem] bg-white p-3 shadow-2xl ring-8 ring-amber-400/20">
-              <img
+              <Image
                 src="/hero-illustration.png"
-                alt="Illustration"
+                alt="DrawMaps map drawing preview"
+                width={768}
+                height={768}
                 className="w-full max-w-lg rounded-[1.8rem] transition-transform hover:scale-105 duration-500"
+                priority
               />
             </div>
           </div>
@@ -409,26 +426,22 @@ export default function HomePage() {
               href="/support"
               className="text-sm text-gray-500 transition-colors hover:text-violet-400"
             >
-              Support
+              {d.support}
             </Link>
             <span className="text-gray-700">·</span>
-            <a
-              href="https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href={`/legal/privacy?lang=${lang}`}
               className="text-sm text-gray-500 transition-colors hover:text-violet-400"
             >
-              Privacy Policy
-            </a>
+              {d.privacy}
+            </Link>
             <span className="text-gray-700">·</span>
-            <a
-              href="https://doc-hosting.flycricket.io/drawmaps-terms-of-use/2197a713-a352-47c7-bf8f-a5a19eee3ddb/terms"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href={`/legal/terms?lang=${lang}`}
               className="text-sm text-gray-500 transition-colors hover:text-violet-400"
             >
-              Terms of Use
-            </a>
+              {d.terms}
+            </Link>
           </div>
         </div>
       </footer>

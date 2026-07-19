@@ -11,12 +11,10 @@
     "lint": "eslint .",
     "type-check": "next typegen && tsc --noEmit",
     "db:migrate": "npx wrangler d1 migrations apply map-db --local",
-    "db:migrate:prod": "npx wrangler d1 migrations apply map-db --remote",
-    "db:migrate:staging": "npx wrangler d1 migrations apply map-db-staging --remote --config wrangler.staging.toml",
-    "deploy": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy",
-    "deploy:staging": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy --config wrangler.staging.toml",
-    "upload": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare upload",
-    "deploy:workers": "cd ../cf-workers && npx wrangler deploy"
+    "deploy": "node ../scripts/assert-d1-v2-target.mjs wrangler.toml && npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy",
+    "deploy:staging": "node ../scripts/assert-d1-v2-target.mjs wrangler.staging.toml && npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy --config wrangler.staging.toml",
+    "upload": "node ../scripts/assert-d1-v2-target.mjs wrangler.toml && npx opennextjs-cloudflare build && npx opennextjs-cloudflare upload",
+    "deploy:workers": "node ../scripts/assert-d1-v2-target.mjs wrangler.toml && npx opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@lucia-auth/adapter-sqlite": "^3.0.2",

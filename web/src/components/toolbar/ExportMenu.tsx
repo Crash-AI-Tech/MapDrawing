@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Download, Image, Copy, Share2, Loader2 } from 'lucide-react';
+import { Download, Image as ImageIcon, Copy, Share2, Loader2 } from 'lucide-react';
 import {
   captureCanvasBlob,
   downloadBlob,
@@ -48,7 +48,7 @@ export default function ExportMenu() {
       showToast(t('exportCaptureFailed'), 'error');
       return null;
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const handleDownloadPNG = useCallback(async () => {
     setExporting(true);
@@ -61,7 +61,7 @@ export default function ExportMenu() {
     } finally {
       setExporting(false);
     }
-  }, [capture, showToast]);
+  }, [capture, showToast, t]);
 
   const handleCopyClipboard = useCallback(async () => {
     setExporting(true);
@@ -77,7 +77,7 @@ export default function ExportMenu() {
     } finally {
       setExporting(false);
     }
-  }, [capture, showToast]);
+  }, [capture, showToast, t]);
 
   const handleShareLink = useCallback(async () => {
     setExporting(true);
@@ -107,7 +107,7 @@ export default function ExportMenu() {
     } finally {
       setExporting(false);
     }
-  }, [capture, showToast]);
+  }, [capture, showToast, t]);
 
   return (
     <>
@@ -120,6 +120,7 @@ export default function ExportMenu() {
                 size="icon"
                 className="h-9 w-9 rounded-full"
                 disabled={exporting}
+                aria-label={t('toolExport')}
               >
                 {exporting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -133,7 +134,7 @@ export default function ExportMenu() {
         </Tooltip>
         <DropdownMenuContent align="center" side="bottom" className="w-44">
           <DropdownMenuItem onClick={handleDownloadPNG} disabled={exporting}>
-            <Image className="mr-2 h-4 w-4" />
+            <ImageIcon className="mr-2 h-4 w-4" />
             {t('exportDownloadPNG')}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleCopyClipboard} disabled={exporting}>

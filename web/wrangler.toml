@@ -16,6 +16,8 @@ binding = "WORKER_SELF_REFERENCE"
 service = "map"
 
 # D1 数据库
+# RELEASE BLOCKED: this is the v1 source database. Create/migrate map-db-v2 and
+# replace both fields below before deploying this branch; deploy scripts enforce it.
 [[d1_databases]]
 binding = "DB"
 database_name = "map-db"
@@ -38,7 +40,8 @@ binding = "CACHE"
 id = "e2837190f44c4e2f854c39b95cea2e51"
 
 # 环境变量
-# RESEND_API_KEY 和 AUTH_SECRET 已迁移到 Cloudflare Secrets (wrangler secret put)
+# AUTH_SECRET, RESEND_API_KEY, APPLE_TEAM_ID, APPLE_KEY_ID and
+# APPLE_PRIVATE_KEY are Cloudflare Secrets (wrangler secret put).
 # 本地开发使用 .dev.vars 文件
 [vars]
 APPLE_CLIENT_ID = "com.niubi.agent"

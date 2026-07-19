@@ -1,22 +1,22 @@
 'use client';
 
 import { useCallback } from 'react';
-import { usePinStore, MapPin } from '@/stores/pinStore';
+import { usePinStore } from '@/stores/pinStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Compliance } from '@/lib/compliance';
 import { X, Flag, Ban } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n';
 
 /** Format a relative time string */
-function timeAgo(ts: number): string {
+function timeAgo(ts: number, text: (key: 'timeJustNow' | 'timeMinutesAgo' | 'timeHoursAgo' | 'timeDaysAgo', params?: Record<string, number>) => string): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins}分钟前`;
+  if (mins < 1) return text('timeJustNow');
+  if (mins < 60) return text('timeMinutesAgo', { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}小时前`;
+  if (hours < 24) return text('timeHoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  return `${days}天前`;
+  return text('timeDaysAgo', { n: days });
 }
 
 /**
@@ -29,28 +29,29 @@ export default function PinDetailModal() {
   const setSelectedPin = usePinStore((s) => s.setSelectedPin);
   const refreshBlocked = usePinStore((s) => s.refreshBlocked);
   const user = useAuthStore((s) => s.user);
+  const { t } = useI18n();
 
   const handleClose = useCallback(() => {
     setSelectedPin(null);
   }, [setSelectedPin]);
 
-  const handleReport = useCallback(() => {
+  const handleReport = useCallback(async () => {
     if (!selectedPin) return;
-    const reason = window.prompt('举报原因:');
+    const reason = window.prompt(t('pinReportReason'));
     if (reason) {
-      Compliance.reportContent(selectedPin.id, 'pin', reason);
+      await Compliance.reportContent(selectedPin.id, 'pin', reason);
       handleClose();
     }
-  }, [selectedPin, handleClose]);
+  }, [selectedPin, handleClose, t]);
 
-  const handleBlock = useCallback(() => {
+  const handleBlock = useCallback(async () => {
     if (!selectedPin) return;
-    if (window.confirm(`屏蔽 ${selectedPin.userName || '此用户'}？他们的图钉将被隐藏。`)) {
-      Compliance.blockUser(selectedPin.userId);
-      refreshBlocked();
+    if (window.confirm(t('pinBlockConfirm', { name: selectedPin.userName || t('pinAnonymous') }))) {
+      const blocked = await Compliance.blockUser(selectedPin.userId);
+      if (blocked) await refreshBlocked();
       handleClose();
     }
-  }, [selectedPin, refreshBlocked, handleClose]);
+  }, [selectedPin, refreshBlocked, handleClose, t]);
 
   if (!selectedPin) return null;
 
@@ -83,16 +84,17 @@ export default function PinDetailModal() {
           {/* User info */}
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-semibold text-gray-800">
-              {selectedPin.userName || '匿名'}
+              {selectedPin.userName || t('pinAnonymous')}
             </p>
             <p className="text-xs text-gray-500">
-              {timeAgo(selectedPin.createdAt)}
+              {timeAgo(selectedPin.createdAt, t)}
             </p>
           </div>
 
           {/* Close button */}
           <button
             onClick={handleClose}
+            aria-label={t('close')}
             className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600"
           >
             <X className="h-5 w-5" />
@@ -114,7 +116,7 @@ export default function PinDetailModal() {
               className="flex flex-1 items-center justify-center gap-2 p-4 text-sm font-semibold text-red-500 transition-colors hover:bg-red-50"
             >
               <Flag className="h-4 w-4" />
-              举报
+              {t('pinReport')}
             </button>
             <div className="w-px bg-gray-200" />
             <button
@@ -122,7 +124,7 @@ export default function PinDetailModal() {
               className="flex flex-1 items-center justify-center gap-2 p-4 text-sm font-semibold text-orange-500 transition-colors hover:bg-orange-50"
             >
               <Ban className="h-4 w-4" />
-              屏蔽用户
+              {t('pinBlockUser')}
             </button>
           </div>
         )}

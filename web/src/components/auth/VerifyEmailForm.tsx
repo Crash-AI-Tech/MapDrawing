@@ -8,9 +8,10 @@ import {
 } from '@/app/(auth)/verify/actions';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
+import type { Lang } from '@/lib/i18n';
 
 interface VerifyEmailFormProps {
-  lang: 'zh' | 'en';
+  lang: Lang;
   email: string;
   onSuccess?: () => void;
   onBack?: () => void;
@@ -34,6 +35,11 @@ const t = {
     back: 'Back',
     resend: 'Resend Code',
     retryIn: (s: number) => `Retry in ${s}s`,
+  },
+  ja: {
+    sentTo: '確認コードの送信先', verifying: '確認中…', verify: 'メールを確認',
+    resent: '確認コードを再送信しました', back: '戻る', resend: '再送信',
+    retryIn: (s: number) => `${s}秒後に再試行`,
   },
 };
 

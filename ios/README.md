@@ -1,50 +1,31 @@
-# Welcome to your Expo app 👋
+# DrawMaps iOS
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The iOS client is an Expo/React Native app using Expo Router, MapLibre, and Skia. It shares the v2 drawing protocol in `packages/shared` with the Web client and Cloudflare Worker.
 
-## Get started
+## Local development
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Use Node.js 22 LTS and install dependencies from the repository root:
 
 ```bash
-npm run reset-project
+nvm use
+pnpm install --frozen-lockfile
+pnpm --filter ios ios:staging
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`ios:staging` selects the committed staging API configuration. To use a backend running on another machine, temporarily set a public URL without committing the local address:
 
-## Learn more
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.x.x:3000 pnpm --filter ios ios
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+The canonical app identity is defined only in `ios/app.json`: bundle identifier `com.niubi.agent` and EAS project `c31ea0d0-e723-4ff2-9a5b-3baddcdd6176`. Environment profiles live in `ios/eas.json`.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Verification
 
-## Join the community
+```bash
+pnpm --filter ios type-check
+pnpm --filter ios lint
+EXPO_PUBLIC_API_ENV=staging pnpm --filter ios exec expo export --platform ios
+```
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Public `EXPO_PUBLIC_*` values may be committed. Cloudflare, Apple server, email, and signing secrets must remain in their provider secret stores and must never be bundled into the app.

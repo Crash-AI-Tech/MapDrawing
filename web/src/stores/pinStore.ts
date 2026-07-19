@@ -17,7 +17,7 @@ interface PinState {
   pins: MapPin[];
   /** Raw (unfiltered) pins from API */
   _rawPins: MapPin[];
-  /** Set of blocked user IDs (loaded from localStorage) */
+  /** In-memory mirror of the authenticated user's server-side block list. */
   blockedUserIds: Set<string>;
   /** Whether pin placement mode is active */
   placingPin: boolean;
@@ -31,19 +31,7 @@ interface PinState {
   setPlacingPin: (placing: boolean) => void;
   setSelectedPin: (pin: MapPin | null) => void;
   setPinColor: (color: string) => void;
-  /** Reload blocked user list from localStorage and re-filter pins */
-  refreshBlocked: () => void;
-}
-
-const BLOCKED_KEY = 'niubi-blocked-users';
-
-function loadBlocked(): Set<string> {
-  try {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(BLOCKED_KEY) : null;
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
+  refreshBlocked: () => Promise<void>;
 }
 
 function filterPins(pins: MapPin[], blocked: Set<string>): MapPin[] {
@@ -54,7 +42,7 @@ function filterPins(pins: MapPin[], blocked: Set<string>): MapPin[] {
 export const usePinStore = create<PinState>((set, get) => ({
   pins: [],
   _rawPins: [],
-  blockedUserIds: loadBlocked(),
+  blockedUserIds: new Set(),
   placingPin: false,
   selectedPin: null,
   pinColor: PIN_COLORS[0],
@@ -71,8 +59,9 @@ export const usePinStore = create<PinState>((set, get) => ({
   setPlacingPin: (placingPin) => set({ placingPin }),
   setSelectedPin: (selectedPin) => set({ selectedPin }),
   setPinColor: (pinColor) => set({ pinColor }),
-  refreshBlocked: () => {
-    const blocked = loadBlocked();
+  refreshBlocked: async () => {
+    const { Compliance } = await import('@/lib/compliance');
+    const blocked = new Set(await Compliance.syncBlockedUsers());
     const raw = get()._rawPins;
     set({ blockedUserIds: blocked, pins: filterPins(raw, blocked) });
   },

@@ -8,13 +8,6 @@ export const BRUSH_IDS = {
 
 export type BrushId = (typeof BRUSH_IDS)[keyof typeof BRUSH_IDS];
 
-/** Read-only compatibility for historical strokes. Never expose these as tools. */
-export const LEGACY_BRUSH_IDS = {
-  MARKER: 'marker',
-  SPRAY: 'spray',
-  HIGHLIGHTER: 'highlighter',
-} as const;
-
 const supportedBrushIds = new Set<string>(Object.values(BRUSH_IDS));
 
 export function isSupportedBrushId(value: unknown): value is BrushId {
@@ -60,9 +53,9 @@ export interface BlockedUsersResponse {
 }
 
 export const TERMS_OF_SERVICE_URL =
-  'https://doc-hosting.flycricket.io/drawmaps-terms-of-use/2197a713-a352-47c7-bf8f-a5a19eee3ddb/terms';
+  'https://map.wisebamboo.fun/legal/terms';
 export const PRIVACY_POLICY_URL =
-  'https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy';
+  'https://map.wisebamboo.fun/legal/privacy';
 
 export const SUPPORTED_LANGUAGES = ['zh', 'en', 'ja'] as const;
 export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -84,7 +77,7 @@ export function shouldRetryHttpStatus(status: number): boolean {
   return classifyHttpFailure(status) === 'retry';
 }
 
-export const OFFLINE_QUEUE_VERSION = 1 as const;
+export const OFFLINE_QUEUE_VERSION = 2 as const;
 export const OFFLINE_QUEUE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface OfflineQueueItem {
@@ -97,41 +90,52 @@ export interface OfflineQueueItem {
 
 function isDrawEvent(value: unknown): value is DrawEvent {
   if (!value || typeof value !== 'object') return false;
-  const type = (value as { type?: unknown }).type;
-  return type === 'STROKE_ADD' || type === 'STROKE_DELETE' ||
-    type === 'STROKE_UPDATE' || type === 'CURSOR_MOVE';
+  const candidate = value as {
+    type?: unknown;
+    stroke?: { brushId?: unknown };
+    strokeId?: unknown;
+    patches?: { brushId?: unknown };
+  };
+  if (candidate.type === 'STROKE_ADD') {
+    return !!candidate.stroke && isSupportedBrushId(candidate.stroke.brushId);
+  }
+  if (candidate.type === 'STROKE_UPDATE') {
+    return typeof candidate.strokeId === 'string' && !!candidate.patches &&
+      (candidate.patches.brushId === undefined || isSupportedBrushId(candidate.patches.brushId));
+  }
+  if (candidate.type === 'STROKE_DELETE') return typeof candidate.strokeId === 'string';
+  return candidate.type === 'CURSOR_MOVE';
 }
 
-/** Upgrade both historical Web queue items and raw iOS events to v1. */
-export function normalizeOfflineQueue(
+/** Parse only the current queue contract; incompatible local data is discarded. */
+export function parseOfflineQueue(
   value: unknown,
-  createId: () => string,
   now = Date.now(),
 ): OfflineQueueItem[] {
   if (!Array.isArray(value)) return [];
 
   const items: OfflineQueueItem[] = [];
   for (const entry of value) {
-    let event: DrawEvent | undefined;
-    let id = createId();
-    let createdAt = now;
-    let attempts = 0;
-
-    if (isDrawEvent(entry)) {
-      event = entry;
-    } else if (entry && typeof entry === 'object') {
-      const candidate = entry as Record<string, unknown>;
-      if (isDrawEvent(candidate.event)) event = candidate.event;
-      if (typeof candidate.id === 'string' && candidate.id) id = candidate.id;
-      const storedTime = candidate.createdAt ?? candidate.timestamp;
-      if (typeof storedTime === 'number' && Number.isFinite(storedTime)) createdAt = storedTime;
-      if (typeof candidate.attempts === 'number' && Number.isFinite(candidate.attempts)) {
-        attempts = Math.max(0, Math.trunc(candidate.attempts));
-      }
-    }
-
-    if (!event || now - createdAt > OFFLINE_QUEUE_MAX_AGE_MS) continue;
-    items.push({ version: OFFLINE_QUEUE_VERSION, id, event, createdAt, attempts });
+    if (!entry || typeof entry !== 'object') continue;
+    const candidate = entry as Record<string, unknown>;
+    if (
+      candidate.version !== OFFLINE_QUEUE_VERSION ||
+      typeof candidate.id !== 'string' ||
+      !candidate.id ||
+      !isDrawEvent(candidate.event) ||
+      typeof candidate.createdAt !== 'number' ||
+      !Number.isFinite(candidate.createdAt) ||
+      typeof candidate.attempts !== 'number' ||
+      !Number.isFinite(candidate.attempts) ||
+      now - candidate.createdAt > OFFLINE_QUEUE_MAX_AGE_MS
+    ) continue;
+    items.push({
+      version: OFFLINE_QUEUE_VERSION,
+      id: candidate.id,
+      event: candidate.event,
+      createdAt: candidate.createdAt,
+      attempts: Math.max(0, Math.trunc(candidate.attempts)),
+    });
   }
 
   return items.sort((a, b) => a.createdAt - b.createdAt);

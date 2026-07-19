@@ -1,12 +1,12 @@
 import type { DrawEvent } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    normalizeOfflineQueue,
+    parseOfflineQueue,
     OFFLINE_QUEUE_VERSION,
     type OfflineQueueItem,
 } from '@niubi/shared';
 
-const QUEUE_KEY_PREFIX = 'offline_queue';
+const QUEUE_KEY_PREFIX = 'offline_queue_v2';
 
 /**
  * OfflineQueue — stores events when disconnected.
@@ -28,10 +28,7 @@ export class OfflineQueue {
         try {
             const stored = await AsyncStorage.getItem(this.storageKey);
             if (stored) {
-                this.queue = normalizeOfflineQueue(
-                    JSON.parse(stored),
-                    () => `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                );
+                this.queue = parseOfflineQueue(JSON.parse(stored));
             }
         } catch (e) {
             console.error('[OfflineQueue] Failed to load queue:', e);

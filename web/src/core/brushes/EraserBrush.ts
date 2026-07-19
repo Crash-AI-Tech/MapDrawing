@@ -50,7 +50,7 @@ export class EraserBrush extends BaseBrush {
     ctx.stroke();
   }
 
-  onStrokeEnd(ctx: CanvasRenderingContext2D, _config: BrushConfig): void {
+  onStrokeEnd(ctx: CanvasRenderingContext2D): void {
     ctx.restore();
   }
 

@@ -27,14 +27,13 @@ interface PinClusterRow {
 
 interface PinRow {
   id: string;
-  user_id: string | null;
+  user_id: string;
   user_name: string;
   lng: number;
   lat: number;
   message: string;
   color: string;
-  created_at: number;
-  created_at_ms: number | null;
+  created_at_ms: number;
 }
 
 /**
@@ -72,7 +71,7 @@ export async function GET(request: Request) {
             COUNT(*) AS count,
             AVG(lng) AS lng,
             AVG(lat) AS lat,
-            MAX(COALESCE(created_at_ms, created_at * 1000)) AS created_at_ms
+            MAX(created_at_ms) AS created_at_ms
          FROM map_pins
          WHERE lat BETWEEN ?5 AND ?6
            AND lng BETWEEN ?7 AND ?8
@@ -99,8 +98,7 @@ export async function GET(request: Request) {
 
     const clampedLimit = Math.max(10, Math.min(limit, 500));
     const pageSize = clampedLimit + 1;
-    let query = `SELECT id, user_id, user_name, lng, lat, message, color,
-                        created_at, created_at_ms
+    let query = `SELECT id, user_id, user_name, lng, lat, message, color, created_at_ms
        FROM map_pins
        WHERE lat BETWEEN ?1 AND ?2
          AND lng BETWEEN ?3 AND ?4`;
@@ -110,15 +108,15 @@ export async function GET(request: Request) {
     if (cursor) {
       query += `
          AND (
-           COALESCE(created_at_ms, created_at * 1000) < ?5
-           OR (COALESCE(created_at_ms, created_at * 1000) = ?5 AND id < ?6)
+           created_at_ms < ?5
+           OR (created_at_ms = ?5 AND id < ?6)
          )
-       ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
+       ORDER BY created_at_ms DESC, id DESC
        LIMIT ?7`;
       binds.push(cursor.createdAt, cursor.id, pageSize);
     } else {
       query += `
-       ORDER BY COALESCE(created_at_ms, created_at * 1000) DESC, id DESC
+       ORDER BY created_at_ms DESC, id DESC
        LIMIT ?5`;
       binds.push(pageSize);
     }
@@ -128,36 +126,32 @@ export async function GET(request: Request) {
     const hasMore = allRows.length > clampedLimit;
     const rows = hasMore ? allRows.slice(0, clampedLimit) : allRows;
 
-    // Filter out pins from blocked users if authenticated (gracefully degrade if table not yet migrated)
+    // Filter out pins from blocked users for authenticated requests.
     let blockedIds: string[] = [];
-    try {
-      const sessionResult = await validateSession(request).catch(() => null);
-      if (sessionResult) {
-        const blockedRows = await getBlockedUsers(sessionResult.user.id);
-        blockedIds = blockedRows.map((r) => r.blocked_id);
-      }
-    } catch {
-      // blocked_users table may not exist in local dev — skip filtering
+    const sessionResult = await validateSession(request).catch(() => null);
+    if (sessionResult) {
+      const blockedRows = await getBlockedUsers(sessionResult.user.id);
+      blockedIds = blockedRows.map((r) => r.blocked_id);
     }
     const filteredRows = blockedIds.length > 0
-      ? rows.filter((r) => !r.user_id || !blockedIds.includes(r.user_id))
+      ? rows.filter((r) => !blockedIds.includes(r.user_id))
       : rows;
 
     const items = filteredRows.map((row) => ({
       type: 'pin' as const,
       id: row.id,
-      userId: row.user_id ?? '',
+      userId: row.user_id,
       userName: row.user_name,
       lng: row.lng,
       lat: row.lat,
       message: row.message,
       color: row.color,
-      createdAt: row.created_at_ms ?? row.created_at * 1000,
+      createdAt: row.created_at_ms,
     }));
 
     const last = rows[rows.length - 1];
     const nextCursor = hasMore && last
-      ? { createdAt: last.created_at_ms ?? last.created_at * 1000, id: last.id }
+      ? { createdAt: last.created_at_ms, id: last.id }
       : null;
 
     return Response.json(
@@ -230,8 +224,8 @@ export async function POST(request: Request) {
       env.DB.prepare(
         `INSERT INTO map_pins (
            id, user_id, user_name, lng, lat, message, color,
-           created_at, created_at_ms, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           created_at_ms, updated_at_ms
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
           id,
           result.user.id,
@@ -240,9 +234,8 @@ export async function POST(request: Request) {
           lat,
           message.trim(),
           color || '#E63946',
-          nowSeconds,
           nowMs,
-          nowSeconds,
+          nowMs,
         ),
     ]);
     const inkRow = batchResults[0]?.results?.[0] as { ink?: number } | undefined;

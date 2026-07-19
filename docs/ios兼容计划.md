@@ -1,5 +1,7 @@
 # iOS 开发与上架指南 (Expo 版) - v3.0
 
+> **历史文档：** 本文的旧端点、多笔刷和发布截图仅供参考。当前环境、合规和 EAS profile 以 `ios/app.json`、`ios/eas.json` 及 `docs/ios发布.md` 为准。
+
 > **核心目标**: 打造与 Web 端体验一致、数据互通的 iOS 移动端应用。
 > **技术栈**: React Native (Expo) + MapLibre GL + Skia + Next.js Backend
 
@@ -116,7 +118,7 @@ eas build --platform ios --profile production --auto-submit
     *   **EULA**: 在“关于”或“注册”页展示用户协议，声明“对违规内容零容忍”。
 2.  **删除账号**: App 内必须提供【彻底删除账号】的功能入口。
 3.  **权限描述**: `Info.plist` (在 `app.json` 中配置) 必须详细说明用途。
-    *   `NSLocationWhenInUseUsageDescription`: "我们需要您的位置以便在地图上显示您的绘画和发现周围的作品。"
+    *   当前版本不请求设备定位权限；地图坐标由用户主动选择。
 
 ### 4.2 准备元数据
 在 App Store Connect 的 "App Information" 和 "Prepare for Submission" 页面填写:
@@ -166,7 +168,6 @@ https://app-privacy-policy-generator.nisrulz.com/
 
 **生成内容**
 ```
-https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy
-https://doc-hosting.flycricket.io/drawmaps-terms-of-use/2197a713-a352-47c7-bf8f-a5a19eee3ddb/terms
+https://map.wisebamboo.fun/legal/privacy
+https://map.wisebamboo.fun/legal/terms
 ```
-

@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { users } from '../../../../../../../drizzle/schema';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { readJsonBody, RequestBodyError } from '@/lib/http/body';
+import { exchangeAppleAuthorizationCode, sealAppleRefreshToken } from '@/lib/auth/apple';
 function generateId(length: number): string {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const arr = new Uint8Array(length);
@@ -30,9 +31,10 @@ export async function POST(request: Request) {
         const { env } = getCloudflareContext();
         const body = await readJsonBody(request, 32 * 1024) as {
             identityToken?: string;
+            authorizationCode?: string;
             user?: string;
         }; // user is JSON string from ASAuthorizationAppleIDCredential
-        const { identityToken, user: userJson } = body;
+        const { identityToken, authorizationCode, user: userJson } = body;
 
         if (!identityToken) {
             return NextResponse.json({ error: 'Missing identity token' }, { status: 400 });
@@ -57,6 +59,16 @@ export async function POST(request: Request) {
         }
 
         const db = getDBClient();
+        let sealedRefreshToken: string | undefined;
+        if (authorizationCode) {
+            try {
+                const refreshToken = await exchangeAppleAuthorizationCode(authorizationCode, env);
+                if (refreshToken) sealedRefreshToken = await sealAppleRefreshToken(refreshToken, env.AUTH_SECRET);
+            } catch (error) {
+                // Login must remain available if Apple's one-time server exchange is temporarily unavailable.
+                console.error('Apple authorization-code exchange failed:', error);
+            }
+        }
 
         // Check if user exists
         let user = await db.query.users.findFirst({
@@ -84,7 +96,7 @@ export async function POST(request: Request) {
                         { status: 409 }
                     );
                 }
-                await db.update(users).set({ appleId }).where(eq(users.id, user.id));
+                await db.update(users).set({ appleId, appleRefreshToken: sealedRefreshToken }).where(eq(users.id, user.id));
             }
         }
 
@@ -116,6 +128,7 @@ export async function POST(request: Request) {
                 userName,
                 passwordHash: dummyPassword,
                 appleId,
+                appleRefreshToken: sealedRefreshToken,
                 avatarUrl: null,
                 createdAt: Math.floor(Date.now() / 1000),
                 updatedAt: Math.floor(Date.now() / 1000),
@@ -128,6 +141,12 @@ export async function POST(request: Request) {
 
         if (!user) {
             return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+        }
+
+        if (sealedRefreshToken && user.appleRefreshToken !== sealedRefreshToken) {
+            await db.update(users)
+                .set({ appleRefreshToken: sealedRefreshToken, updatedAt: Math.floor(Date.now() / 1000) })
+                .where(eq(users.id, user.id));
         }
 
         // Create session

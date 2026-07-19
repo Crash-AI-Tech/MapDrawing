@@ -168,7 +168,7 @@ if (!session) {
 | 删除账号 | ✅ 已实现 | `(protected)/profile.tsx` → `handleDeleteAccount` |
 | 隐私政策链接 | ✅ 已实现 | `profile.tsx` → `Linking.openURL(...)` |
 | 用户协议链接 | ✅ 已实现 | `profile.tsx` → `Linking.openURL(...)` |
-| 位置权限说明 | ✅ 已配置 | `app.json` → `NSLocationWhenInUseUsageDescription` |
+| 位置权限 | ✅ 不请求 | 应用只保存用户主动选择的地图坐标 |
 | 出口合规声明 | ✅ 已配置 | `app.json` → `ITSAppUsesNonExemptEncryption: false` |
 | Apple Sign-In | ✅ 已集成 | `login.tsx` → `AppleAuthentication` |
 
@@ -222,8 +222,8 @@ if (!session) {
   - 截图内容建议：地图全景、绘画操作、图钉弹框、Profile 页
 - [ ] **App 描述** (英文 + 中文)
 - [ ] **关键词**: `map, drawing, social, creative, geo, collaborative`
-- [ ] **支持 URL**: `https://map.wisebamboo.fun` 或专门的支持页
-- [ ] **隐私政策 URL**: `https://doc-hosting.flycricket.io/drawmaps-privacy-policy/ab08a782-7dc0-48b1-97c9-e4ce1ac47c55/privacy`
+- [ ] **支持 URL**: `https://map.wisebamboo.fun/support`
+- [ ] **隐私政策 URL**: `https://map.wisebamboo.fun/legal/privacy`
 - [ ] **可用地区**: ⚠️ 确认已排除中国大陆（避免测绘/ICP 合规问题）
 
 #### 2.3 后端验证

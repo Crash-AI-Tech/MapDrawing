@@ -25,7 +25,7 @@ export default function Register() {
             Alert.alert(ts('error', lang), ts('enterEmailPassword', lang));
             return;
         }
-        if (password.length < 6) {
+        if (password.length < 8) {
             Alert.alert(ts('error', lang), ts('passwordTooShort', lang));
             return;
         }
@@ -164,7 +164,7 @@ export default function Register() {
                     />
                     <TextInput
                         style={styles.input}
-                        placeholder={ts('passwordMin6', lang)}
+                        placeholder={ts('passwordMin8', lang)}
                         placeholderTextColor="#999"
                         value={password}
                         onChangeText={setPassword}

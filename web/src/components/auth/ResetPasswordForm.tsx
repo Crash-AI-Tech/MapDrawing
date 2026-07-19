@@ -8,10 +8,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Lock, ArrowLeft, CheckCircle2, KeyRound, Check } from 'lucide-react';
+import { Lock, ArrowLeft, Check } from 'lucide-react';
+import type { Lang } from '@/lib/i18n';
 
 interface ResetPasswordFormProps {
-  lang: 'zh' | 'en';
+  lang: Lang;
   email: string;
   onSuccess?: () => void;
   onBack?: () => void;
@@ -22,19 +23,25 @@ const t = {
     sentTo: '验证码已发送至',
     verifyCode: '验证码',
     newPassword: '新密码',
-    placeholderPwd: '至少6位',
+    placeholderPwd: '至少8位',
     resetting: '重置中...',
     reset: '重置密码',
+    success: '密码重置成功！请使用新密码登录',
     back: '返回',
   },
   en: {
     sentTo: 'Code sent to',
     verifyCode: 'Verification Code',
     newPassword: 'New Password',
-    placeholderPwd: 'Min 6 chars',
+    placeholderPwd: 'Min 8 chars',
     resetting: 'Resetting...',
     reset: 'Reset Password',
+    success: 'Password reset. Log in with your new password.',
     back: 'Back',
+  },
+  ja: {
+    sentTo: '確認コードの送信先', verifyCode: '確認コード', newPassword: '新しいパスワード',
+    placeholderPwd: '8文字以上', resetting: 'リセット中…', reset: 'パスワードをリセット', success: 'パスワードを変更しました。新しいパスワードでログインしてください。', back: '戻る',
   },
 };
 
@@ -127,6 +134,7 @@ export default function ResetPasswordForm({
               inputMode="numeric"
               maxLength={1}
               value={digit}
+              aria-label={`${d.verifyCode} ${i + 1}`}
               onChange={(e) => handleInput(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               className="h-12 w-11 rounded-xl border border-white/60 bg-white/50 text-center text-xl font-bold text-gray-900 shadow-sm backdrop-blur-sm transition-all focus:border-gray-300 focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-gray-200"
@@ -152,7 +160,7 @@ export default function ResetPasswordForm({
               type="password"
               placeholder={d.placeholderPwd}
               required
-              minLength={6}
+              minLength={8}
               className="h-11 rounded-xl border-white/60 bg-white/50 pl-10 shadow-sm backdrop-blur-sm placeholder:text-gray-300 focus:border-gray-300 focus:bg-white/80 focus:ring-1 focus:ring-gray-200"
             />
           </div>
@@ -165,7 +173,7 @@ export default function ResetPasswordForm({
         )}
         {state?.success && (
           <div className="rounded-lg bg-green-50/80 px-3 py-2 text-center text-sm text-green-600 backdrop-blur-sm">
-            密码重置成功！请使用新密码登录
+            {d.success}
           </div>
         )}
 
