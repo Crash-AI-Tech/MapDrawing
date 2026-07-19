@@ -47,7 +47,7 @@ export default function ColorPicker() {
         <TooltipContent side="bottom">颜色与笔触 (B)</TooltipContent>
       </Tooltip>
 
-      <PopoverContent side="bottom" align="start" className="w-72 space-y-3 border-white/50 bg-white/80 backdrop-blur-xl">
+      <PopoverContent side="bottom" align="start" className="liquid-glass-panel w-72 space-y-3">
         <p className="text-xs font-medium text-muted-foreground">Presets</p>
         <div className="grid grid-cols-6 gap-1.5">
           {colorPresets.map((color) => (

@@ -10,7 +10,7 @@ import { BRUSH_IDS, MAX_BRUSH_SIZE, MIN_DRAW_ZOOM, MIN_PIN_ZOOM } from '@/consta
  * useKeyboardShortcuts — global keyboard shortcuts for the map/drawing screen.
  *
  * Shortcuts:
- *   B — toggle brush panel (switch to draw mode)
+ *   B / D — enter drawing mode; press again to toggle pencil/eraser
  *   E — toggle eraser
  *   H — hand (navigate) mode
  *   P — pin placement mode
@@ -29,8 +29,6 @@ export function useKeyboardShortcuts() {
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const placingPin = usePinStore((s) => s.placingPin);
   const currentZoom = useUIStore((s) => s.currentZoom);
-  const setBrushPanelOpen = useUIStore((s) => s.setBrushPanelOpen);
-  const brushPanelOpen = useUIStore((s) => s.brushPanelOpen);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,13 +47,17 @@ export function useKeyboardShortcuts() {
           setPlacingPin(false);
           break;
 
-        case 'b': // Toggle brush panel / enter draw mode
+        case 'b':
+        case 'd': // Match the combined Dock drawing button
           e.preventDefault();
           if (currentZoom >= MIN_DRAW_ZOOM) {
-            setBrushPanelOpen(!brushPanelOpen);
             if (!drawingMode) {
               setDrawingMode(true);
               setPlacingPin(false);
+            } else {
+              setActiveBrush(
+                activeBrushId === BRUSH_IDS.ERASER ? BRUSH_IDS.PENCIL : BRUSH_IDS.ERASER
+              );
             }
           }
           break;
@@ -93,9 +95,7 @@ export function useKeyboardShortcuts() {
 
         case 'escape': // Exit current mode / close panels
           e.preventDefault();
-          if (brushPanelOpen) {
-            setBrushPanelOpen(false);
-          } else if (placingPin) {
+          if (placingPin) {
             setPlacingPin(false);
           } else if (drawingMode) {
             setDrawingMode(false);
@@ -107,7 +107,7 @@ export function useKeyboardShortcuts() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
-    activeBrushId, activeSize, drawingMode, placingPin, currentZoom, brushPanelOpen,
-    setDrawingMode, setActiveBrush, setActiveSize, setPlacingPin, setBrushPanelOpen,
+    activeBrushId, activeSize, drawingMode, placingPin, currentZoom,
+    setDrawingMode, setActiveBrush, setActiveSize, setPlacingPin,
   ]);
 }

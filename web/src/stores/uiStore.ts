@@ -4,8 +4,6 @@ import type { SyncState } from '@/core/types';
 interface UIState {
   /** Whether the toolbar panel is expanded */
   toolbarExpanded: boolean;
-  /** Whether brush settings panel is open */
-  brushPanelOpen: boolean;
   /** Whether color picker is open */
   colorPickerOpen: boolean;
   /** Whether user menu is open */
@@ -20,7 +18,6 @@ interface UIState {
   currentZoom: number;
 
   setToolbarExpanded: (expanded: boolean) => void;
-  setBrushPanelOpen: (open: boolean) => void;
   setColorPickerOpen: (open: boolean) => void;
   setUserMenuOpen: (open: boolean) => void;
   setLoading: (loading: boolean) => void;
@@ -32,7 +29,6 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   toolbarExpanded: true,
-  brushPanelOpen: false,
   colorPickerOpen: false,
   userMenuOpen: false,
   isLoading: false,
@@ -41,7 +37,6 @@ export const useUIStore = create<UIState>((set) => ({
   currentZoom: 14,
 
   setToolbarExpanded: (toolbarExpanded) => set({ toolbarExpanded }),
-  setBrushPanelOpen: (brushPanelOpen) => set({ brushPanelOpen }),
   setColorPickerOpen: (colorPickerOpen) => set({ colorPickerOpen }),
   setUserMenuOpen: (userMenuOpen) => set({ userMenuOpen }),
   setLoading: (isLoading) => set({ isLoading }),

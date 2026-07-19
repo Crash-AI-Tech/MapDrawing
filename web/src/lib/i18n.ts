@@ -54,6 +54,8 @@ const dict = {
   // ─── Toolbar ───
   toolNavigation: { zh: '导航 (H)', en: 'Navigation (H)', ja: 'ナビゲーション (H)' },
   toolDraw: { zh: '画笔 (D)', en: 'Draw (D)', ja: '描画 (D)' },
+  toolPencilToggle: { zh: '画笔（再次点击切换橡皮擦）', en: 'Pencil (click again for eraser)', ja: '鉛筆（もう一度押すと消しゴム）' },
+  toolEraserToggle: { zh: '橡皮擦（再次点击切换画笔）', en: 'Eraser (click again for pencil)', ja: '消しゴム（もう一度押すと鉛筆）' },
   toolPin: { zh: '图钉 (P)', en: 'Pin (P)', ja: 'ピン (P)' },
   toolUndo: { zh: '撤销 (Ctrl+Z)', en: 'Undo (Ctrl+Z)', ja: '元に戻す (Ctrl+Z)' },
   toolRedo: { zh: '重做 (Ctrl+Shift+Z)', en: 'Redo (Ctrl+Shift+Z)', ja: 'やり直す (Ctrl+Shift+Z)' },

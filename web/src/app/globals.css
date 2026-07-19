@@ -64,6 +64,60 @@ body {
 }
 
 /* ========================
+   Liquid Glass — Web approximation of the native iOS material
+   ======================== */
+
+.liquid-glass,
+.liquid-glass-panel {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.2)),
+    rgba(238, 241, 248, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.28),
+    0 12px 36px rgba(30, 41, 59, 0.16),
+    0 2px 8px rgba(30, 41, 59, 0.08);
+  backdrop-filter: blur(24px) saturate(185%) contrast(105%);
+  -webkit-backdrop-filter: blur(24px) saturate(185%) contrast(105%);
+}
+
+.liquid-glass {
+  overflow: visible;
+}
+
+.liquid-glass::before,
+.liquid-glass-panel::before {
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0.08) 42%,
+    rgba(167, 139, 250, 0.08) 72%,
+    rgba(255, 255, 255, 0.32)
+  );
+  content: '';
+  pointer-events: none;
+}
+
+.liquid-glass-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass,
+  .liquid-glass-panel {
+    background: rgba(248, 250, 252, 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ========================
    MapLibre GL Overrides
    ======================== */
 
@@ -82,12 +136,12 @@ body {
 }
 
 .maplibregl-ctrl-group {
-  border-radius: 12px !important;
-  border: 1px solid rgba(209, 213, 219, 0.6) !important;
-  background: rgba(255, 255, 255, 0.9) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  background: rgba(238, 241, 248, 0.45) !important;
+  backdrop-filter: blur(20px) saturate(175%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(175%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 24px rgba(30, 41, 59, 0.14) !important;
 }
 
 .maplibregl-ctrl-group button {

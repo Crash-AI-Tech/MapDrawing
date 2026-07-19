@@ -19,7 +19,6 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from '@/components/ui/tooltip';
-import BrushPanel from './BrushPanel';
 import ColorPicker from './ColorPicker';
 import InkBar from './InkBar';
 import ExportMenu from './ExportMenu';
@@ -28,6 +27,7 @@ import {
   Redo2,
   Hand,
   Pencil,
+  Eraser,
   MapPin,
   Eye,
   EyeOff,
@@ -38,11 +38,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useI18n } from '@/lib/i18n';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type ToolMode = 'hand' | 'draw' | 'pin';
 
 const ACTIVE_BTN = 'bg-violet-600 text-white hover:bg-violet-500 hover:text-white shadow-inner';
+const ERASER_BTN = 'bg-orange-500 text-white hover:bg-orange-400 hover:text-white shadow-inner';
 
 interface ToolbarProps {
   /** Called when a guest tries to draw — opens AuthDialog */
@@ -67,15 +68,22 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   const currentZoom = useUIStore((s) => s.currentZoom);
   const syncState = useUIStore((s) => s.syncState);
   const [zoomTooltip, setZoomTooltip] = useState<string | null>(null);
+  const zoomTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derive current tool mode
   const currentMode: ToolMode = placingPin ? 'pin' : drawingMode ? 'draw' : 'hand';
+  const isEraser = activeBrushId === BRUSH_IDS.ERASER;
 
   /** Show a temporary tooltip */
   const flashTooltip = (msg: string) => {
+    if (zoomTooltipTimerRef.current) clearTimeout(zoomTooltipTimerRef.current);
     setZoomTooltip(msg);
-    setTimeout(() => setZoomTooltip(null), 3000);
+    zoomTooltipTimerRef.current = setTimeout(() => setZoomTooltip(null), 3000);
   };
+
+  useEffect(() => () => {
+    if (zoomTooltipTimerRef.current) clearTimeout(zoomTooltipTimerRef.current);
+  }, []);
 
   /** Gate an action behind auth */
   const requireAuth = (action: () => void) => {
@@ -125,7 +133,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         Desktop: top-center horizontal bar
         Mobile:  bottom-center compact bar with overflow menu
       */}
-      <div className="absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-gray-200/60 bg-gray-100/80 p-1.5 shadow-lg backdrop-blur-md bottom-4 md:bottom-auto md:top-4 md:gap-1.5">
+      <div className="liquid-glass absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-[1.35rem] p-1.5 bottom-4 md:bottom-auto md:top-4 md:gap-1.5">
         {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -141,19 +149,25 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
           <TooltipContent>{t('toolNavigation')}</TooltipContent>
         </Tooltip>
 
-        {/* Draw */}
+        {/* Current drawing tool — enters draw mode, then toggles pencil/eraser */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className={cn('h-9 w-9 rounded-full', currentMode === 'draw' && ACTIVE_BTN)}
+              className={cn(
+                'h-9 w-9 rounded-full',
+                isEraser ? ERASER_BTN : currentMode === 'draw' && ACTIVE_BTN,
+              )}
               onClick={() => switchMode('draw')}
+              aria-label={isEraser ? t('toolEraserToggle') : t('toolPencilToggle')}
             >
-              <Pencil className="h-4 w-4" />
+              {isEraser ? <Eraser className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t('toolDraw')}</TooltipContent>
+          <TooltipContent>
+            {isEraser ? t('toolEraserToggle') : t('toolPencilToggle')}
+          </TooltipContent>
         </Tooltip>
 
         {/* Pin */}
@@ -180,9 +194,8 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
 
         <div className="h-5 w-px bg-border" />
 
-        {/* Brush & Color — visible on both, disabled if guest */}
-        <div className={cn('flex items-center gap-1', !user && 'opacity-50 pointer-events-none grayscale')}>
-          <BrushPanel />
+        {/* Color and brush settings — visible on both, disabled if guest */}
+        <div className={cn('flex items-center', !user && 'opacity-50 pointer-events-none grayscale')}>
           <ColorPicker />
         </div>
 
@@ -292,7 +305,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-48">
+            <DropdownMenuContent align="end" side="top" sideOffset={8} className="liquid-glass-panel w-48">
               <DropdownMenuItem onClick={() => setStrokesTransparent(!strokesTransparent)}>
                 {strokesTransparent ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
                 {strokesTransparent ? t('toolTransparencyOff') : t('toolTransparencyOn')}

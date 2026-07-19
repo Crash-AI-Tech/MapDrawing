@@ -8,6 +8,7 @@
 import React, { useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, PanResponder } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { PlatformGlassView } from '@/components/ui/PlatformGlassView';
 
 interface ZoomControlsProps {
   currentZoom: number;
@@ -52,8 +53,21 @@ export default function ZoomControls({
   ).current;
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
-      <TouchableOpacity style={styles.btn} onPress={onZoomIn} activeOpacity={0.7}>
+    <PlatformGlassView
+      testID="zoom-controls-glass"
+      style={styles.container}
+      fallbackStyle={styles.containerFallback}
+      glassEffectStyle="clear"
+      isInteractive
+      {...panResponder.panHandlers}
+    >
+      <TouchableOpacity
+        style={styles.btn}
+        onPress={onZoomIn}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Zoom in"
+      >
         <Feather name="plus" size={18} color="#333" />
       </TouchableOpacity>
 
@@ -61,10 +75,16 @@ export default function ZoomControls({
         <Text style={styles.zoomText}>{currentZoom.toFixed(1)}</Text>
       </View>
 
-      <TouchableOpacity style={styles.btn} onPress={onZoomOut} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.btn}
+        onPress={onZoomOut}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Zoom out"
+      >
         <Feather name="minus" size={18} color="#333" />
       </TouchableOpacity>
-    </View>
+    </PlatformGlassView>
   );
 }
 
@@ -73,8 +93,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 50,
     left: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
+    borderRadius: 26,
+    paddingVertical: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -83,16 +103,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     zIndex: 200,
   },
+  containerFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.76)',
+  },
   btn: {
     width: 40,
     height: 40,
+    marginHorizontal: 4,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   zoomDisplay: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#eee',
+    borderColor: 'rgba(255, 255, 255, 0.62)',
+    marginHorizontal: 8,
     paddingVertical: 4,
     alignItems: 'center',
   },

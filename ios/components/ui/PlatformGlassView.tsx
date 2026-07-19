@@ -1,5 +1,5 @@
 import React, { type PropsWithChildren } from 'react';
-import { Platform, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import { BlurView, type BlurViewProps } from 'expo-blur';
 import {
   GlassView,
@@ -8,7 +8,7 @@ import {
   type GlassViewProps,
 } from 'expo-glass-effect';
 
-type PlatformGlassViewProps = PropsWithChildren<{
+type PlatformGlassViewProps = PropsWithChildren<Omit<ViewProps, 'style'> & {
   style?: StyleProp<ViewStyle>;
   fallbackStyle?: StyleProp<ViewStyle>;
   glassEffectStyle?: GlassViewProps['glassEffectStyle'];
@@ -16,7 +16,6 @@ type PlatformGlassViewProps = PropsWithChildren<{
   isInteractive?: boolean;
   fallbackIntensity?: number;
   fallbackTint?: BlurViewProps['tint'];
-  testID?: string;
 }>;
 
 /**
@@ -33,6 +32,7 @@ export function PlatformGlassView({
   fallbackIntensity = 70,
   fallbackTint = Platform.OS === 'ios' ? 'systemMaterial' : 'light',
   testID,
+  ...viewProps
 }: PlatformGlassViewProps) {
   const canUseLiquidGlass = Platform.OS === 'ios' &&
     isGlassEffectAPIAvailable() &&
@@ -41,6 +41,7 @@ export function PlatformGlassView({
   if (canUseLiquidGlass) {
     return (
       <GlassView
+        {...viewProps}
         testID={testID}
         style={style}
         glassEffectStyle={glassEffectStyle}
@@ -54,6 +55,7 @@ export function PlatformGlassView({
 
   return (
     <BlurView
+      {...viewProps}
       testID={testID}
       style={[style, fallbackStyle]}
       intensity={fallbackIntensity}
