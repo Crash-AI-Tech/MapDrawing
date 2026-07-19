@@ -16,6 +16,8 @@ import {
   FileText,
   ShieldCheck,
   UserX,
+  Settings2,
+  ChevronLeft,
   ChevronRight,
   Camera,
 } from 'lucide-react';
@@ -53,6 +55,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
   const [blockedExpanded, setBlockedExpanded] = useState(false);
   const [blockedLoading, setBlockedLoading] = useState(false);
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
+  const [menuView, setMenuView] = useState<'main' | 'account'>('main');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch stats when popover opens
@@ -78,7 +81,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5 border-gray-200/60 bg-gray-100/80 shadow-md backdrop-blur-md hover:bg-gray-200/80"
+        className="liquid-glass relative h-10 gap-1.5 rounded-full px-4 hover:bg-white/50"
         onClick={onLoginClick}
       >
         <LogIn className="h-3.5 w-3.5" />
@@ -171,12 +174,21 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
   const avatarSrc = resolveAvatarUrl(profile?.avatarUrl);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          setMenuView('main');
+          setBlockedExpanded(false);
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-8 w-8 rounded-full border border-gray-200/60 bg-gray-100/80 backdrop-blur-md"
+          className="liquid-glass relative h-10 w-10 rounded-full p-0"
           aria-label={displayName}
         >
           {avatarSrc ? (
@@ -186,10 +198,10 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
               width={32}
               height={32}
               unoptimized
-              className="h-8 w-8 rounded-full object-cover"
+              className="h-9 w-9 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
               {initials}
             </div>
           )}
@@ -199,150 +211,180 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-72 rounded-xl border-gray-200/60 bg-white/95 p-0 shadow-2xl backdrop-blur-xl"
+        className="liquid-glass-panel w-72 rounded-3xl p-0"
       >
-        {/* ===== Identity Card ===== */}
-        <div className="flex flex-col items-center px-5 pt-5 pb-4">
-          {/* Avatar — click to upload */}
-          <div className="relative mb-3">
-            <button
-              className="group relative cursor-pointer rounded-full"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              aria-label={t('menuChangeAvatar')}
-            >
-              {avatarSrc ? (
-                <Image
-                  src={avatarSrc}
-                  alt={displayName}
-                  width={64}
-                  height={64}
-                  unoptimized
-                  className="h-16 w-16 rounded-full border-[3px] border-white object-cover shadow-lg"
-                />
-              ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-white bg-primary text-lg font-semibold text-primary-foreground shadow-lg">
-                  {initials}
-                </div>
-              )}
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/30">
-                <Camera className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
-              </div>
-              {uploading && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                </div>
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarUpload}
-            />
-            {/* Online badge */}
-            <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-[2.5px] border-white bg-green-500" />
-          </div>
-          <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-          <p className="text-xs text-gray-500">{handle}</p>
-
-          {/* Stats row */}
-          <div className="mt-3 flex w-full items-center justify-center gap-0 rounded-lg bg-gray-50 py-2.5">
-            <StatItem
-              icon={<MapPin className="h-3 w-3 text-blue-500" />}
-              value={stats?.pins ?? '–'}
-              label={t('menuPins')}
-            />
-            <div className="mx-3 h-6 w-px bg-gray-200" />
-            <StatItem
-              icon={<PenTool className="h-3 w-3 text-purple-500" />}
-              value={stats?.drawings ?? '–'}
-              label={t('menuDrawings')}
-            />
-          </div>
-        </div>
-
-        {/* ===== Support & Legal ===== */}
-        <div className="border-t border-gray-100 px-2 py-1.5">
-          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-            {t('menuSupportLegal')}
-          </p>
-          <div className="mx-2 mb-1 rounded-lg bg-gray-50 px-2 py-1.5">
-            <LanguageSelector compact />
-          </div>
-          <MenuItem
-            icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
-            label={t('menuTerms')}
-            onClick={() => window.open(`/legal/terms?lang=${lang}`, '_blank', 'noopener,noreferrer')}
-          />
-          <MenuItem
-            icon={<ShieldCheck className="h-3.5 w-3.5 text-green-500" />}
-            label={t('menuPrivacy')}
-            onClick={() => window.open(`/legal/privacy?lang=${lang}`, '_blank', 'noopener,noreferrer')}
-          />
-          <MenuItem
-            icon={<UserX className="h-3.5 w-3.5 text-orange-500" />}
-            label={t('menuBlockedUsers')}
-            onClick={() => { void toggleBlockedUsers(); }}
-          />
-          {blockedExpanded && (
-            <div className="mx-2 mb-1 max-h-36 overflow-y-auto rounded-lg bg-gray-50 p-2">
-              {blockedLoading ? (
-                <p className="py-2 text-center text-xs text-gray-400">{t('menuBlockedLoading')}</p>
-              ) : blockedUsers.length === 0 ? (
-                <p className="py-2 text-center text-xs text-gray-400">{t('menuBlockedEmpty')}</p>
-              ) : blockedUsers.map((blockedUser) => {
-                const blockedAvatar = resolveAvatarUrl(blockedUser.avatarUrl);
-                return (
-                  <div key={blockedUser.userId} className="flex items-center gap-2 border-b border-gray-100 py-2 last:border-0">
-                    {blockedAvatar ? (
-                      <Image src={blockedAvatar} alt="" width={28} height={28} unoptimized className="h-7 w-7 rounded-full object-cover" />
-                    ) : (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-600">
-                        {blockedUser.userName.slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-gray-700">{blockedUser.userName}</p>
-                      <p className="text-[10px] text-gray-400">
-                        {new Date(blockedUser.blockedAt).toLocaleDateString(
-                          lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : 'en-US',
-                        )}
-                      </p>
+        {menuView === 'main' ? (
+          <>
+            {/* ===== Identity Card ===== */}
+            <div className="flex flex-col items-center px-5 pt-5 pb-4">
+              <div className="relative mb-3">
+                <button
+                  className="group relative cursor-pointer rounded-full"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  aria-label={t('menuChangeAvatar')}
+                >
+                  {avatarSrc ? (
+                    <Image
+                      src={avatarSrc}
+                      alt={displayName}
+                      width={64}
+                      height={64}
+                      unoptimized
+                      className="h-16 w-16 rounded-full border-[3px] border-white object-cover shadow-lg"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-white bg-primary text-lg font-semibold text-primary-foreground shadow-lg">
+                      {initials}
                     </div>
-                    <button
-                      className="rounded-md bg-orange-50 px-2 py-1 text-[10px] font-medium text-orange-600 disabled:opacity-50"
-                      disabled={unblockingId === blockedUser.userId}
-                      onClick={() => { void handleUnblock(blockedUser.userId); }}
-                    >
-                      {unblockingId === blockedUser.userId ? '…' : t('menuUnblock')}
-                    </button>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/30">
+                    <Camera className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  {uploading && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    </div>
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+                <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-[2.5px] border-white bg-green-500" />
+              </div>
+              <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+              <p className="text-xs text-gray-500">{handle}</p>
 
-        {/* ===== Footer Actions ===== */}
-        <div className="border-t border-gray-100 px-2 py-1.5">
-          <button
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50"
-            onClick={() => { setOpen(false); void signOut(); }}
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            {t('menuLogout')}
-          </button>
-          <button
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
-            onClick={handleDeleteAccount}
-            disabled={deleting}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {deleting ? t('menuDeleting') : t('menuDeleteAccount')}
-          </button>
-        </div>
+              <div className="mt-3 flex w-full items-center justify-center gap-0 rounded-full bg-white/45 py-2.5">
+                <StatItem
+                  icon={<MapPin className="h-3 w-3 text-blue-500" />}
+                  value={stats?.pins ?? '–'}
+                  label={t('menuPins')}
+                />
+                <div className="mx-3 h-6 w-px bg-gray-200" />
+                <StatItem
+                  icon={<PenTool className="h-3 w-3 text-purple-500" />}
+                  value={stats?.drawings ?? '–'}
+                  label={t('menuDrawings')}
+                />
+              </div>
+            </div>
+
+            {/* ===== Support & Legal ===== */}
+            <div className="border-t border-white/50 px-2 py-1.5">
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                {t('menuSupportLegal')}
+              </p>
+              <div className="mb-1 rounded-full bg-white/40 px-3 py-1.5">
+                <LanguageSelector compact />
+              </div>
+              <MenuItem
+                icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
+                label={t('menuTerms')}
+                onClick={() => window.open(`/legal/terms?lang=${lang}`, '_blank', 'noopener,noreferrer')}
+              />
+              <MenuItem
+                icon={<ShieldCheck className="h-3.5 w-3.5 text-green-500" />}
+                label={t('menuPrivacy')}
+                onClick={() => window.open(`/legal/privacy?lang=${lang}`, '_blank', 'noopener,noreferrer')}
+              />
+            </div>
+
+            {/* ===== Footer Actions ===== */}
+            <div className="border-t border-white/50 px-2 py-1.5">
+              <MenuItem
+                icon={<Settings2 className="h-3.5 w-3.5 text-gray-500" />}
+                label={t('menuAccountPrivacy')}
+                onClick={() => setMenuView('account')}
+              />
+              <button
+                className="flex w-full items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50/70"
+                onClick={() => { setOpen(false); void signOut(); }}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                {t('menuLogout')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* ===== Account & Privacy second-level menu ===== */}
+            <div className="flex h-14 items-center border-b border-white/50 px-2">
+              <button
+                type="button"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-white/60"
+                onClick={() => {
+                  setMenuView('main');
+                  setBlockedExpanded(false);
+                }}
+                aria-label={t('menuBack')}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <p className="text-sm font-semibold text-gray-900">{t('menuAccountPrivacy')}</p>
+            </div>
+
+            <div className="px-2 py-2">
+              <MenuItem
+                icon={<UserX className="h-3.5 w-3.5 text-orange-500" />}
+                label={t('menuBlockedUsers')}
+                onClick={() => { void toggleBlockedUsers(); }}
+              />
+              {blockedExpanded && (
+                <div className="mx-2 mb-1 max-h-44 overflow-y-auto rounded-2xl bg-white/45 p-2">
+                  {blockedLoading ? (
+                    <p className="py-2 text-center text-xs text-gray-400">{t('menuBlockedLoading')}</p>
+                  ) : blockedUsers.length === 0 ? (
+                    <p className="py-2 text-center text-xs text-gray-400">{t('menuBlockedEmpty')}</p>
+                  ) : blockedUsers.map((blockedUser) => {
+                    const blockedAvatar = resolveAvatarUrl(blockedUser.avatarUrl);
+                    return (
+                      <div key={blockedUser.userId} className="flex items-center gap-2 border-b border-white/60 py-2 last:border-0">
+                        {blockedAvatar ? (
+                          <Image src={blockedAvatar} alt="" width={28} height={28} unoptimized className="h-7 w-7 rounded-full object-cover" />
+                        ) : (
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-600">
+                            {blockedUser.userName.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-gray-700">{blockedUser.userName}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {new Date(blockedUser.blockedAt).toLocaleDateString(
+                              lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : 'en-US',
+                            )}
+                          </p>
+                        </div>
+                        <button
+                          className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-medium text-orange-600 disabled:opacity-50"
+                          disabled={unblockingId === blockedUser.userId}
+                          onClick={() => { void handleUnblock(blockedUser.userId); }}
+                        >
+                          {unblockingId === blockedUser.userId ? '…' : t('menuUnblock')}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-white/50 px-2 py-2">
+              <button
+                className="flex w-full items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-50/70"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deleting ? t('menuDeleting') : t('menuDeleteAccount')}
+              </button>
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

@@ -136,7 +136,8 @@ body {
 }
 
 .maplibregl-ctrl-group {
-  border-radius: 16px !important;
+  overflow: hidden !important;
+  border-radius: 9999px !important;
   border: 1px solid rgba(255, 255, 255, 0.72) !important;
   background: rgba(238, 241, 248, 0.45) !important;
   backdrop-filter: blur(20px) saturate(175%) !important;
@@ -145,13 +146,13 @@ body {
 }
 
 .maplibregl-ctrl-group button {
-  width: 32px !important;
-  height: 32px !important;
+  width: 40px !important;
+  height: 40px !important;
 }
 
 /* Position the top-left nav controls below the custom zoom/coords panel */
 .maplibregl-ctrl-top-left {
-  top: 48px !important;
+  top: 56px !important;
 }
 
 /* Custom Red/White Compass Icon */

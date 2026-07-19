@@ -46,7 +46,9 @@ export default function CanvasPage() {
         <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
           {/* Sync status dot */}
           <div
-            className="flex items-center gap-1.5 rounded-full border border-gray-200/60 bg-gray-100/80 px-2.5 py-1 text-[11px] backdrop-blur-md"
+            className="liquid-glass relative flex h-10 items-center gap-2 rounded-full px-3 text-[11px]"
+            role="status"
+            aria-live="polite"
             title={syncState === 'connected' ? t('syncConnected') : syncState === 'connecting' ? t('syncConnecting') : t('syncOffline')}
           >
             <span

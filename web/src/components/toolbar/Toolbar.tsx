@@ -31,9 +31,6 @@ import {
   MapPin,
   Eye,
   EyeOff,
-  Wifi,
-  WifiOff,
-  Loader2,
   MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -66,20 +63,12 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   const placingPin = usePinStore((s) => s.placingPin);
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const currentZoom = useUIStore((s) => s.currentZoom);
-  const syncState = useUIStore((s) => s.syncState);
   const [zoomTooltip, setZoomTooltip] = useState<string | null>(null);
   const zoomTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derive current tool mode
   const currentMode: ToolMode = placingPin ? 'pin' : drawingMode ? 'draw' : 'hand';
   const isEraser = activeBrushId === BRUSH_IDS.ERASER;
-  const syncLabel = syncState === 'connected'
-    ? t('syncConnected')
-    : syncState === 'connecting'
-      ? t('syncConnecting')
-      : syncState === 'error'
-        ? t('syncError')
-        : t('syncDisconnected');
 
   /** Show a temporary tooltip */
   const flashTooltip = (msg: string) => {
@@ -140,7 +129,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         Desktop: top-center horizontal bar
         Mobile:  bottom-center compact bar with overflow menu
       */}
-      <div className="liquid-glass absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-[1.35rem] p-1.5 bottom-4 md:bottom-auto md:top-4 md:gap-1.5">
+      <div className="liquid-glass absolute bottom-4 left-1/2 z-30 flex min-h-12 -translate-x-1/2 items-center gap-1 rounded-full p-1.5 md:bottom-auto md:top-4 md:gap-1.5">
         {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -272,32 +261,6 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
           {/* Ink bar */}
           <InkBar />
 
-          {/* Sync status indicator */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex h-5 w-5 items-center justify-center" role="status" aria-label={syncLabel}>
-                {syncState === 'connected' && (
-                  <Wifi className="h-3 w-3 text-green-500" />
-                )}
-                {syncState === 'connecting' && (
-                  <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
-                )}
-                {syncState === 'disconnected' && (
-                  <WifiOff className="h-3 w-3 text-gray-400" />
-                )}
-                {syncState === 'error' && (
-                  <WifiOff className="h-3 w-3 text-red-500" />
-                )}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {syncState === 'connected' && t('syncConnected')}
-              {syncState === 'connecting' && t('syncConnecting')}
-              {syncState === 'disconnected' && t('syncDisconnected')}
-              {syncState === 'error' && t('syncError')}
-            </TooltipContent>
-          </Tooltip>
-
           {/* Stroke count */}
           {strokeCount > 0 && (
             <>
@@ -321,17 +284,6 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               <DropdownMenuItem onClick={() => setStrokesTransparent(!strokesTransparent)}>
                 {strokesTransparent ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
                 {strokesTransparent ? t('toolTransparencyOff') : t('toolTransparencyOn')}
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  {syncState === 'connected' && <Wifi className="h-3 w-3 text-green-500" />}
-                  {syncState === 'connecting' && <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />}
-                  {(syncState === 'disconnected' || syncState === 'error') && <WifiOff className="h-3 w-3 text-gray-400" />}
-                  {syncState === 'connected' ? t('syncConnected') : syncState === 'connecting' ? t('syncConnecting') : t('syncOffline')}
-                </span>
-                {strokeCount > 0 && (
-                  <span className="text-[10px] tabular-nums text-muted-foreground">{strokeCount}</span>
-                )}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

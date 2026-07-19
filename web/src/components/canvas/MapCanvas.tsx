@@ -607,7 +607,7 @@ export default function MapCanvas() {
 
       {/* Zoom level & mouse coordinates */}
       <div className="absolute top-4 left-3 z-30 flex flex-col gap-1.5">
-        <div className="flex items-center gap-2 rounded-xl border border-gray-200/60 bg-white/90 px-3 py-2 text-[11px] tabular-nums text-muted-foreground shadow-md backdrop-blur-md">
+        <div className="liquid-glass relative flex h-10 items-center gap-2 rounded-full px-3 text-[11px] tabular-nums text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <svg className="h-3.5 w-3.5 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
             <span className="font-semibold text-foreground">{currentZoom.toFixed(1)}</span>

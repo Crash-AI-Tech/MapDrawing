@@ -179,6 +179,8 @@ const dict = {
   menuSupportLegal: { zh: '帮助与法律', en: 'Support & Legal', ja: 'サポートと法務' },
   menuTerms: { zh: '服务条款', en: 'Terms of Service', ja: '利用規約' },
   menuPrivacy: { zh: '隐私政策', en: 'Privacy Policy', ja: 'プライバシーポリシー' },
+  menuAccountPrivacy: { zh: '账号与隐私', en: 'Account & Privacy', ja: 'アカウントとプライバシー' },
+  menuBack: { zh: '返回', en: 'Back', ja: '戻る' },
   menuBlockedUsers: { zh: '已屏蔽用户', en: 'Blocked Users', ja: 'ブロック中のユーザー' },
   menuBlockedLoading: { zh: '加载中…', en: 'Loading…', ja: '読み込み中…' },
   menuBlockedEmpty: { zh: '尚未屏蔽任何用户', en: 'No users blocked yet.', ja: 'ブロック中のユーザーはいません' },
