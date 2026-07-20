@@ -1,8 +1,4 @@
-/** Generate an SVG pencil cursor data URI */
-function pencilCursor(): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" fill="%23333" stroke="%23333" stroke-width="1"/><path d="m15 5 4 4" stroke="white" stroke-width="1"/></svg>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 2 22, crosshair`;
-}
+import { eraserToolCursor, pencilToolCursor } from './toolCursors';
 
 /**
  * WebCanvasProvider — manages DOM canvas elements for the overlay system.
@@ -12,6 +8,8 @@ export class WebCanvasProvider {
   private container: HTMLElement | null = null;
   private compositeCanvas: HTMLCanvasElement | null = null;
   private activeCanvas: HTMLCanvasElement | null = null;
+  private drawingEnabled = false;
+  private drawingCursor = pencilToolCursor();
 
   /**
    * Initialize the canvas overlay within a container element.
@@ -85,9 +83,18 @@ export class WebCanvasProvider {
 
   /** Set pointer-events on the active canvas (enable/disable drawing) */
   setDrawingMode(enabled: boolean): void {
+    this.drawingEnabled = enabled;
     if (this.activeCanvas) {
       this.activeCanvas.style.pointerEvents = enabled ? 'auto' : 'none';
-      this.activeCanvas.style.cursor = enabled ? pencilCursor() : 'default';
+      this.activeCanvas.style.cursor = enabled ? this.drawingCursor : 'default';
+    }
+  }
+
+  /** Keep the input canvas cursor in sync with the selected drawing tool. */
+  setBrushCursor(brushId: string): void {
+    this.drawingCursor = brushId === 'eraser' ? eraserToolCursor() : pencilToolCursor();
+    if (this.activeCanvas && this.drawingEnabled) {
+      this.activeCanvas.style.cursor = this.drawingCursor;
     }
   }
 
@@ -108,5 +115,6 @@ export class WebCanvasProvider {
     this.compositeCanvas = null;
     this.activeCanvas = null;
     this.container = null;
+    this.drawingEnabled = false;
   }
 }

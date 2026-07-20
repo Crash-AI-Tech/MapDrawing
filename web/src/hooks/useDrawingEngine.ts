@@ -163,6 +163,7 @@ export function useDrawingEngine(
       // 9) Sync initial drawing store state → engine
       const state = drawingStore.getState();
       engine.setBrush(state.activeBrushId);
+      canvasProvider.setBrushCursor(state.activeBrushId);
       engine.setColor(state.activeColor);
       engine.setOpacity(state.activeOpacity);
       engine.setSize(state.activeSize);
@@ -184,6 +185,7 @@ export function useDrawingEngine(
 
       if (state.activeBrushId !== prevState.activeBrushId) {
         engine.setBrush(state.activeBrushId);
+        canvasProviderRef.current?.setBrushCursor(state.activeBrushId);
       }
       if (state.activeColor !== prevState.activeColor) {
         engine.setColor(state.activeColor);

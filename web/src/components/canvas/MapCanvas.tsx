@@ -29,6 +29,7 @@ import { Compliance } from '@/lib/compliance';
 import { getI18nText, useI18n } from '@/lib/i18n';
 import { usePresence } from '@/hooks/usePresence';
 import { CursorOverlay } from '@/components/canvas/CursorOverlay';
+import { eraserToolCursor } from '@/platform/web/toolCursors';
 
 /** Generate an SVG pin cursor data URI — small size (14x20) */
 function pinCursorSvg(color: string): string {
@@ -83,13 +84,6 @@ function saveViewport(center: { lng: number; lat: number }, zoom: number) {
 function brushCursorSvg(color: string, size: number): string {
   const r = Math.max(4, size / 2 + 2); // visible size
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${r * 2}" height="${r * 2}" viewBox="0 0 ${r * 2} ${r * 2}"><circle cx="${r}" cy="${r}" r="${Math.max(2, size / 2)}" fill="${color}" stroke="white" stroke-width="1" opacity="0.8"/></svg>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${r} ${r}, auto`;
-}
-
-// Eraser cursor (white circle with border)
-function eraserCursorSvg(size: number): string {
-  const r = Math.max(6, size / 2 + 2);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${r * 2}" height="${r * 2}" viewBox="0 0 ${r * 2} ${r * 2}"><circle cx="${r}" cy="${r}" r="${Math.max(4, size / 2)}" fill="white" stroke="#333" stroke-width="2" opacity="0.8"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${r} ${r}, auto`;
 }
 
@@ -490,7 +484,7 @@ export default function MapCanvas() {
       canvas.style.cursor = pinCursorSvg(pinColor);
     } else if (drawingMode) {
       if (activeBrushId === 'eraser') {
-        canvas.style.cursor = eraserCursorSvg(activeSize);
+        canvas.style.cursor = eraserToolCursor();
       } else {
         canvas.style.cursor = brushCursorSvg(activeColor, activeSize);
       }
