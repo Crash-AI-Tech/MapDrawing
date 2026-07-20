@@ -82,8 +82,13 @@ export default function InkBar() {
               style={{ width: `${percent}%` }}
             />
           </div>
-          <span className="w-7 shrink-0 text-right text-[9px] font-bold tabular-nums text-emerald-700">
-            {percent}%
+          <span className="flex h-6 w-7 shrink-0 flex-col justify-center text-right tabular-nums">
+            <span className="text-[9px] font-bold leading-none text-emerald-700">{percent}%</span>
+            {ink < maxInk && (
+              <span className="mt-0.5 text-[7px] font-medium leading-none text-muted-foreground">
+                {countdown}s
+              </span>
+            )}
           </span>
         </div>
       </TooltipTrigger>
