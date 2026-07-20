@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import Constants from 'expo-constants';
 
 import { fetchProfile, fetchProfileStats, apiFetch, deleteAccount as deleteAccountApi } from '@/lib/api';
 import type { UserProfileStats } from '@/lib/api';
@@ -14,6 +15,7 @@ import { runMapExportAction } from '@/utils/mapExportAction';
 
 const LANG_LABELS: Record<Lang, string> = { zh: '中文', en: 'English', ja: '日本語' };
 const LANG_ORDER: Lang[] = ['en', 'zh', 'ja'];
+const APP_VERSION = Constants.expoConfig?.version ?? '1.2.0';
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -256,7 +258,7 @@ export default function ProfileScreen() {
                             </Text>
                         </TouchableOpacity>
 
-                        <Text style={styles.versionText}>DrawMaps v1.1.0</Text>
+                        <Text style={styles.versionText}>DrawMaps v{APP_VERSION}</Text>
                     </View>
                 </ScrollView>
             </SafeAreaView>
