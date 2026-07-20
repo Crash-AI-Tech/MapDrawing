@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Download, Image as ImageIcon, Copy, Share2, Loader2 } from 'lucide-react';
+import { Download, Image as ImageIcon, Copy, Share2, Loader2, ChevronRight } from 'lucide-react';
 import {
   captureCanvasBlob,
   downloadBlob,
@@ -22,7 +22,11 @@ import { useI18n } from '@/lib/i18n';
  * ExportMenu — dropdown to export the current map+drawing view.
  * Finds canvases via DOM IDs set by WebCanvasProvider and MapLibre.
  */
-export default function ExportMenu() {
+interface ExportMenuProps {
+  variant?: 'icon' | 'profile';
+}
+
+export default function ExportMenu({ variant = 'icon' }: ExportMenuProps) {
   const { t } = useI18n();
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -112,27 +116,44 @@ export default function ExportMenu() {
   return (
     <>
       <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                disabled={exporting}
-                aria-label={t('toolExport')}
-              >
-                {exporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{t('toolExport')}</TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align="center" side="bottom" className="w-44">
+        {variant === 'profile' ? (
+          <DropdownMenuTrigger asChild>
+            <button className="flex w-full items-center justify-between rounded-full px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-white/55">
+              <span className="flex items-center gap-2.5">
+                <Download className="h-3.5 w-3.5 text-violet-500" />
+                {t('toolExport')}
+              </span>
+              <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+            </button>
+          </DropdownMenuTrigger>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  disabled={exporting}
+                  aria-label={t('toolExport')}
+                >
+                  {exporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t('toolExport')}</TooltipContent>
+          </Tooltip>
+        )}
+        <DropdownMenuContent
+          align={variant === 'profile' ? 'end' : 'center'}
+          side={variant === 'profile' ? 'left' : 'bottom'}
+          sideOffset={8}
+          className="liquid-glass-panel w-48"
+        >
           <DropdownMenuItem onClick={handleDownloadPNG} disabled={exporting}>
             <ImageIcon className="mr-2 h-4 w-4" />
             {t('exportDownloadPNG')}

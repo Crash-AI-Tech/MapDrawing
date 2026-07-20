@@ -10,6 +10,7 @@ import { fetchProfile, fetchProfileStats, apiFetch, deleteAccount as deleteAccou
 import type { UserProfileStats } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
 import { useLang, ts, type Lang } from '@/lib/i18n';
+import { runMapExportAction } from '@/utils/mapExportAction';
 
 const LANG_LABELS: Record<Lang, string> = { zh: '中文', en: 'English', ja: '日本語' };
 const LANG_ORDER: Lang[] = ['en', 'zh', 'ja'];
@@ -147,6 +148,16 @@ export default function ProfileScreen() {
             }
         },
         {
+            title: ts('exportMap', lang),
+            icon: 'share-outline',
+            color: '#7C3AED',
+            onPress: () => {
+                if (!runMapExportAction()) {
+                    Alert.alert(ts('exportMap', lang), ts('exportUnavailable', lang));
+                }
+            }
+        },
+        {
             title: ts('privacy', lang),
             icon: 'shield-checkmark-outline',
             color: '#34C759',
@@ -210,7 +221,7 @@ export default function ProfileScreen() {
                     <View style={styles.menuGroup}>
                         {menuItems.map((item, index) => (
                             <TouchableOpacity
-                                key={index}
+                                key={item.title}
                                 style={[styles.menuItem, index < menuItems.length - 1 && styles.borderBottom]}
                                 onPress={item.onPress}
                             >

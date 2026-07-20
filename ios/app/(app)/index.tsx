@@ -86,6 +86,7 @@ import type { StrokeData, StrokePoint, CameraState } from '@/core/types';
 import { useLang, ts, tf, getCurrentLang } from '@/lib/i18n';
 import ViewShot from 'react-native-view-shot';
 import { showExportMenu } from '@/utils/exportMap';
+import { registerMapExportAction } from '@/utils/mapExportAction';
 import { usePresence } from '@/hooks/usePresence';
 import { CursorOverlay } from '@/components/CursorOverlay';
 import { getActiveBrushConfig } from '@/core/activeBrush';
@@ -155,6 +156,11 @@ export default function MapScreen() {
   const cameraRef = useRef<CameraRef | null>(null);
   const viewShotRef = useRef<ViewShot | null>(null);
 
+  useEffect(
+    () => registerMapExportAction(() => showExportMenu(viewShotRef, getCurrentLang())),
+    [],
+  );
+
   // ===== Reactive State =====
   const [mode, setMode] = useState<'hand' | 'draw' | 'pin'>('hand');
   const [strokesTransparent, setStrokesTransparent] = useState(false);
@@ -162,7 +168,6 @@ export default function MapScreen() {
   // ===== Real-time Collaboration =====
   const syncManagerRef = useRef<SyncManager | null>(null);
   const tileManagerRef = useRef<TileManager | null>(null);
-  const [syncState, setSyncState] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connected');
 
   // ===== Strokes: ref-based (no React state for big arrays) =====
   const strokesRef = useRef<Map<string, StrokeData>>(new Map());
@@ -189,9 +194,6 @@ export default function MapScreen() {
       },
     });
     syncManagerRef.current = syncManager;
-    syncManager.onStateChange((state) => {
-      setSyncState(state);
-    });
     fetchInk()
       .then(({ ink: serverInk }) => inkManagerRef.current?.reconcile(serverInk))
       .catch(() => undefined);
@@ -1122,8 +1124,6 @@ export default function MapScreen() {
         currentZoom={cameraState.zoom}
         strokesTransparent={strokesTransparent}
         onToggleTransparency={() => setStrokesTransparent((v) => !v)}
-        onExport={() => showExportMenu(viewShotRef, getCurrentLang())}
-        syncState={syncState}
       />
 
       {/* ===== Selected Pin Tooltip (Outside MapView) ===== */}

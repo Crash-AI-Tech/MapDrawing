@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/tooltip';
 import ColorPicker from './ColorPicker';
 import InkBar from './InkBar';
-import ExportMenu from './ExportMenu';
 import {
   Undo2,
   Redo2,
@@ -125,11 +124,18 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      {/*
-        Desktop: top-center horizontal bar
-        Mobile:  bottom-center compact bar with overflow menu
-      */}
-      <div className="liquid-glass absolute bottom-4 left-1/2 z-30 flex h-10 -translate-x-1/2 items-center gap-1 rounded-full px-1 py-px md:bottom-auto md:top-4 md:gap-1.5">
+      <div className="absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
+        {/* Zoom tooltip */}
+        {zoomTooltip && (
+          <div className="absolute bottom-full z-50 mb-2 whitespace-nowrap rounded-full bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+            {zoomTooltip}
+          </div>
+        )}
+
+        {/* Ink is a separate floating status above the dock on both platforms. */}
+        <InkBar />
+
+        <div className="liquid-glass relative flex h-12 w-[94vw] max-w-[44rem] items-center justify-center gap-2 rounded-full px-3 md:gap-4">
         {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -144,6 +150,22 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('toolNavigation')}</TooltipContent>
+        </Tooltip>
+
+        {/* Pin */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('h-9 w-9 rounded-full', currentMode === 'pin' && ACTIVE_BTN)}
+              onClick={() => switchMode('pin')}
+              aria-label={t('toolPin')}
+            >
+              <MapPin className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('toolPin')}</TooltipContent>
         </Tooltip>
 
         {/* Current drawing tool — enters draw mode, then toggles pencil/eraser */}
@@ -166,29 +188,6 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
             {isEraser ? t('toolEraserToggle') : t('toolPencilToggle')}
           </TooltipContent>
         </Tooltip>
-
-        {/* Pin */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn('h-9 w-9 rounded-full', currentMode === 'pin' && ACTIVE_BTN)}
-              onClick={() => switchMode('pin')}
-              aria-label={t('toolPin')}
-            >
-              <MapPin className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t('toolPin')}</TooltipContent>
-        </Tooltip>
-
-        {/* Zoom tooltip */}
-        {zoomTooltip && (
-          <div className="absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm bottom-full mb-2 md:bottom-auto md:top-full md:mt-2 md:mb-0">
-            {zoomTooltip}
-          </div>
-        )}
 
         <div className="h-5 w-px bg-border" />
 
@@ -253,14 +252,6 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
             </TooltipContent>
           </Tooltip>
 
-          {/* Export / Share */}
-          <ExportMenu />
-
-          <div className="h-5 w-px bg-border" />
-
-          {/* Ink bar */}
-          <InkBar />
-
           {/* Stroke count */}
           {strokeCount > 0 && (
             <>
@@ -287,6 +278,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
         </div>
       </div>
     </TooltipProvider>

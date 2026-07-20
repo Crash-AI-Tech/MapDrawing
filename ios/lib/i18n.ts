@@ -75,6 +75,8 @@ export const translations = {
   supportLegal: { zh: '帮助 & 法律', en: 'Support & Legal', ja: 'サポート & 法律' },
   terms: { zh: '服务条款', en: 'Terms of Service', ja: '利用規約' },
   privacy: { zh: '隐私政策', en: 'Privacy Policy', ja: 'プライバシーポリシー' },
+  exportMap: { zh: '导出 / 分享地图', en: 'Export / Share Map', ja: '地図をエクスポート / 共有' },
+  exportUnavailable: { zh: '地图暂时无法导出，请返回地图后重试。', en: 'The map is not available to export. Return to the map and try again.', ja: '地図をエクスポートできません。地図に戻ってもう一度お試しください。' },
   blocked: { zh: '已屏蔽的用户', en: 'Blocked Users', ja: 'ブロック中のユーザー' },
   blockedEmpty: { zh: '暂无已屏蔽的用户', en: 'No users blocked yet.', ja: 'ブロック中のユーザーはいません' },
   unblockUser: { zh: '解除屏蔽', en: 'Unblock User', ja: 'ブロック解除' },

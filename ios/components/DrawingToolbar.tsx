@@ -100,8 +100,6 @@ interface DrawingToolbarProps {
   currentZoom: number;
   strokesTransparent: boolean;
   onToggleTransparency: () => void;
-  onExport?: () => void;
-  syncState?: 'connecting' | 'connected' | 'disconnected' | 'error';
 }
 
 const BRUSH_ICONS: Record<string, { lib: 'feather' | 'mci'; name: string }> = {
@@ -129,8 +127,6 @@ export default function DrawingToolbar({
   currentZoom,
   strokesTransparent,
   onToggleTransparency,
-  onExport,
-  syncState = 'connected',
 }: DrawingToolbarProps) {
   const [lang] = useLang();
   const [showColorPanel, setShowColorPanel] = useState(false);
@@ -272,14 +268,7 @@ export default function DrawingToolbar({
     setShowColorPanel(!showColorPanel);
   };
 
-  // Ink bar color: green → yellow → red
   const inkPercent = Math.max(0, Math.min(1, ink / maxInk));
-  const inkColor =
-    inkPercent > 0.5
-      ? '#22c55e'
-      : inkPercent > 0.2
-        ? '#eab308'
-        : '#ef4444';
 
   const handleModeChange = (newMode: 'hand' | 'draw' | 'pin') => {
     if (newMode === 'draw') {
@@ -432,26 +421,25 @@ export default function DrawingToolbar({
             />
           </TouchableOpacity>
 
-          {/* Group 5: Export */}
-          {onExport && (
-            <>
-              <Divider />
-              <TouchableOpacity style={styles.btn} onPress={onExport}>
-                <Feather name="share" size={16} color="#333" />
-              </TouchableOpacity>
-            </>
-          )}
         </PlatformGlassView>
 
-        {/* Ink Droplet hovering above toolbar */}
+        {/* Green ink droplet + progress bar hovering above the dock */}
         <View style={styles.inkDropletContainer}>
           <PlatformGlassView
             style={styles.inkDroplet}
             fallbackStyle={styles.inkDropletFallback}
             glassEffectStyle="regular"
           >
-            <MaterialCommunityIcons name="water" size={12} color={inkColor} />
-            <Text style={[styles.inkDropletText, { color: inkColor }]}>
+            <MaterialCommunityIcons name="water" size={14} color="#16a34a" />
+            <View style={styles.inkProgressTrack}>
+              <View
+                style={[
+                  styles.inkProgressFill,
+                  { width: `${Math.round(inkPercent * 100)}%` as `${number}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.inkDropletText}>
               {Math.round(inkPercent * 100)}%
             </Text>
             {ink < maxInk && (
@@ -460,13 +448,6 @@ export default function DrawingToolbar({
               </Text>
             )}
           </PlatformGlassView>
-          {/* Sync status dot */}
-          <View style={[
-            styles.syncDot,
-            { backgroundColor: syncState === 'connected' ? '#22c55e'
-              : syncState === 'connecting' ? '#eab308'
-              : '#ef4444' }
-          ]} />
         </View>
 
         {/* ===== Color Panel (bottom sheet style) with custom color, recent, size/opacity sliders ===== */}
@@ -686,6 +667,8 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
+    width: '94%',
+    maxWidth: 520,
     borderRadius: 24,
     overflow: 'hidden',
     padding: 6,
@@ -696,6 +679,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
     alignItems: 'center',
+    justifyContent: 'space-evenly',
     gap: 6,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
@@ -752,23 +736,24 @@ const styles = StyleSheet.create({
   // Ink Droplet (Glassmorphism badge)
   inkDropletContainer: {
     position: 'absolute',
-    top: -28, // Hover above the toolbar
+    top: -34,
     left: '50%',
-    transform: [{ translateX: -24 }], // Center horizontally (half of width 48)
+    width: 196,
+    transform: [{ translateX: -98 }],
     alignItems: 'center',
   },
   inkDroplet: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 12,
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
-    gap: 2,
+    gap: 6,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.5)',
     overflow: 'hidden',
@@ -779,7 +764,20 @@ const styles = StyleSheet.create({
   inkDropletText: {
     fontSize: 10,
     fontWeight: '800',
+    color: '#15803d',
     fontVariant: ['tabular-nums'],
+  },
+  inkProgressTrack: {
+    width: 88,
+    height: 8,
+    overflow: 'hidden',
+    borderRadius: 4,
+    backgroundColor: 'rgba(6, 78, 59, 0.12)',
+  },
+  inkProgressFill: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22c55e',
   },
   inkCountdown: {
     fontSize: 8,
@@ -787,13 +785,6 @@ const styles = StyleSheet.create({
     color: '#999',
     fontVariant: ['tabular-nums'],
   },
-  syncDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginLeft: 4,
-  },
-
   // Panels
   panel: {
     position: 'absolute',

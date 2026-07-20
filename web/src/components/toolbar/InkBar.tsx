@@ -8,14 +8,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Droplets } from 'lucide-react';
+import { Droplet } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 const REGEN_INTERVAL_S = 18;
 
 /**
- * InkBar — displays the current ink level as a compact bar in the toolbar.
- * Shows a gradient bar (blue → red), numeric value, and recovery countdown.
+ * InkBar — floating ink status displayed above the dock.
+ * Uses the same green droplet + progress treatment as iOS.
  * Low ink (< 20%): pulsing animation.
  * Empty ink: shake animation.
  */
@@ -53,13 +53,6 @@ export default function InkBar() {
     prevInkRef.current = ink;
   }, [ink]);
 
-  // Color transitions: blue → yellow → red
-  const getBarColor = () => {
-    if (ratio > 0.5) return 'bg-blue-500';
-    if (ratio > 0.2) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
   const isLow = ratio <= 0.2;
   const isEmpty = ink <= 0;
 
@@ -73,7 +66,7 @@ export default function InkBar() {
           aria-valuemax={maxInk}
           aria-valuenow={ink}
           className={cn(
-            'flex items-center gap-1.5 px-1 py-0.5',
+            'liquid-glass relative flex h-8 items-center gap-2 rounded-full px-3',
             isLow && !isEmpty && 'animate-pulse',
             shaking && 'animate-[shake_0.3s_ease-in-out_2]'
           )}
@@ -81,36 +74,15 @@ export default function InkBar() {
             animation: 'shake 0.3s ease-in-out 0s 2',
           } : undefined}
         >
-          <Droplets
-            className={cn(
-              'h-3.5 w-3.5',
-              ratio > 0.5
-                ? 'text-blue-500'
-                : ratio > 0.2
-                  ? 'text-yellow-500'
-                  : 'text-red-500'
-            )}
-          />
+          <Droplet className="h-3.5 w-3.5 fill-emerald-500 text-emerald-600" />
           {/* Horizontal bar showing ink level */}
-          <div className="relative h-2 w-16 overflow-hidden rounded-full bg-muted">
+          <div className="relative h-2 w-24 overflow-hidden rounded-full bg-emerald-950/10">
             <div
-              className={cn(
-                'absolute top-0 left-0 h-full rounded-full transition-all duration-500 ease-out',
-                getBarColor()
-              )}
+              className="absolute top-0 left-0 h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
               style={{ width: `${percent}%` }}
             />
           </div>
-          <span
-            className={cn(
-              'text-[9px] tabular-nums font-bold min-w-[28px] text-right',
-              ratio > 0.5
-                ? 'text-muted-foreground'
-                : ratio > 0.2
-                  ? 'text-yellow-600'
-                  : 'text-red-500'
-            )}
-          >
+          <span className="min-w-[28px] text-right text-[9px] font-bold tabular-nums text-emerald-700">
             {percent}%
           </span>
           {/* Recovery countdown when not full */}
@@ -121,7 +93,7 @@ export default function InkBar() {
           )}
         </div>
       </TooltipTrigger>
-      <TooltipContent side="bottom">
+      <TooltipContent side="top">
         <p>{t('inkLabel')} {ink.toFixed(1)}/{maxInk} ({percent}%)</p>
         {ink < maxInk ? (
           <p className="text-xs text-muted-foreground">{t('inkNextRegen', { seconds: countdown })}</p>

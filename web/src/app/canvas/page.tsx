@@ -7,7 +7,6 @@ import Toolbar from '@/components/toolbar/Toolbar';
 import UserMenu from '@/components/auth/UserMenu';
 import AuthDialog from '@/components/auth/AuthDialog';
 import { useAuth } from '@/hooks/useAuth';
-import { useUIStore } from '@/stores/uiStore';
 import { useI18n } from '@/lib/i18n';
 
 // MapCanvas uses MapLibre GL which requires window — lazy import with client-only guard
@@ -19,7 +18,6 @@ const LazyMapCanvas = lazy(() => import('@/components/canvas/MapCanvas'));
  */
 export default function CanvasPage() {
   useAuth();
-  const syncState = useUIStore((s) => s.syncState);
   const { t } = useI18n();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -42,28 +40,8 @@ export default function CanvasPage() {
         {/* Toolbar (left) — passes auth gate callback */}
         <Toolbar onAuthRequired={() => setShowAuthDialog(true)} />
 
-        {/* User menu + sync status (top-right) */}
-        <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
-          {/* Sync status dot */}
-          <div
-            className="liquid-glass relative flex h-10 items-center gap-2 rounded-full px-3 text-[11px]"
-            role="status"
-            aria-live="polite"
-            title={syncState === 'connected' ? t('syncConnected') : syncState === 'connecting' ? t('syncConnecting') : t('syncOffline')}
-          >
-            <span
-              className={`h-2 w-2 rounded-full ${
-                syncState === 'connected'
-                  ? 'bg-green-500'
-                  : syncState === 'connecting'
-                    ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-red-500'
-              }`}
-            />
-            <span className="text-muted-foreground">
-              {syncState === 'connected' ? t('syncOnline') : syncState === 'connecting' ? t('syncConnecting') : t('syncOffline')}
-            </span>
-          </div>
+        {/* User menu (top-right) */}
+        <div className="absolute right-4 top-4 z-30">
           <UserMenu onLoginClick={() => setShowAuthDialog(true)} />
         </div>
 

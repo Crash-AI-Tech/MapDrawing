@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/shared/LanguageSelector';
+import ExportMenu from '@/components/toolbar/ExportMenu';
 import { useI18n } from '@/lib/i18n';
 import {
   LogOut,
@@ -296,6 +297,7 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
 
             {/* ===== Footer Actions ===== */}
             <div className="border-t border-white/50 px-2 py-1.5">
+              <ExportMenu variant="profile" />
               <MenuItem
                 icon={<Settings2 className="h-3.5 w-3.5 text-gray-500" />}
                 label={t('menuAccountPrivacy')}
