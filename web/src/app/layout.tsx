@@ -4,22 +4,37 @@ import { LanguageDocumentSync } from '@/components/shared/LanguageDocumentSync';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://map.wisebamboo.fun'),
-  title: 'Map — Global Collaborative Map Drawing',
-  description: 'Draw and leave messages on a shared real-world map with a global community.',
-  keywords: ['map collaboration', 'global canvas', 'digital graffiti', 'collaborative art', 'interactive map'],
-  authors: [{ name: 'Map Team' }],
+  title: {
+    default: 'DrawMaps — Draw Together on the Real-World Map',
+    template: '%s | DrawMaps',
+  },
+  description: 'DrawMaps is a collaborative map canvas for geographic drawing and location-based messages on Web and iOS.',
+  applicationName: 'DrawMaps',
+  keywords: ['collaborative map drawing', 'shared map canvas', 'location-based art', 'map graffiti', 'interactive map drawing'],
+  authors: [{ name: 'Shenzhen Yuzhu Intelligent Co., Ltd.' }],
+  creator: 'Shenzhen Yuzhu Intelligent Co., Ltd.',
+  publisher: 'Shenzhen Yuzhu Intelligent Co., Ltd.',
   icons: { icon: '/logo.png' },
+  alternates: {
+    canonical: '/',
+    languages: {
+      en: '/en',
+      'zh-CN': '/zh-cn',
+      ja: '/ja',
+      'x-default': '/en',
+    },
+  },
   openGraph: {
-    title: 'Map — Global Collaborative Map Drawing',
-    description: 'Sketch on the streets of the world. Connect with others through art on a shared global canvas.',
+    title: 'DrawMaps — Draw Together on the Real-World Map',
+    description: 'Draw at real coordinates, leave location-based messages, and create one shared global canvas.',
     url: 'https://map.wisebamboo.fun',
-    siteName: 'Map',
+    siteName: 'DrawMaps',
     images: [
       {
         url: '/hero-illustration.png',
-        width: 1200,
-        height: 630,
-        alt: 'Map Project Illustration',
+        width: 600,
+        height: 600,
+        alt: 'DrawMaps collaborative map canvas',
       },
     ],
     locale: 'en_US',
@@ -27,15 +42,18 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Map — Global Collaborative Map Drawing',
-    description: 'Sketch on the streets of the world. Connect with others through art on a shared global canvas.',
+    title: 'DrawMaps — Draw Together on the Real-World Map',
+    description: 'Draw at real coordinates, leave location-based messages, and create one shared global canvas.',
     images: ['/hero-illustration.png'],
   },
-  other: {
-    'geo.region': 'US',
-    'geo.position': '37.7749;-122.4194',
-    'ICBM': '37.7749, -122.4194',
-  }
+  verification: {
+    ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+      : {}),
+    ...(process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+      ? { other: { 'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION } }
+      : {}),
+  },
 };
 
 export const viewport: Viewport = {
@@ -51,9 +69,45 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const structuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'Shenzhen Yuzhu Intelligent Co., Ltd.',
+      alternateName: '深圳市玉竹智能有限公司',
+      url: 'https://map.wisebamboo.fun',
+      logo: 'https://map.wisebamboo.fun/logo.png',
+      email: 'wenjian@wisebamboo.fun',
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: 'DrawMaps',
+      url: 'https://map.wisebamboo.fun',
+      inLanguage: ['en', 'zh-CN', 'ja'],
+      publisher: { '@type': 'Organization', name: 'Shenzhen Yuzhu Intelligent Co., Ltd.' },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'DrawMaps',
+      applicationCategory: 'EntertainmentApplication',
+      operatingSystem: 'Web, iOS',
+      url: 'https://map.wisebamboo.fun',
+      description: 'A collaborative map canvas for geographic drawing and location-based messages.',
+      featureList: [
+        'Coordinate-based collaborative drawing',
+        'Location-based pin messages',
+        'Web and iOS account synchronization',
+        'Reporting and user blocking',
+      ],
+    },
+  ];
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background antialiased">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
         <LanguageDocumentSync />
         {children}
       </body>

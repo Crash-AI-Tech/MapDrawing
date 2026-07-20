@@ -55,6 +55,7 @@ const t = {
     // footer
     footer: 'Map — 全球实时协作绘画平台',
     support: '支持', privacy: '隐私政策', terms: '服务条款',
+    learn: '产品资料', faq: '常见问题', safety: '安全与隐私', press: '媒体资料',
   },
   en: {
     navFeatures: 'Features',
@@ -93,6 +94,7 @@ const t = {
     visionCta: 'Enter Canvas →',
     footer: 'Map — Global Collaborative Art Platform',
     support: 'Support', privacy: 'Privacy Policy', terms: 'Terms of Service',
+    learn: 'Product Guide', faq: 'FAQ', safety: 'Safety', press: 'Press Kit',
   },
   ja: {
     navFeatures: '機能', navSteps: '使い方', navInk: 'インク', navVision: 'ビジョン', navCta: '探索を始める',
@@ -119,6 +121,7 @@ const t = {
     visionDesc: '誰もがこの地球に自分の印を残せること。一本の線から、時間と場所を越えて人々をつなぐデジタル地球を目指します。',
     visionCta: 'キャンバスを開く →', footer: 'Map — グローバル共同アートプラットフォーム',
     support: 'サポート', privacy: 'プライバシーポリシー', terms: '利用規約',
+    learn: '製品ガイド', faq: 'よくある質問', safety: '安全', press: 'プレス資料',
   },
 } as const;
 
@@ -138,6 +141,7 @@ export default function HomePage() {
   const { lang } = useI18n();
   const [scrolled, setScrolled] = useState(false);
   const d = t[lang];
+  const publicLocale = lang === 'zh' ? 'zh-cn' : lang;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -421,9 +425,34 @@ export default function HomePage() {
           <p className="text-sm text-gray-400" style={FONT}>
             © {new Date().getFullYear()} DrawMaps · {d.footer}
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <Link
-              href="/support"
+              href={`/${publicLocale}/how-it-works`}
+              className="text-sm text-gray-500 transition-colors hover:text-violet-400"
+            >
+              {d.learn}
+            </Link>
+            <Link
+              href={`/${publicLocale}/faq`}
+              className="text-sm text-gray-500 transition-colors hover:text-violet-400"
+            >
+              {d.faq}
+            </Link>
+            <Link
+              href={`/${publicLocale}/safety`}
+              className="text-sm text-gray-500 transition-colors hover:text-violet-400"
+            >
+              {d.safety}
+            </Link>
+            <Link
+              href={`/${publicLocale}/press`}
+              className="text-sm text-gray-500 transition-colors hover:text-violet-400"
+            >
+              {d.press}
+            </Link>
+            <span className="text-gray-700">·</span>
+            <Link
+              href={`/support?lang=${lang}`}
               className="text-sm text-gray-500 transition-colors hover:text-violet-400"
             >
               {d.support}

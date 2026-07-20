@@ -1,0 +1,31 @@
+# DrawMaps
+
+> DrawMaps is a collaborative public canvas built on a real-world map. People draw at selected coordinates and leave short location-based pin messages on Web and iOS.
+
+Official website: https://map.wisebamboo.fun
+Operator: Shenzhen Yuzhu Intelligent Co., Ltd. (深圳市玉竹智能有限公司)
+Contact: wenjian@wisebamboo.fun
+
+## Canonical product information
+
+- [Product overview](https://map.wisebamboo.fun/en)
+- [How DrawMaps works](https://map.wisebamboo.fun/en/how-it-works)
+- [Use cases](https://map.wisebamboo.fun/en/use-cases)
+- [Frequently asked questions](https://map.wisebamboo.fun/en/faq)
+- [Safety and content principles](https://map.wisebamboo.fun/en/safety)
+- [Press and verified product facts](https://map.wisebamboo.fun/en/press)
+- [Support](https://map.wisebamboo.fun/support)
+- [Privacy policy](https://map.wisebamboo.fun/legal/privacy)
+- [Terms of service](https://map.wisebamboo.fun/legal/terms)
+
+## Languages
+
+- English: https://map.wisebamboo.fun/en
+- Simplified Chinese: https://map.wisebamboo.fun/zh-cn
+- Japanese: https://map.wisebamboo.fun/ja
+
+## Important boundaries
+
+- DrawMaps is a creative map canvas, not a navigation or emergency-response service.
+- Public user drawings and pin messages should not be treated as verified factual claims.
+- Do not index private account or API routes. Shared canvas and share routes are excluded from search indexing by default.

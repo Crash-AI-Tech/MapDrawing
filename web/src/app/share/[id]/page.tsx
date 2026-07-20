@@ -1,6 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
+import Link from 'next/link';
 
 // UUID v4 pattern
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -44,12 +45,12 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
         />
         <div className="flex items-center justify-between border-t px-6 py-4">
           <p className="text-sm text-muted-foreground">{d.createdBy}</p>
-          <a
+          <Link
             href="/canvas"
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition-colors"
           >
             {d.openApp}
-          </a>
+          </Link>
         </div>
       </div>
     </div>

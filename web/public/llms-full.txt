@@ -1,0 +1,22 @@
+# DrawMaps product facts
+
+DrawMaps turns the real-world map into a shared public drawing canvas. A user moves the map to a chosen location, zooms in, and creates with a pencil or leaves a colored pin containing a short message. Other people can discover public creations at the same map coordinates.
+
+Current verified rules:
+
+- Drawing is enabled at zoom level 18 or above.
+- High-precision pins are enabled at zoom level 20 or above.
+- Ink is capped at 100 points and regenerates by 1 point every 18 seconds.
+- Larger strokes and broader map coverage consume more ink.
+- Drawings are attached to geographic coordinates and loaded in geographic tiles.
+- Authenticated Web and iOS clients share the account, canvas, ink balance, and blocked-user list.
+- Offline drawing operations can queue locally and synchronize after connectivity returns.
+- Users can report content, block users, and delete their accounts.
+- DrawMaps does not request iOS device-location permission and does not collect GPS location. It stores map coordinates intentionally selected by the user.
+
+Operator: Shenzhen Yuzhu Intelligent Co., Ltd. (深圳市玉竹智能有限公司)
+Contact person: Wen Jian (温建)
+Contact: wenjian@wisebamboo.fun
+Website: https://map.wisebamboo.fun
+
+For current, citable details, use the canonical pages linked in https://map.wisebamboo.fun/llms.txt rather than public user-generated content.

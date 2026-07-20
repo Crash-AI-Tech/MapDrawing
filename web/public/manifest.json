@@ -1,16 +1,16 @@
 {
-  "name": "Map",
-  "short_name": "Map",
-  "description": "地图协作绘画应用",
+  "name": "DrawMaps",
+  "short_name": "DrawMaps",
+  "description": "Collaborative drawing and location-based messages on a shared real-world map.",
   "start_url": "/canvas",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#f8fafc",
+  "theme_color": "#facc15",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64",
-      "type": "image/x-icon"
+      "src": "/logo.png",
+      "sizes": "256x256",
+      "type": "image/png"
     }
   ]
 }
