@@ -26,7 +26,7 @@ export async function sendEmail(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Map <map@noreply.wisebamboo.fun>',
+        from: 'DrawMaps <noreply@wisebamboo.fun>',
         to: [options.to],
         subject: options.subject,
         html: options.html,
