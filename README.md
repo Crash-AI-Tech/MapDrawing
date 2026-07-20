@@ -58,7 +58,7 @@ pnpm --filter web build
 
 测试站地址：<https://map-staging.privacy2privacy.workers.dev>
 
-当前 `wrangler*.toml` 故意保留旧 D1 作为数据源，因此部署命令会主动拒绝运行。不要将 `0001_v2_baseline.sql` 应用到旧测试库或生产库。正确的发布流程是：
+不要将 `0001_v2_baseline.sql` 应用到旧测试库或生产库。测试与生产配置现已分别绑定独立的 `map-db-staging-v2` 和 `map-db-v2`；旧 `map-db` 仍保留为生产回滚数据源。新环境的发布流程是：
 
 1. 新建空的 `map-db-staging-v2` / `map-db-v2` D1。
 2. 按 [D1 v2 迁移手册](docs/d1-v2-runbook.md) 只复制用户和有效会话。

@@ -15,13 +15,12 @@ binding = "ASSETS"
 binding = "WORKER_SELF_REFERENCE"
 service = "map"
 
-# D1 数据库
-# RELEASE BLOCKED: this is the v1 source database. Create/migrate map-db-v2 and
-# replace both fields below before deploying this branch; deploy scripts enforce it.
+# D1 v2 production database. The original map-db remains untouched as the
+# rollback source after the user/session-only migration.
 [[d1_databases]]
 binding = "DB"
-database_name = "map-db"
-database_id = "bf333342-1998-421a-a439-465caea85ae9"
+database_name = "map-db-v2"
+database_id = "2caf30c5-cc2a-4e74-9153-a869ac6b590c"
 migrations_dir = "../drizzle/migrations"
 
 # R2 对象存储 (用户上传)
