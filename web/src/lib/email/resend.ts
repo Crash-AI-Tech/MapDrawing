@@ -65,11 +65,11 @@ export async function sendVerificationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   return sendEmail(apiKey, {
     to,
-    subject: `Map 邮箱验证码: ${code}`,
+    subject: `DrawMaps 邮箱验证码: ${code}`,
     html: `
       <div style="max-width:480px;margin:0 auto;padding:32px 24px;font-family:system-ui,-apple-system,sans-serif;">
         <div style="text-align:center;margin-bottom:24px;">
-          <h1 style="font-size:24px;font-weight:700;color:#111;margin:0;">🎨 Map</h1>
+          <h1 style="font-size:24px;font-weight:700;color:#111;margin:0;">🎨 DrawMaps</h1>
           <p style="color:#666;margin-top:8px;font-size:14px;">在真实地图上画画的全球协作平台</p>
         </div>
         <div style="background:#f8f9fa;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
@@ -77,7 +77,7 @@ export async function sendVerificationEmail(
           <div style="font-size:36px;font-weight:700;letter-spacing:8px;color:#111;font-family:monospace;">${code}</div>
           <p style="color:#999;margin:16px 0 0;font-size:13px;">验证码 10 分钟内有效</p>
         </div>
-        <p style="color:#999;font-size:12px;text-align:center;margin:0;">如果你没有在 Map 注册账号，请忽略此邮件。</p>
+        <p style="color:#999;font-size:12px;text-align:center;margin:0;">如果你没有在 DrawMaps 注册账号，请忽略此邮件。</p>
       </div>
     `,
   });
@@ -93,11 +93,11 @@ export async function sendPasswordResetEmail(
 ): Promise<{ success: boolean; error?: string }> {
   return sendEmail(apiKey, {
     to,
-    subject: `Map 密码重置验证码: ${code}`,
+    subject: `DrawMaps 密码重置验证码: ${code}`,
     html: `
       <div style="max-width:480px;margin:0 auto;padding:32px 24px;font-family:system-ui,-apple-system,sans-serif;">
         <div style="text-align:center;margin-bottom:24px;">
-          <h1 style="font-size:24px;font-weight:700;color:#111;margin:0;">🎨 Map</h1>
+          <h1 style="font-size:24px;font-weight:700;color:#111;margin:0;">🎨 DrawMaps</h1>
           <p style="color:#666;margin-top:8px;font-size:14px;">密码重置</p>
         </div>
         <div style="background:#f8f9fa;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
