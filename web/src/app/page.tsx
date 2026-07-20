@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { MapPin, Palette, Sparkles, ArrowRight, Droplets, Users } from 'lucide-react';
+import { MapPin, Palette, Sparkles, ArrowRight, Droplets, Users, Plane, GraduationCap, Globe2, Shield, Trash2 } from 'lucide-react';
 import { LanguageSelector } from '@/components/shared/LanguageSelector';
+import { WavySeparator } from '@/components/marketing/WavySeparator';
 import { useI18n } from '@/lib/i18n';
 
 /* ================================
@@ -48,6 +49,29 @@ const t = {
     inkDetail1: '📏 zoom 越低消耗越高 — 保护大尺度地图景观',
     inkDetail2: '⚡ 18秒/+1 自动回墨 — 即使离线重连也不中断',
     inkDetail3: '🎨 画笔尺寸影响消耗 — 鼓励用更细致的笔触叙事',
+    // discovery
+    useCasesTitle: '地图上的灵感，来自每一种生活',
+    useCasesSubtitle: '一幅小画、一段回忆或一句问候，都能让一个地点拥有新的故事。',
+    useCases: [
+      { title: '旅行记忆', description: '把旅途中难忘的一刻画在故事发生的地点，让记忆真正落在地图上。' },
+      { title: '社区共创', description: '从街道、公园到校园，邀请熟悉同一地点的人一起完成作品。' },
+      { title: '地点学习', description: '通过绘画探索地理、文化和比例尺，让知识与真实空间连接。' },
+      { title: '远程协作', description: '和身处不同城市的朋友共享一张画布，不需要分享实时 GPS。' },
+    ],
+    useCasesCta: '查看更多使用灵感 →',
+    faqSectionTitle: '你可能想知道',
+    faqSectionSubtitle: '关于定位、墨水、跨设备同步和社区安全的直接回答。',
+    faqItems: [
+      { question: 'DrawMaps 会追踪我的 GPS 位置吗？', answer: '不会。iOS 应用不请求设备定位权限，只保存你在地图上主动选择的坐标。' },
+      { question: 'Web 与 iOS 的内容互通吗？', answer: '是。登录后两端共享账号、全球画布、墨水余额和屏蔽列表。' },
+      { question: '墨水用完后怎么办？', answer: '墨水上限为 100 点，每 18 秒自动恢复 1 点；更细致的笔画消耗更少。' },
+      { question: '遇到不当内容怎么办？', answer: '你可以举报绘画或图钉，也可以屏蔽用户；我们会根据规则审核和处理。' },
+    ],
+    faqCta: '查看全部常见问题 →',
+    safetySectionTitle: '放心创作，也尊重每一个人',
+    safetySectionDesc: '共享画布默认公开。我们提供清晰的位置隐私、内容治理和账号控制，让创作更安心。',
+    safetyFacts: ['不请求 iOS GPS 定位权限', '支持举报和屏蔽用户', '可以在产品内删除账号'],
+    safetyCta: '了解安全与隐私 →',
     // vision
     visionTitle: '我们的愿景',
     visionDesc: '每个人都能在这颗星球上留下自己的印记。一笔一画，连接不同时空的你我。我们希望构建一颗由大家共同创作、持续生长的数字地球。',
@@ -89,6 +113,28 @@ const t = {
     inkDetail1: '📏 Lower zoom = Higher cost — Protect global landscapes',
     inkDetail2: '⚡ 18s/+1 Regen — Continuous recovery even when offline',
     inkDetail3: '🎨 Size affects cost — Encouraging delicate, detailed storytelling',
+    useCasesTitle: 'Every place can inspire a different story',
+    useCasesSubtitle: 'A small sketch, a memory, or a local hello can give a place a new creative layer.',
+    useCases: [
+      { title: 'Travel memories', description: 'Draw a memorable moment close to where it happened and place the story on the map.' },
+      { title: 'Neighborhood art', description: 'Invite people who know the same street, park, or campus to create together.' },
+      { title: 'Place-based learning', description: 'Connect geography, culture, and visual storytelling with real-world space.' },
+      { title: 'Remote collaboration', description: 'Share one canvas with friends in different cities without sharing live GPS.' },
+    ],
+    useCasesCta: 'Explore more ideas →',
+    faqSectionTitle: 'Good questions, clear answers',
+    faqSectionSubtitle: 'The essentials about location, ink, device sync, and community safety.',
+    faqItems: [
+      { question: 'Does DrawMaps track my GPS location?', answer: 'No. The iOS app does not request device-location permission. It only stores map coordinates you intentionally select.' },
+      { question: 'Do Web and iOS share the same content?', answer: 'Yes. After login, both clients share the account, global canvas, ink balance, and blocked-user list.' },
+      { question: 'What happens when I run out of ink?', answer: 'Ink is capped at 100 points and regenerates by 1 every 18 seconds. Smaller, detailed strokes cost less.' },
+      { question: 'What can I do about inappropriate content?', answer: 'You can report a drawing or pin and block a user. Reports are reviewed against the community rules.' },
+    ],
+    faqCta: 'Read all questions →',
+    safetySectionTitle: 'Create freely, respect every person',
+    safetySectionDesc: 'The shared canvas is public by default. Clear location privacy, moderation, and account controls make creation safer.',
+    safetyFacts: ['No iOS GPS permission request', 'Reporting and user blocking', 'In-product account deletion'],
+    safetyCta: 'Learn about safety →',
     visionTitle: 'Our Vision',
     visionDesc: 'Everyone can leave their mark on this planet. Stroke by stroke, connecting souls across time and space. We aim to build a digital Earth created by everyone, for everyone.',
     visionCta: 'Enter Canvas →',
@@ -117,6 +163,28 @@ const t = {
     inkDetail1: '📏 低いズームほど高コスト — 広域の上書きを防止',
     inkDetail2: '⚡ 18秒ごとに1回復 — オフライン中も継続',
     inkDetail3: '🎨 太さもコストに反映 — 丁寧な表現を応援',
+    useCasesTitle: '場所ごとに、新しい物語が生まれる',
+    useCasesSubtitle: '小さな絵、思い出、地域への挨拶が、その場所に新しい創作の層を加えます。',
+    useCases: [
+      { title: '旅の記憶', description: '忘れたくない瞬間を、出来事があった場所の近くに描いて残します。' },
+      { title: '地域の共同制作', description: '同じ通り、公園、学校を知る人たちと一つの作品を育てます。' },
+      { title: '場所を使った学習', description: '地理、文化、視覚的な物語を現実の空間と結び付けます。' },
+      { title: '遠隔コラボレーション', description: 'リアルタイム GPS を共有せず、別の都市の友人と同じキャンバスで制作します。' },
+    ],
+    useCasesCta: '活用アイデアを見る →',
+    faqSectionTitle: 'よくある質問に、明確な回答を',
+    faqSectionSubtitle: '位置情報、インク、端末間同期、コミュニティの安全について説明します。',
+    faqItems: [
+      { question: 'GPS 位置を追跡しますか？', answer: 'いいえ。iOS は端末位置権限を要求せず、地図上で自分が選んだ座標だけを保存します。' },
+      { question: 'Web と iOS は同じ内容ですか？', answer: 'はい。ログイン後はアカウント、キャンバス、インク、ブロックリストを共有します。' },
+      { question: 'インクがなくなったら？', answer: '上限は 100 で、18 秒ごとに 1 回復します。細かな線ほど消費を抑えられます。' },
+      { question: '不適切な内容を見つけたら？', answer: '描画やピンを通報し、ユーザーをブロックできます。通報はルールに沿って確認されます。' },
+    ],
+    faqCta: 'すべての質問を見る →',
+    safetySectionTitle: '自由な創作と、互いへの配慮',
+    safetySectionDesc: '共有キャンバスは原則公開です。位置プライバシー、審査、アカウント管理を明確にしています。',
+    safetyFacts: ['iOS の GPS 権限を要求しない', '通報とユーザーブロック', '製品内でアカウント削除'],
+    safetyCta: '安全とプライバシーを見る →',
     visionTitle: '私たちのビジョン',
     visionDesc: '誰もがこの地球に自分の印を残せること。一本の線から、時間と場所を越えて人々をつなぐデジタル地球を目指します。',
     visionCta: 'キャンバスを開く →', footer: 'Map — グローバル共同アートプラットフォーム',
@@ -387,9 +455,101 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Wave to Next Section (Violet) */}
-        <div className="absolute bottom-[-1px] left-0 w-full rotate-180 leading-none text-violet-500">
+        {/* Wave to Next Section (Orange) */}
+        <div className="absolute bottom-[-1px] left-0 w-full rotate-180 leading-none text-orange-400">
           <WavySeparator className="scale-x-[-1]" />
+        </div>
+      </section>
+
+      {/* ====== Use cases — orange block ====== */}
+      <section className="relative bg-orange-400 px-6 pb-32 pt-20 md:px-10 lg:px-16 lg:pb-40 lg:pt-28">
+        <div className="relative mx-auto max-w-7xl">
+          <h2 className="mx-auto max-w-3xl text-center text-4xl font-bold text-white md:text-5xl" style={FONT}>
+            {d.useCasesTitle}
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-center text-lg leading-relaxed text-white/85">
+            {d.useCasesSubtitle}
+          </p>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {d.useCases.map((item, index) => {
+              const Icon = [Plane, Users, GraduationCap, Globe2][index];
+              return (
+                <article key={item.title} className="rounded-[2rem] bg-white p-7 shadow-lg transition-transform hover:-translate-y-1 hover:shadow-xl">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
+                    <Icon className="h-7 w-7" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900" style={FONT}>{item.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-gray-600">{item.description}</p>
+                </article>
+              );
+            })}
+          </div>
+          <div className="mt-10 text-center">
+            <Link href={`/${publicLocale}/use-cases`} className="inline-flex items-center rounded-full bg-gray-900 px-7 py-3 font-bold text-white shadow-lg transition hover:bg-gray-800">
+              {d.useCasesCta}
+            </Link>
+          </div>
+        </div>
+        <div className="absolute bottom-[-1px] left-0 w-full rotate-180 leading-none text-indigo-500">
+          <WavySeparator />
+        </div>
+      </section>
+
+      {/* ====== FAQ — indigo block ====== */}
+      <section className="relative bg-indigo-500 px-6 pb-32 pt-20 md:px-10 lg:px-16 lg:pb-40 lg:pt-28">
+        <div className="relative mx-auto max-w-5xl">
+          <h2 className="text-center text-4xl font-bold text-white md:text-5xl" style={FONT}>{d.faqSectionTitle}</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-center text-lg leading-relaxed text-white/80">{d.faqSectionSubtitle}</p>
+          <div className="mt-12 grid gap-5 md:grid-cols-2">
+            {d.faqItems.map((item) => (
+              <details key={item.question} className="group rounded-[2rem] bg-white px-7 py-6 shadow-lg open:shadow-xl">
+                <summary className="cursor-pointer text-lg font-bold text-gray-900 marker:text-indigo-500" style={FONT}>{item.question}</summary>
+                <p className="mt-4 text-sm leading-relaxed text-gray-600">{item.answer}</p>
+              </details>
+            ))}
+          </div>
+          <div className="mt-10 text-center">
+            <Link href={`/${publicLocale}/faq`} className="inline-flex items-center rounded-full bg-white px-7 py-3 font-bold text-indigo-600 shadow-lg transition hover:bg-indigo-50">
+              {d.faqCta}
+            </Link>
+          </div>
+        </div>
+        <div className="absolute bottom-[-1px] left-0 w-full rotate-180 leading-none text-amber-300">
+          <WavySeparator className="scale-x-[-1]" />
+        </div>
+      </section>
+
+      {/* ====== Safety — yellow block ====== */}
+      <section className="relative bg-amber-300 px-6 pb-32 pt-20 md:px-10 lg:px-16 lg:pb-40 lg:pt-28">
+        <div className="relative mx-auto max-w-6xl">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/60 text-amber-700 shadow-sm">
+              <Shield className="h-8 w-8" aria-hidden="true" />
+            </div>
+            <h2 className="text-4xl font-bold text-gray-900 md:text-5xl" style={FONT}>{d.safetySectionTitle}</h2>
+            <p className="mt-4 text-lg leading-relaxed text-gray-700">{d.safetySectionDesc}</p>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {d.safetyFacts.map((fact, index) => {
+              const Icon = [MapPin, Shield, Trash2][index];
+              return (
+                <div key={fact} className="flex items-center gap-4 rounded-[2rem] bg-white/70 px-6 py-5 shadow-sm">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                  <p className="font-semibold text-gray-800">{fact}</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-10 text-center">
+            <Link href={`/${publicLocale}/safety`} className="inline-flex items-center rounded-full bg-gray-900 px-7 py-3 font-bold text-white shadow-lg transition hover:bg-gray-800">
+              {d.safetyCta}
+            </Link>
+          </div>
+        </div>
+        <div className="absolute bottom-[-1px] left-0 w-full rotate-180 leading-none text-violet-500">
+          <WavySeparator />
         </div>
       </section>
 
@@ -534,24 +694,5 @@ function StepCard({
       </h3>
       <p className="text-sm leading-relaxed text-white/90">{description}</p>
     </div>
-  );
-}
-
-
-/**
- * Irregular Wavy Separator (big waves).
- * Fits at the bottom of a section to transition to the next color.
- */
-function WavySeparator({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 1440 120"
-      className={`block w-full ${className || ''}`}
-      fill="currentColor"
-      preserveAspectRatio="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,0L1360,0C1280,0,1120,0,960,0C800,0,640,0,480,0C320,0,160,0,80,0L0,0Z" />
-    </svg>
   );
 }
