@@ -135,7 +135,7 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         {/* Ink is a separate floating status above the dock on both platforms. */}
         <InkBar />
 
-        <div className="liquid-glass relative flex h-12 w-[94vw] max-w-[44rem] items-center justify-center gap-2 rounded-full px-3 md:gap-4">
+        <div className="liquid-glass relative flex h-12 w-fit max-w-[94vw] items-center justify-start gap-1 rounded-full px-1.5 md:gap-1.5">
         {/* Hand (navigate) */}
         <Tooltip>
           <TooltipTrigger asChild>

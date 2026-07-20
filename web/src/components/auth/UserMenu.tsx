@@ -275,24 +275,11 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
               </div>
             </div>
 
-            {/* ===== Support & Legal ===== */}
+            {/* ===== Language ===== */}
             <div className="border-t border-white/50 px-2 py-1.5">
-              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                {t('menuSupportLegal')}
-              </p>
               <div className="mb-1 rounded-full bg-white/40 px-3 py-1.5">
                 <LanguageSelector compact />
               </div>
-              <MenuItem
-                icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
-                label={t('menuTerms')}
-                onClick={() => window.open(`/legal/terms?lang=${lang}`, '_blank', 'noopener,noreferrer')}
-              />
-              <MenuItem
-                icon={<ShieldCheck className="h-3.5 w-3.5 text-green-500" />}
-                label={t('menuPrivacy')}
-                onClick={() => window.open(`/legal/privacy?lang=${lang}`, '_blank', 'noopener,noreferrer')}
-              />
             </div>
 
             {/* ===== Footer Actions ===== */}
@@ -331,6 +318,16 @@ export default function UserMenu({ onLoginClick }: UserMenuProps) {
             </div>
 
             <div className="px-2 py-2">
+              <MenuItem
+                icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
+                label={t('menuTerms')}
+                onClick={() => window.open(`/legal/terms?lang=${lang}`, '_blank', 'noopener,noreferrer')}
+              />
+              <MenuItem
+                icon={<ShieldCheck className="h-3.5 w-3.5 text-green-500" />}
+                label={t('menuPrivacy')}
+                onClick={() => window.open(`/legal/privacy?lang=${lang}`, '_blank', 'noopener,noreferrer')}
+              />
               <MenuItem
                 icon={<UserX className="h-3.5 w-3.5 text-orange-500" />}
                 label={t('menuBlockedUsers')}

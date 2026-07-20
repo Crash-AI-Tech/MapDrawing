@@ -66,7 +66,7 @@ export default function InkBar() {
           aria-valuemax={maxInk}
           aria-valuenow={ink}
           className={cn(
-            'liquid-glass relative flex h-8 items-center gap-2 rounded-full px-3',
+            'liquid-glass relative flex h-8 w-[7.5rem] items-center gap-1.5 rounded-full px-2',
             isLow && !isEmpty && 'animate-pulse',
             shaking && 'animate-[shake_0.3s_ease-in-out_2]'
           )}
@@ -74,23 +74,17 @@ export default function InkBar() {
             animation: 'shake 0.3s ease-in-out 0s 2',
           } : undefined}
         >
-          <Droplet className="h-3.5 w-3.5 fill-emerald-500 text-emerald-600" />
+          <Droplet className="h-3 w-3 shrink-0 fill-emerald-500 text-emerald-600" />
           {/* Horizontal bar showing ink level */}
-          <div className="relative h-2 w-24 overflow-hidden rounded-full bg-emerald-950/10">
+          <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-emerald-950/10">
             <div
               className="absolute top-0 left-0 h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
               style={{ width: `${percent}%` }}
             />
           </div>
-          <span className="min-w-[28px] text-right text-[9px] font-bold tabular-nums text-emerald-700">
+          <span className="w-7 shrink-0 text-right text-[9px] font-bold tabular-nums text-emerald-700">
             {percent}%
           </span>
-          {/* Recovery countdown when not full */}
-          {ink < maxInk && (
-            <span className="text-[8px] tabular-nums text-muted-foreground min-w-[16px]">
-              {countdown}s
-            </span>
-          )}
         </div>
       </TooltipTrigger>
       <TooltipContent side="top">
