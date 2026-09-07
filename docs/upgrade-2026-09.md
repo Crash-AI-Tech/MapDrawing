@@ -52,6 +52,16 @@ Recruit 20 non-team participants around one place/activity. Track successful fir
 
 This is the first bounded-loading release, not the historical snapshot/LOD milestone. Dense views can intentionally show partial history and ask the user to zoom in; absolute rendering budgets are safeguards, not fidelity/capacity proof. Offline storage still depends on browser/OS storage availability. Visual acceptance, 100/500/1,000-client staging measurements and Apple analytics privacy declarations remain release/follow-up gates as indicated above. No production data has been reset.
 
+### Acceptance follow-up
+
+- User authorized standalone Playwright and simulator boot. iPhone 17 Pro (iOS 26.4) is booted.
+- Real Playwright desktop/mobile inspection completed. Guest trial, authentication without canvas reload, explicit publication, persisted undo/redo, offline recovery and eraser cursor passed using `scripts/staging-browser.mjs`; fixtures were removed. English/Japanese language switching also inspected.
+- Fixed login destroying Web practice strokes. Native auth now dismisses back to the existing canvas rather than replacing it with a new instance. Added acknowledged-deletion guards so stale tile data cannot resurrect local undo/deletion.
+- Staging D1 read replication is `auto`; authenticated API/cache invalidation smoke tests passed afterward. Sessions API semantics: https://developers.cloudflare.com/d1/best-practices/read-replication/ . This is not a load test.
+- Production iOS build 29 finished; simulator build `b8af16a6-01cf-43b1-9859-e36434795b3a` finished. Both precede the acceptance fixes above and must not be submitted as the final fixed release.
+- Added the `simulator` EAS profile, using the same single staging backend. CocoaPods is not installed locally; use `eas build -p ios --profile simulator` for an installable simulator archive.
+- App Store Connect login is open in the isolated visible browser; user sign-in requested. No private key extraction is attempted.
+
 ### Product report
 
 Run `wrangler d1 execute map-db-v2 --remote --config web/wrangler.toml --file scripts/product-report.sql` from the repository root with the usual private Cloudflare credentials. This report contains aggregate numbers only. Client counters are events, not unique visitors; authenticated activity and D7 return begin at this release and do not reconstruct historical visits. Apple privacy disclosures must include account-linked product interaction data for analytics before App Store review.

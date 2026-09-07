@@ -29,6 +29,7 @@ export class DurableWriter {
   private enqueuing: Promise<void> = Promise.resolve();
   private retry = 0;
   private pending = new Set<string>();
+  private deleted = new Set<string>();
   private listeners = new Set<(state: SyncState) => void>();
   private state: SyncState = 'connecting';
 
@@ -45,13 +46,15 @@ export class DurableWriter {
 
   getState(): SyncState { return this.state; }
   isPending(id: string): boolean { return this.pending.has(id); }
+  /** A stale viewport page must not resurrect an acknowledged local deletion. */
+  shouldIgnoreRemote(id: string): boolean { return this.pending.has(id) || this.deleted.has(id); }
   onStateChange(listener: (state: SyncState) => void): () => void {
     this.listeners.add(listener); listener(this.state); return () => { this.listeners.delete(listener); };
   }
   enqueue(event: DrawEvent): Promise<void> {
     if (this.disposed) return Promise.resolve();
-    if (event.type === 'STROKE_ADD') this.pending.add(event.stroke.id);
-    if (event.type === 'STROKE_DELETE') this.pending.add(event.strokeId);
+    if (event.type === 'STROKE_ADD') { this.pending.add(event.stroke.id); this.deleted.delete(event.stroke.id); }
+    if (event.type === 'STROKE_DELETE') { this.pending.add(event.strokeId); this.deleted.add(event.strokeId); }
     this.setState('connecting');
     this.enqueuing = this.enqueuing.catch(() => undefined).then(() => this.options.queue.enqueue(event));
     return this.enqueuing.then(() => this.schedule(700)).catch(() => { this.setState('error'); });
@@ -77,9 +80,12 @@ export class DurableWriter {
     try {
       await this.enqueuing;
       let events = await this.options.queue.peek();
+      const locallyQueued = new Set(this.pending);
       for (const event of events) {
-        if (event.type === 'STROKE_ADD') this.pending.add(event.stroke.id);
-        if (event.type === 'STROKE_DELETE') this.pending.add(event.strokeId);
+        // Restore old persisted operations, but never overwrite a newer local
+        // undo/redo that arrived while the storage read was in progress.
+        if (event.type === 'STROKE_ADD') { this.pending.add(event.stroke.id); if (!locallyQueued.has(event.stroke.id)) this.deleted.delete(event.stroke.id); }
+        if (event.type === 'STROKE_DELETE') { this.pending.add(event.strokeId); if (!locallyQueued.has(event.strokeId)) this.deleted.add(event.strokeId); }
       }
       while (events.length && !this.disposed) {
         this.setState('connecting');

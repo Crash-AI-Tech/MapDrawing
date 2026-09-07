@@ -47,7 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Redirect authenticated users away from auth screens to the public map.
         if (session && rootSegment === '(auth)') {
-            router.replace('/');
+            // Pop back to the mounted public canvas, preserving guest practice.
+            // If opened directly on login, dismissTo falls back to replacement.
+            router.dismissTo('/');
         }
         // Unauthenticated users can stay on public routes as guests.
         // Protected routes handle their own redirect to /login.

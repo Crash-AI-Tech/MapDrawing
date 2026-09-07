@@ -131,6 +131,11 @@ test('durable writer batches saves before deleting and drains the persisted queu
     assert.deepEqual(calls, [['a', 'b'], 'delete:a']);
     assert.deepEqual(events, []);
     assert.equal(writer.getState(), 'connected');
+    assert.equal(writer.isPending('a'), false);
+    assert.equal(writer.shouldIgnoreRemote('a'), true, 'stale tiles cannot resurrect an acknowledged undo');
+    await writer.enqueue({ type: 'STROKE_ADD', stroke: stroke('a') });
+    await new Promise(resolve => setTimeout(resolve, 800));
+    assert.equal(writer.shouldIgnoreRemote('a'), false, 'redo clears the deletion guard after save');
   } finally { writer.dispose(); }
 });
 

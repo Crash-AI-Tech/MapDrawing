@@ -377,7 +377,7 @@ export default function MapScreen() {
         if (newStrokes.length > 0) {
           console.log(`[loadViewport] Got ${newStrokes.length} new strokes (total: ${strokesRef.current.size + newStrokes.length})`);
           for (const stroke of newStrokes) {
-            if (syncManagerRef.current?.isPending(stroke.id)) continue;
+            if (syncManagerRef.current?.shouldIgnoreRemote(stroke.id)) continue;
             if (Compliance.isBlocked(stroke.userId)) continue;
             if (!strokesRef.current.has(stroke.id)) newStrokesAdded = true;
             strokesRef.current.set(stroke.id, stroke);

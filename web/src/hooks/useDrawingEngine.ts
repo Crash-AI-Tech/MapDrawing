@@ -175,6 +175,7 @@ export function useDrawingEngine(
       engine.setColor(state.activeColor);
       engine.setOpacity(state.activeOpacity);
       engine.setSize(state.activeSize);
+      canvasProvider.setDrawingMode(state.drawingMode && adapter.getViewState().zoom >= MIN_DRAW_ZOOM);
 
       // 10) Register engine undo/redo in the store so Toolbar can use them
       drawingStore.getState().registerEngineActions(

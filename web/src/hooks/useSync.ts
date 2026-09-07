@@ -90,7 +90,7 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
 
       const blockedUserIds = usePinStore.getState().blockedUserIds;
       const strokes = (await manager.fetchMissingTiles(bounds))
-        .filter((stroke) => !blockedUserIds.has(stroke.userId) && !syncRef.current?.isPending(stroke.id));
+        .filter((stroke) => !blockedUserIds.has(stroke.userId) && !syncRef.current?.shouldIgnoreRemote(stroke.id));
 
       if (generation !== loadGeneration.current || tileManagerRef.current !== manager) return [];
       useUIStore.getState().setContentLimited(manager.truncated);

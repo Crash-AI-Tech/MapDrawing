@@ -13,6 +13,11 @@
       "distribution": "internal",
       "env": { "EXPO_PUBLIC_API_ENV": "staging" }
     },
+    "simulator": {
+      "distribution": "internal",
+      "ios": { "simulator": true },
+      "env": { "EXPO_PUBLIC_API_ENV": "staging" }
+    },
     "production": {
       "autoIncrement": true,
       "env": { "EXPO_PUBLIC_API_ENV": "production" }

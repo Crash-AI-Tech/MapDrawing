@@ -15,6 +15,7 @@ import ForgotPasswordForm from './ForgotPasswordForm';
 import ResetPasswordForm from './ResetPasswordForm';
 import { LanguageSelector } from '@/components/shared/LanguageSelector';
 import { useI18n } from '@/lib/i18n';
+import { useAuth } from '@/hooks/useAuth';
 
 export type AuthMode =
   | 'login'
@@ -80,6 +81,7 @@ const t = {
 };
 
 export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
+  const { refreshUser } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const { lang } = useI18n();
   const [verifyEmail, setVerifyEmail] = useState('');
@@ -95,10 +97,11 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setMode('reset-password');
   }, []);
 
-  const handleSuccess = useCallback(() => {
+  const handleSuccess = useCallback(async () => {
+    // Keep the mounted canvas and its guest practice strokes alive across login.
+    await refreshUser();
     onOpenChange(false);
-    setTimeout(() => window.location.reload(), 300);
-  }, [onOpenChange]);
+  }, [onOpenChange, refreshUser]);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
