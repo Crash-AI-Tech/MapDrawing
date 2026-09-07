@@ -11,16 +11,17 @@ Preserve the playful yellow landing page, shared pencil/eraser protocol and exis
 - [x] Cache historical Web rendering separately from live input; budget point data and requests.
 - [x] Serialize durable writes and batch adjacent strokes; preserve add/delete ordering and retry safety.
 - [x] Version public tile caches.
-- [ ] Enable D1 read replication after staging verification; no production capacity qualification yet.
+- [x] Enable D1 read replication after staging verification; no production capacity qualification yet.
 - [x] Add privacy-minimal product counters and authenticated activity for activation/retention, with account-deletion cleanup.
-- [x] Improve first creation: guided zoom, useful entry points, localized save states, consistent controls (visual acceptance pending).
+- [x] Improve first creation: guided zoom, useful entry points, localized save states and consistent controls.
 - [x] Share a map location, not just a generic canvas; simplify technical landing copy without replacing its visual identity.
 - [x] Verify shared contracts, database migrations, Web/iOS types and staging API smoke tests.
 - [ ] Verify Web and native iOS visual interaction, native build and production release gates.
 - [x] Commit/push implementation to main (`b78cca1`).
 - [x] Deploy the updated Web/backend to the single staging environment and rerun API smoke tests.
 - [x] Queue iOS 1.3.0 build 29 through the normal EAS build workflow (no automatic submission).
-- [ ] Deploy production Web/backend after acceptance, complete native build validation, submit iOS and record exact App Store/TestFlight status.
+- [x] Deploy production Web/backend after acceptance and verify preserved data and read-only production smoke checks.
+- [ ] Complete final native login/save validation, submit iOS and record exact App Store/TestFlight status.
 
 ## Validation gates
 
@@ -34,7 +35,7 @@ In an isolated fixture environment test 100/500/1,000 clients and 1k/10k/100k st
 
 Recruit 20 non-team participants around one place/activity. Track successful first creation, sharing and seven-day return. Use clearly labelled official examples, genuine community posts and channel attribution; no fabricated activity or bulk outreach.
 
-## Release evidence
+## Initial release evidence (superseded where noted below)
 
 - `pnpm check`: all schema migrations, Web/iOS type checks and both linters passed using Node 22.23.1. Shared regression suite now has 20 passing tests, including interrupted pagination, eviction/revisit, cancellation, point budgets, expired authentication and partially rejected batches.
 - iOS Metro/Hermes export passed. This is not a native build or simulator acceptance test.
@@ -50,7 +51,7 @@ Recruit 20 non-team participants around one place/activity. Track successful fir
 
 ### Known limits
 
-This is the first bounded-loading release, not the historical snapshot/LOD milestone. Dense views can intentionally show partial history and ask the user to zoom in; absolute rendering budgets are safeguards, not fidelity/capacity proof. Offline storage still depends on browser/OS storage availability. Visual acceptance, 100/500/1,000-client staging measurements and Apple analytics privacy declarations remain release/follow-up gates as indicated above. No production data has been reset.
+This is the first bounded-loading release, not the historical snapshot/LOD milestone. Dense views can intentionally show partial history and ask the user to zoom in; absolute rendering budgets are safeguards, not fidelity/capacity proof. Offline storage still depends on browser/OS storage availability. The 100/500/1,000-client staging measurements remain a follow-up gate. No production data has been reset. Native acceptance and Apple submission status are recorded separately below.
 
 ### Acceptance follow-up
 
@@ -60,11 +61,22 @@ This is the first bounded-loading release, not the historical snapshot/LOD miles
 - Staging D1 read replication is `auto`; authenticated API/cache invalidation smoke tests passed afterward. Sessions API semantics: https://developers.cloudflare.com/d1/best-practices/read-replication/ . This is not a load test.
 - Production iOS build 29 finished; simulator build `b8af16a6-01cf-43b1-9859-e36434795b3a` finished. Both precede the acceptance fixes above and must not be submitted as the final fixed release.
 - Added the `simulator` EAS profile, using the same single staging backend. CocoaPods is not installed locally; use `eas build -p ios --profile simulator` for an installable simulator archive.
-- App Store Connect login is open in the isolated visible browser; user sign-in requested. No private key extraction is attempted.
+- User completed App Store Connect sign-in in the isolated visible browser. No private key extraction was attempted.
 
 ### Product report
 
 Run `wrangler d1 execute map-db-v2 --remote --config web/wrangler.toml --file scripts/product-report.sql` from the repository root with the usual private Cloudflare credentials. This report contains aggregate numbers only. Client counters are events, not unique visitors; authenticated activity and D7 return begin at this release and do not reconstruct historical visits. Apple privacy disclosures must include account-linked product interaction data for analytics before App Store review.
+
+### Production rollout, September 8
+
+- Applied additive D1 migrations 0002/0003. Before/after counts: 13 accounts, 78 drawings, 9 pins; all preserved. Both staging and production D1 read replication now report `auto`.
+- A full local production export was refused by the safety approval layer; it was not attempted through another path. Recorded the existing cloud Time Travel recovery bookmark instead: `00000043-00000000-000050df-a4e38e257ea1c0a34a957d99ff637cff` (time-limited provider retention applies).
+- Previous Worker for rollback: `8af2e103-d124-4400-9ec7-633c63eeb450`. Initial 1.3 production deployment: `db35dfbc-a75f-4667-84cd-4b9a1a507981`. Production canvas HTTP 200, renders the updated UI, no uncaught browser errors. Browser production check disabled analytics and did not create accounts/content.
+- Extended dense-tile test exposed D1's 100 bound-parameter ceiling. Replaced the ID placeholder list with `json_each(?)`; real staging test with 110 temporary strokes passed. Source: https://developers.cloudflare.com/d1/platform/limits/ . Staging patch Worker: `72b9328f-c608-4f67-8d2a-cae40d7b96f6`. Final production Worker: `93e17ec4-6e90-4feb-bac7-6ff7e98f1261`.
+- Final production read-only checks: homepage, canvas, English terms, Chinese privacy, robots.txt, sitemap.xml and tile API all HTTP 200; tile conditional request HTTP 304; Playwright canvas has zero uncaught errors. Final database counts remain 13 accounts / 78 drawings / 9 pins.
+- Simulator build `0f48032a-81a8-4876-8d76-768a241aea9b` passed cold launch, safe-area layout, guest drawing, undo/redo and opening the native sharing sheet. For AXe gesture tests use a small sampling delta (10) and duration 2 seconds; coarse deltas can generate too few points for a stroke.
+- Added accessible button roles to login/profile and localized field/back labels; cancelling login now returns to the existing practice canvas. Final iOS source revision: `8eebc3f`. Simulator build `0ae4d5ee-663e-416f-95e5-f1de23d7b70a`; production 1.3.0/build 33: `d15f2f31-b5be-4748-90e2-489ce2d6d5be`. Earlier production builds 29/31 are superseded. Requests 30/32 failed before build creation; build numbers were not reset.
+- App Store privacy: added account-linked product interaction for analytics, without tracking. User ID analytics purpose also updated. Existing 1.2.0/build 28 is waiting for developer release; do not mistake it for this upgrade.
 
 ### Rollback
 
