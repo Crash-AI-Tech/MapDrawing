@@ -90,8 +90,10 @@ export async function GET(request: Request) {
     const hasMore = allRows.length > selected.length;
     // Read point bodies only after applying a byte budget, not 500 huge strokes.
     const rows = selected.length ? (await database.prepare(
-      `SELECT * FROM drawings WHERE id IN (${selected.map(() => '?').join(',')}) ORDER BY created_at_ms DESC, id DESC`
-    ).bind(...selected).all<DrawingRow>()).results ?? [] : [];
+      // D1 allows at most 100 bound parameters. A JSON array keeps a 500-item
+      // bounded page to one parameter without splitting session reads.
+      `SELECT * FROM drawings WHERE id IN (SELECT value FROM json_each(?)) ORDER BY created_at_ms DESC, id DESC`
+    ).bind(JSON.stringify(selected)).all<DrawingRow>()).results ?? [] : [];
 
     const items = rows.map((row) => ({
       id: row.id,

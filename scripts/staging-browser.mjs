@@ -16,10 +16,19 @@ const hash = `pbkdf2:100000:${salt.toString('hex')}:${pbkdf2Sync(password, salt,
 const output = process.env.MAP_QA_OUTPUT || '/tmp/map-browser-acceptance';
 if (!process.env.CLOUDFLARE_API_TOKEN) throw new Error('Load private Cloudflare credentials first');
 async function sql(sql, params = []) {
-  const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ sql, params }) });
-  const result = await response.json();
-  assert.equal(result.success, true, JSON.stringify(result.errors));
-  return result.result[0].results;
+  // These fixture operations are idempotent, so a transient control-plane TLS
+  // failure can safely retry, including cleanup after an interrupted run.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ sql, params }), signal: AbortSignal.timeout(15_000) });
+      const result = await response.json();
+      assert.equal(result.success, true, JSON.stringify(result.errors));
+      return result.result[0].results;
+    } catch (error) {
+      if (attempt >= 3) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+    }
+  }
 }
 async function eventually(check, message) {
   for (let attempt = 0; attempt < 30; attempt++) {
@@ -31,7 +40,8 @@ async function eventually(check, message) {
 let browser;
 try {
   await mkdir(output, { recursive: true });
-  await sql('INSERT INTO users (id,email,user_name,password_hash,email_verified) VALUES (?,?,?,?,1)', [user, email, 'Acceptance tester', hash]);
+  console.log('Staging fixture:', user);
+  await sql('INSERT OR IGNORE INTO users (id,email,user_name,password_hash,email_verified) VALUES (?,?,?,?,1)', [user, email, 'Acceptance tester', hash]);
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'zh-CN' });
   const page = await context.newPage();
