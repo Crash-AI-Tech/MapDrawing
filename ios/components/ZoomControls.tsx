@@ -9,6 +9,8 @@ import React, { useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, PanResponder } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PlatformGlassView } from '@/components/ui/PlatformGlassView';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLang, ts } from '@/lib/i18n';
 
 interface ZoomControlsProps {
   currentZoom: number;
@@ -24,6 +26,8 @@ export default function ZoomControls({
   onZoomOut,
   onZoomDelta,
 }: ZoomControlsProps) {
+  const insets = useSafeAreaInsets();
+  const [lang] = useLang();
   const lastDeltaRef = useRef(0);
   const isDraggingRef = useRef(false);
 
@@ -55,7 +59,7 @@ export default function ZoomControls({
   return (
     <PlatformGlassView
       testID="zoom-controls-glass"
-      style={styles.container}
+      style={[styles.container, { top: insets.top + 8 }]}
       fallbackStyle={styles.containerFallback}
       glassEffectStyle="clear"
       isInteractive
@@ -66,7 +70,7 @@ export default function ZoomControls({
         onPress={onZoomIn}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="Zoom in"
+        accessibilityLabel={ts('zoomInControl', lang)}
       >
         <Feather name="plus" size={18} color="#333" />
       </TouchableOpacity>
@@ -80,7 +84,7 @@ export default function ZoomControls({
         onPress={onZoomOut}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="Zoom out"
+        accessibilityLabel={ts('zoomOutControl', lang)}
       >
         <Feather name="minus" size={18} color="#333" />
       </TouchableOpacity>
@@ -91,10 +95,12 @@ export default function ZoomControls({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 50,
-    left: 20,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 44,
     borderRadius: 26,
-    paddingVertical: 4,
+    paddingHorizontal: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -115,10 +121,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   zoomDisplay: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.62)',
-    marginHorizontal: 8,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     alignItems: 'center',
   },

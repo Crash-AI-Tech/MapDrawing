@@ -9,20 +9,20 @@ export default function CreationGuide(props: { lang: AppLanguage; authenticated:
   const [open, setOpen] = useState(true);
   const insets = useSafeAreaInsets();
   const t = (key: Parameters<typeof journeyText>[0]) => journeyText(key, props.lang);
-  return <View style={[styles.container, { top: insets.top + 55 }]} pointerEvents="box-none">
+  return <View style={[styles.container, { top: insets.top + 64 }]} pointerEvents="box-none">
     {open ? <View style={styles.card}>
-      <View style={styles.row}><Text style={styles.tag}>YOUR WORLD, YOUR CANVAS</Text><TouchableOpacity accessibilityLabel={t('close')} style={styles.close} onPress={() => setOpen(false)}><Feather name="x" size={18} color="#39275c" /></TouchableOpacity></View>
+      <View style={styles.row}><Text style={styles.tag}>YOUR WORLD, YOUR CANVAS</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel={t('close')} style={styles.close} onPress={() => setOpen(false)}><Feather name="x" size={18} color="#39275c" /></TouchableOpacity></View>
       <Text style={styles.title}>{t('title')}</Text>
       <Text style={styles.body}>{t('intro')}</Text>
-      <TouchableOpacity style={styles.start} onPress={() => { props.onStart(); setOpen(false); }}><Feather name="edit-2" size={16} color="white" /><Text style={styles.startText}>{t('start')}</Text></TouchableOpacity>
-    </View> : <TouchableOpacity onPress={() => setOpen(true)}><PlatformGlassView style={styles.pill}><Feather name="compass" size={16} color="#45277a" /><Text style={styles.link}>{t('explore')}</Text></PlatformGlassView></TouchableOpacity>}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('start')} style={styles.start} onPress={() => { props.onStart(); setOpen(false); }}><Feather name="edit-2" size={16} color="white" /><Text style={styles.startText}>{t('start')}</Text></TouchableOpacity>
+    </View> : <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('explore')} onPress={() => setOpen(true)}><PlatformGlassView style={styles.pill}><Feather name="compass" size={16} color="#45277a" /><Text style={styles.link}>{t('explore')}</Text></PlatformGlassView></TouchableOpacity>}
     <PlatformGlassView style={styles.status}>
-      {!props.authenticated ? <TouchableOpacity onPress={props.onLogin}><Text style={styles.body}>{t('preview')}</Text></TouchableOpacity> : <>
+      {!props.authenticated ? <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('preview')} onPress={props.onLogin}><Text style={styles.body}>{t('preview')}</Text></TouchableOpacity> : <>
         <Text accessibilityLiveRegion="polite" style={styles.body}>{t(props.state === 'connected' ? 'saved' : props.state === 'connecting' ? 'saving' : props.state === 'error' ? 'error' : 'pending')}</Text>
-        {props.hasPractice && <TouchableOpacity style={styles.action} onPress={props.onPublish}><Text style={styles.link}>{t('publish')}</Text></TouchableOpacity>}
+        {props.hasPractice && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('publish')} style={styles.action} onPress={props.onPublish}><Text style={styles.link}>{t('publish')}</Text></TouchableOpacity>}
       </>}
       {props.limited && <Text style={styles.body}>{t('dense')}</Text>}
-      <TouchableOpacity style={styles.action} onPress={props.onShare}><Feather name="share-2" size={14} color="#45277a" /><Text style={styles.link}>{t('share')}</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('share')} style={styles.action} onPress={props.onShare}><Feather name="share-2" size={14} color="#45277a" /><Text style={styles.link}>{t('share')}</Text></TouchableOpacity>
     </PlatformGlassView>
   </View>;
 }

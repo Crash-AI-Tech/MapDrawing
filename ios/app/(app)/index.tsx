@@ -51,6 +51,8 @@ import ZoomControls from '@/components/ZoomControls';
 import PinPlacer from '@/components/PinPlacer';
 import MapPinOverlay, { MapPinTooltip, type PinData } from '@/components/MapPinOverlay';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CreationGuide from '@/components/CreationGuide';
 import { trackEvent } from '@/lib/analytics';
 import {
@@ -128,6 +130,7 @@ export default function MapScreen() {
     return typeof value === 'string' ? value : null;
   } });
   const { session, avatarVersion } = useMapSession();
+  const insets = useSafeAreaInsets();
   const {
     inkManagerRef,
     historyRef,
@@ -995,15 +998,17 @@ export default function MapScreen() {
   return (
     <View style={styles.page} onLayout={handleLayout}>
       {/* ===== Top Bar Controls ===== */}
-      <View style={styles.topControls}>
+      <View style={[styles.topControls, { top: insets.top + 8 }]}>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={ts(session ? 'profile' : 'signIn', lang)}
           style={styles.profileBtn}
           onPress={() => router.push(session ? '/profile' : '/login')}
         >
-          <Image
-            source={session?.avatarUrl ? { uri: `${API_BASE_URL}/api/files/${session.avatarUrl.replace(/^\//, '')}?v=${avatarVersion}` } : require('@/assets/images/react-logo.png')}
+          {session?.avatarUrl ? <Image
+            source={{ uri: `${API_BASE_URL}/api/files/${session.avatarUrl.replace(/^\//, '')}?v=${avatarVersion}` }}
             style={styles.avatarImage}
-          />
+          /> : <Feather name="user" size={22} color="#6d28d9" />}
         </TouchableOpacity>
       </View>
       {/* ===== MapLibre GL Native ===== */}

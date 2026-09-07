@@ -298,6 +298,7 @@ export default function DrawingToolbar({
             <TouchableOpacity
               style={[styles.btn, currentMode === 'hand' && styles.activeBtn]}
               onPress={() => handleModeChange('hand')}
+              accessibilityRole="button" accessibilityLabel={ts('navigateTool', lang)} accessibilityState={{ selected: currentMode === 'hand' }}
             >
               <Ionicons
                 name="hand-left-outline"
@@ -309,6 +310,7 @@ export default function DrawingToolbar({
             <TouchableOpacity
               style={[styles.btn, currentMode === 'pin' && styles.activeBtn]}
               onPress={() => handleModeChange('pin')}
+              accessibilityRole="button" accessibilityLabel={ts('pinTool', lang)} accessibilityState={{ selected: currentMode === 'pin' }}
             >
               <Feather
                 name="map-pin"
@@ -323,6 +325,7 @@ export default function DrawingToolbar({
           {/* Group 2: Brush toggle (pencil/eraser) + Color panel */}
           <View style={styles.group}>
             <TouchableOpacity
+              accessibilityRole="button" accessibilityLabel={ts(currentBrush === BRUSH_IDS.ERASER ? 'eraserTool' : 'pencilTool', lang)} accessibilityState={{ selected: currentMode === 'draw' }}
               style={[
                 styles.btn,
                 currentMode === 'draw' && currentBrush !== BRUSH_IDS.ERASER && styles.activeBtn, // Highlight pencil if in draw mode
@@ -360,6 +363,7 @@ export default function DrawingToolbar({
             <TouchableOpacity
               style={[styles.btn, showColorPanel && styles.activePanelBtn]}
               onPress={toggleColorPanel}
+              accessibilityRole="button" accessibilityLabel={ts('colors', lang)} accessibilityState={{ expanded: showColorPanel }}
             >
               <View
                 style={[styles.colorDot, { backgroundColor: currentColor }]}
@@ -375,6 +379,7 @@ export default function DrawingToolbar({
               style={[styles.btn, !canUndo && styles.disabledBtn]}
               onPress={onUndo}
               disabled={!canUndo}
+              accessibilityRole="button" accessibilityLabel={ts('undoTool', lang)} accessibilityState={{ disabled: !canUndo }}
             >
               <Feather
                 name="rotate-ccw"
@@ -386,6 +391,7 @@ export default function DrawingToolbar({
               style={[styles.btn, !canRedo && styles.disabledBtn]}
               onPress={onRedo}
               disabled={!canRedo}
+              accessibilityRole="button" accessibilityLabel={ts('redoTool', lang)} accessibilityState={{ disabled: !canRedo }}
             >
               <Feather
                 name="rotate-cw"
@@ -401,6 +407,7 @@ export default function DrawingToolbar({
           <TouchableOpacity
             style={[styles.btn, strokesTransparent && styles.activeBtn]}
             onPress={onToggleTransparency}
+            accessibilityRole="button" accessibilityLabel={ts('transparencyTool', lang)} accessibilityState={{ selected: strokesTransparent }}
           >
             <Feather
               name={strokesTransparent ? 'eye-off' : 'eye'}

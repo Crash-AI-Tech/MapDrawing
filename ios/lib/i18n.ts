@@ -98,6 +98,15 @@ export const translations = {
   uploadFailed: { zh: '上传失败', en: 'Upload Failed', ja: 'アップロードに失敗しました' },
 
   // ===== DrawingToolbar =====
+  navigateTool: { zh: '导航', en: 'Navigate', ja: '地図を移動' },
+  pinTool: { zh: '图钉', en: 'Pin', ja: 'ピン' },
+  pencilTool: { zh: '画笔，点击切换橡皮擦', en: 'Pencil, tap to switch to eraser', ja: 'ペン、タップで消しゴムに切替' },
+  eraserTool: { zh: '橡皮擦，点击切换画笔', en: 'Eraser, tap to switch to pencil', ja: '消しゴム、タップでペンに切替' },
+  undoTool: { zh: '撤销', en: 'Undo', ja: '元に戻す' },
+  redoTool: { zh: '重做', en: 'Redo', ja: 'やり直す' },
+  transparencyTool: { zh: '切换绘制透明度', en: 'Toggle drawing transparency', ja: '描画の透明度を切替' },
+  zoomInControl: { zh: '放大', en: 'Zoom in', ja: '拡大' },
+  zoomOutControl: { zh: '缩小', en: 'Zoom out', ja: '縮小' },
   cannotDraw: { zh: '无法绘制', en: 'Cannot Draw', ja: '描画できません' },
   cannotPin: { zh: '无法放置图钉', en: 'Cannot Place Pin', ja: 'ピンを配置できません' },
   zoomInToDraw: { zh: (z: number) => `请放大到 ${z} 级以上才能绘画`, en: (z: number) => `Please zoom in to level ${z} or higher to draw.`, ja: (z: number) => `描画するにはレベル ${z} 以上にズームしてください` },
