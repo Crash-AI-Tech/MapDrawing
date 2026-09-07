@@ -12,11 +12,13 @@ export class StrokeManager {
   private rtree = new RBush<StrokeRTreeItem>();
   /** Track which items are in the tree for removal */
   private rtreeItems = new Map<string, StrokeRTreeItem>();
+  revision = 0;
 
   /** Add a stroke */
   add(stroke: StrokeData): void {
     if (this.strokes.has(stroke.id)) return;
     this.strokes.set(stroke.id, stroke);
+    this.revision += 1;
     const item = this.toRTreeItem(stroke);
     this.rtreeItems.set(stroke.id, item);
     this.rtree.insert(item);
@@ -28,6 +30,7 @@ export class StrokeManager {
     if (!stroke) return undefined;
 
     this.strokes.delete(strokeId);
+    this.revision += 1;
     const item = this.rtreeItems.get(strokeId);
     if (item) {
       this.rtree.remove(item, (a, b) => a.strokeId === b.strokeId);
@@ -89,7 +92,8 @@ export class StrokeManager {
    * viewport. Visible content is never removed by this method.
    */
   evictOutsideBounds(bounds: GeoBounds, maxCount: number): number {
-    if (this.strokes.size <= maxCount) return 0;
+    let pointCount = [...this.strokes.values()].reduce((n, s) => n + s.points.length, 0);
+    if (this.strokes.size <= maxCount && pointCount <= 150_000) return 0;
     const outside = [...this.strokes.values()]
       .filter((stroke) =>
         stroke.bounds.maxLng < bounds.minLng ||
@@ -101,7 +105,8 @@ export class StrokeManager {
 
     let removed = 0;
     for (const stroke of outside) {
-      if (this.strokes.size <= maxCount) break;
+      if (this.strokes.size <= maxCount && pointCount <= 150_000) break;
+      pointCount -= stroke.points.length;
       if (this.remove(stroke.id)) removed += 1;
     }
     return removed;
@@ -118,11 +123,13 @@ export class StrokeManager {
       items.push(item);
     }
     this.rtree.load(items);
+    if (items.length) this.revision += 1;
   }
 
   /** Clear all data */
   clear(): void {
     this.strokes.clear();
+    this.revision += 1;
     this.rtreeItems.clear();
     this.rtree.clear();
   }

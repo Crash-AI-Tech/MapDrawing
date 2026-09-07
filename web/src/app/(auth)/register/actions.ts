@@ -7,6 +7,7 @@
 
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { hashPassword } from '@/lib/auth/password';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 import { generateId } from 'lucia';
 import {
   generateVerificationCode,
@@ -37,6 +38,7 @@ export async function register(
   }
 
   try {
+    if (!await allowAuthAttempt('email', email)) return { error: '请稍后重试 / Please try again shortly / しばらくしてお試しください' };
     const { env } = getCloudflareContext();
 
     // 检查邮箱是否已存在

@@ -18,14 +18,13 @@ import {
   Text,
   TextInput,
   Pressable,
-  Alert,
   Dimensions,
   ScrollView,
   Platform,
   PanResponder,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { INK_REGEN_INTERVAL_SECONDS, MIN_DRAW_ZOOM, MIN_PIN_ZOOM } from '@niubi/shared';
+import { INK_REGEN_INTERVAL_SECONDS } from '@niubi/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Feather,
@@ -41,7 +40,7 @@ import {
   OPACITY_STEP,
 } from '@niubi/shared';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLang, ts, tf } from '@/lib/i18n';
+import { useLang, ts } from '@/lib/i18n';
 import { PlatformGlassView } from '@/components/ui/PlatformGlassView';
 
 const RECENT_COLORS_KEY = 'niubi-recent-colors';
@@ -271,17 +270,6 @@ export default function DrawingToolbar({
   const inkPercent = Math.max(0, Math.min(1, ink / maxInk));
 
   const handleModeChange = (newMode: 'hand' | 'draw' | 'pin') => {
-    if (newMode === 'draw') {
-      if (currentZoom < MIN_DRAW_ZOOM) {
-        Alert.alert(ts('cannotDraw', lang), tf('zoomInToDraw', lang)(MIN_DRAW_ZOOM));
-        return;
-      }
-    } else if (newMode === 'pin') {
-      if (currentZoom < MIN_PIN_ZOOM) {
-        Alert.alert(ts('cannotPin', lang), tf('zoomInToPin', lang)(MIN_PIN_ZOOM));
-        return;
-      }
-    }
     onModeChange(newMode);
   };
 

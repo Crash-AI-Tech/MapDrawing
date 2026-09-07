@@ -212,6 +212,7 @@ export async function fetchPins(
     zoom?: number;
     limit?: number;
     cursor?: PageCursor | null;
+    signal?: AbortSignal;
   }
 ): Promise<{
   mode: 'raw' | 'clustered';
@@ -233,7 +234,7 @@ export async function fetchPins(
       : {}),
   }).toString();
 
-  return apiFetch(`/api/pins?${qs}`);
+  return apiFetch(`/api/pins?${qs}`, { auth: true, signal: params.signal });
 }
 
 /**

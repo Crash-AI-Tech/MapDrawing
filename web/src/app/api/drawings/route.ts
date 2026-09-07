@@ -2,6 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { validateCsrf } from '@/lib/csrf';
+import { activityStatement } from '@/lib/product-metrics';
 import { readJsonBody, RequestBodyError } from '@/lib/http/body';
 import {
   MAX_DRAWING_REQUEST_BYTES,
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
     const body = await readJsonBody(request, MAX_DRAWING_REQUEST_BYTES);
-    const strokes = validateStrokeBatch(body);
+    let strokes = validateStrokeBatch(body);
 
     const placeholders = strokes.map(() => '?').join(',');
     const existing = await env.DB.prepare(
@@ -45,10 +46,14 @@ export async function POST(request: Request) {
           .filter((row) => row.user_id === result.user.id)
           .map((row) => row.id),
       );
+      if ((existing.results ?? []).some(row => row.user_id !== result.user.id)) {
+        return Response.json({ error: 'One or more stroke ids already exist' }, { status: 409 });
+      }
       if (ownedIds.size === strokes.length) {
         return Response.json({ ok: true, count: strokes.length, duplicate: true });
       }
-      return Response.json({ error: 'One or more stroke ids already exist' }, { status: 409 });
+      // A retry can contain both committed and new strokes. Never charge twice.
+      strokes = strokes.filter(stroke => !ownedIds.has(stroke.id));
     }
 
     const stmt = env.DB.prepare(
@@ -102,6 +107,7 @@ export async function POST(request: Request) {
       prepareInkConsumption(env.DB, result.user.id, totalInkCost, nowSeconds),
       ...inserts,
       ...tileInserts,
+      activityStatement(env.DB, result.user.id, 'create'),
     ]);
     const inkRow = batchResults[0]?.results?.[0] as { ink?: number } | undefined;
 

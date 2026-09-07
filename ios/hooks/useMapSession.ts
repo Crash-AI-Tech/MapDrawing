@@ -6,6 +6,7 @@ import { fetchProfile, getToken } from '@/lib/api';
 export interface MapSession {
   token: string;
   userId: string;
+  userName: string;
   avatarUrl: string | null;
 }
 /** Owns map-screen authentication hydration and profile refresh. */
@@ -22,7 +23,7 @@ export function useMapSession() {
       try {
         const profile = await fetchProfile();
         if (!cancelled) {
-          setSession({ token, userId: profile.id, avatarUrl: profile.avatar_url });
+          setSession({ token, userId: profile.id, userName: profile.user_name, avatarUrl: profile.avatar_url });
         }
       } catch (error: unknown) {
         if ((error as { status?: number })?.status === 401) await signOut();
@@ -36,11 +37,12 @@ export function useMapSession() {
       let cancelled = false;
       void (async () => {
         const token = await getToken();
-        if (!token || cancelled) return;
+        if (cancelled) return;
+        if (!token) { setSession(null); return; }
         try {
           const profile = await fetchProfile();
           if (cancelled) return;
-          setSession({ token, userId: profile.id, avatarUrl: profile.avatar_url });
+          setSession({ token, userId: profile.id, userName: profile.user_name, avatarUrl: profile.avatar_url });
           setAvatarVersion((version) => version + 1);
         } catch {
           // Initial hydration owns expired-session handling.

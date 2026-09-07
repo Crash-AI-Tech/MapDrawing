@@ -7,6 +7,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
 import { verifyPassword } from '@/lib/auth/password';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 import { cookies } from 'next/headers';
 import { generateId } from 'lucia';
 import {
@@ -33,6 +34,7 @@ export async function login(
   }
 
   try {
+    if (!await allowAuthAttempt('login', email)) return { error: '请稍后重试 / Please try again shortly / しばらくしてお試しください' };
     const { env } = getCloudflareContext();
 
     // 查找用户

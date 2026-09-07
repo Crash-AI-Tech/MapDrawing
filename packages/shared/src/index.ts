@@ -64,6 +64,11 @@ export {
     dedupeById,
 } from './tileSync';
 export type { TileCoordinate } from './tileSync';
+export { ViewportTileLoader } from './tileLoader';
+export type { TileFetcher } from './tileLoader';
+export { DurableWriter, nextWriteBatch } from './writeQueue';
+export { journeyText, parseMapLocation, mapLocationQuery, PRODUCT_EVENTS } from './journey';
+export type { MapLocation, ProductEvent } from './journey';
 
 // ========================
 // Drawing Tool Constants

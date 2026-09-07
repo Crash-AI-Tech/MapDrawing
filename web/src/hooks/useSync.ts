@@ -24,6 +24,7 @@ export interface UseSyncOptions {
 export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
   const syncRef = useRef<SyncManager | null>(null);
   const tileManagerRef = useRef<TileManager | null>(null);
+  const loadGeneration = useRef(0);
   const setSyncState = useUIStore((s) => s.setSyncState);
 
   // Public drawing tiles are available to guests.
@@ -73,6 +74,7 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
     return () => {
       syncRef.current?.dispose();
       syncRef.current = null;
+      tileManagerRef.current?.cancelInFlight();
       tileManagerRef.current = null;
     };
   }, []);
@@ -83,10 +85,18 @@ export function useSync({ engine, userId, accessToken }: UseSyncOptions) {
       // Safety guard: never load data when zoomed out too far
       if (zoom < MIN_DATA_ZOOM) return [];
       if (!tileManagerRef.current || !engine) return [];
+      const generation = ++loadGeneration.current;
+      const manager = tileManagerRef.current;
 
       const blockedUserIds = usePinStore.getState().blockedUserIds;
-      const strokes = (await tileManagerRef.current.fetchMissingTiles(bounds))
-        .filter((stroke) => !blockedUserIds.has(stroke.userId));
+      const strokes = (await manager.fetchMissingTiles(bounds))
+        .filter((stroke) => !blockedUserIds.has(stroke.userId) && !syncRef.current?.isPending(stroke.id));
+
+      if (generation !== loadGeneration.current || tileManagerRef.current !== manager) return [];
+      useUIStore.getState().setContentLimited(manager.truncated);
+      for (const id of manager.takeRemovedIds()) {
+        if (!syncRef.current?.isPending(id)) engine.rejectStroke(id);
+      }
 
       if (strokes.length > 0) {
         engine.loadStrokes(strokes);

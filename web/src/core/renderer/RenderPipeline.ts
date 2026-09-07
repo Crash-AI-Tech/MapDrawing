@@ -3,6 +3,7 @@ import { StrokeRenderer } from './StrokeRenderer';
 import { OverlayManager } from './OverlayManager';
 import type { ViewportManager } from '../engine/ViewportManager';
 import type { StrokeManager } from '../engine/StrokeManager';
+import type { ViewState } from '../types';
 import { STROKE_HIDE_ZOOM_DIFF } from '@/constants';
 
 export interface RenderPipelineConfig {
@@ -11,206 +12,99 @@ export interface RenderPipelineConfig {
   strokeManager: StrokeManager;
 }
 
-/**
- * RenderPipeline — orchestrates the 3-layer canvas rendering.
- *
- * Layer 1: tileCanvas — cached historical strokes as bitmap tiles
- * Layer 2: activeCanvas — current live stroke being drawn
- * Layer 3: compositeCanvas — composites both layers onto the map overlay
+/** Historical raster and live input are independent. During camera gestures,
+ * transform the last snapshot; rebuild paths only after the camera settles.
+ * Snapshot lifetime is local and tied to stroke revision (including deletion).
  */
 export class RenderPipeline {
   readonly strokeRenderer: StrokeRenderer;
-  readonly overlay: OverlayManager;
-
-  private brushRegistry: BrushRegistry;
-  private viewportManager: ViewportManager;
-  private strokeManager: StrokeManager;
-
+  readonly overlay = new OverlayManager();
   private compositeCanvas: HTMLCanvasElement | null = null;
-  private compositeCtx: CanvasRenderingContext2D | null = null;
   private activeCanvas: HTMLCanvasElement | null = null;
-  private activeCtx: CanvasRenderingContext2D | null = null;
-
-  /** Reusable offscreen canvas for transparency compositing */
-  private tmpCanvas: HTMLCanvasElement | null = null;
-  private tmpCtx: CanvasRenderingContext2D | null = null;
-  private tmpCanvasW = 0;
-  private tmpCanvasH = 0;
-
+  private historyCanvas: HTMLCanvasElement | null = null;
+  private snapshotView: ViewState | null = null;
+  private snapshotKey = '';
   private rafId: number | null = null;
-
-  /** When true, strokes are rendered at 50% opacity to reveal map underneath */
+  interacting = false;
   strokesTransparent = false;
+  limited = false;
 
-  constructor(config: RenderPipelineConfig) {
-    this.brushRegistry = config.brushRegistry;
-    this.viewportManager = config.viewportManager;
-    this.strokeManager = config.strokeManager;
-
-    this.strokeRenderer = new StrokeRenderer(config.brushRegistry);
-    this.overlay = new OverlayManager();
+  constructor(private config: RenderPipelineConfig) { this.strokeRenderer = new StrokeRenderer(config.brushRegistry); }
+  init(composite: HTMLCanvasElement, active: HTMLCanvasElement, container: HTMLElement): void {
+    this.compositeCanvas = composite;
+    this.activeCanvas = active;
+    this.historyCanvas = document.createElement('canvas');
+    this.overlay.setCanvas(composite, container);
+    this.resize();
   }
-
-  /** Initialize with DOM elements */
-  init(
-    compositeCanvas: HTMLCanvasElement,
-    activeCanvas: HTMLCanvasElement,
-    container: HTMLElement
-  ): void {
-    this.compositeCanvas = compositeCanvas;
-    this.compositeCtx = compositeCanvas.getContext('2d');
-    this.activeCanvas = activeCanvas;
-    this.activeCtx = activeCanvas.getContext('2d');
-
-    this.overlay.setCanvas(compositeCanvas, container);
-
-    // Also resize active canvas
-    const dpr = window.devicePixelRatio || 1;
-    const rect = container.getBoundingClientRect();
-    activeCanvas.width = rect.width * dpr;
-    activeCanvas.height = rect.height * dpr;
-    activeCanvas.style.width = `${rect.width}px`;
-    activeCanvas.style.height = `${rect.height}px`;
-    const actCtx = activeCanvas.getContext('2d');
-    if (actCtx) actCtx.scale(dpr, dpr);
-
-    this.requestRender();
-  }
-
-  /** Get the active canvas context for live drawing */
-  getActiveContext(): CanvasRenderingContext2D | null {
-    return this.activeCtx;
-  }
-
-  /** Request a re-render on the next frame */
+  getActiveContext(): CanvasRenderingContext2D | null { return this.activeCanvas?.getContext('2d') ?? null; }
   requestRender(): void {
     if (this.rafId !== null) return;
-    this.rafId = requestAnimationFrame(() => {
-      this.rafId = null;
-      this.render();
-    });
+    this.rafId = requestAnimationFrame(() => { this.rafId = null; this.render(); });
   }
-
-  /** Force immediate render */
   render(): void {
-    if (!this.compositeCtx || !this.compositeCanvas) return;
-
-    const width = this.compositeCanvas.width;
-    const height = this.compositeCanvas.height;
+    const composite = this.compositeCanvas;
+    const history = this.historyCanvas;
+    const ctx = composite?.getContext('2d');
+    if (!composite || !history || !ctx) return;
     const dpr = window.devicePixelRatio || 1;
-
-    // Clear composite
-    this.compositeCtx.clearRect(0, 0, width, height);
-
-    // Get visible strokes
-    const bounds = this.viewportManager.getBounds();
-    const currentZoom = this.viewportManager.zoom;
-    let visibleStrokes = this.strokeManager.queryByBounds(bounds);
-
-    // Filter out strokes that are too far above current zoom (hide when zoomed out)
-    visibleStrokes = visibleStrokes.filter(
-      (s) => currentZoom >= s.createdZoom - STROKE_HIDE_ZOOM_DIFF
-    );
-
-    // Safety cap: degrade rendering when too many strokes.
-    // At high counts, only render the most recent strokes to prevent freeze.
-    const SOFT_CAP = 3000;
-    if (visibleStrokes.length > SOFT_CAP) {
-      // Keep only the most recent strokes
-      visibleStrokes.sort((a, b) =>
-        b.createdAt - a.createdAt || b.id.localeCompare(a.id)
-      );
-      visibleStrokes = visibleStrokes.slice(0, SOFT_CAP);
-    }
-
-    // Sort by createdAt ascending so newer strokes render on top of older ones
-    visibleStrokes.sort((a, b) =>
-      a.createdAt - b.createdAt || a.id.localeCompare(b.id)
-    );
-
-    // Build transform: geo → screen
-    const transform = (geoX: number, geoY: number) => {
-      const result = this.viewportManager.geoToScreen(geoX, geoY);
-      return result ?? { x: 0, y: 0 };
-    };
-
-    // Render all visible strokes to composite canvas
-    this.compositeCtx.save();
-    // Reset scale since we'll work in CSS pixels
-    this.compositeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    if (this.strokesTransparent) {
-      // Reuse a cached offscreen canvas for transparency compositing.
-      // Recreating it every frame causes massive GC pressure and page crashes.
-      if (!this.tmpCanvas || this.tmpCanvasW !== width || this.tmpCanvasH !== height) {
-        this.tmpCanvas = document.createElement('canvas');
-        this.tmpCanvas.width = width;
-        this.tmpCanvas.height = height;
-        this.tmpCtx = this.tmpCanvas.getContext('2d');
-        this.tmpCanvasW = width;
-        this.tmpCanvasH = height;
+    const { width, height } = composite;
+    const view = this.config.viewportManager.getViewState();
+    const key = JSON.stringify([view, width, height, this.config.strokeManager.revision]);
+    const canTransform = this.interacting && this.snapshotView && this.snapshotView.bearing === view.bearing && this.snapshotView.pitch === view.pitch && history.width === width && history.height === height;
+    if (this.snapshotKey !== key && !canTransform) {
+      if (history.width !== width || history.height !== height) { history.width = width; history.height = height; }
+      const hctx = history.getContext('2d');
+      if (!hctx) return;
+      hctx.setTransform(1, 0, 0, 1, 0, 0);
+      hctx.clearRect(0, 0, width, height);
+      hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const candidates = this.config.strokeManager.queryByBounds(this.config.viewportManager.getBounds())
+        .filter(s => view.zoom >= s.createdZoom - STROKE_HIDE_ZOOM_DIFF)
+        .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id));
+      let points = 0;
+      const strokes = [];
+      for (const stroke of candidates) {
+        if (strokes.length >= 3000 || points + stroke.points.length > 150_000) break;
+        strokes.push(stroke); points += stroke.points.length;
       }
-      const tmpCtx = this.tmpCtx;
-      if (tmpCtx) {
-        tmpCtx.clearRect(0, 0, width, height);
-        tmpCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        this.strokeRenderer.renderStrokes(tmpCtx, visibleStrokes, transform, currentZoom);
-        // Reset to identity so drawImage maps device pixels 1:1 (no double-scaling by dpr)
-        this.compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
-        this.compositeCtx.globalAlpha = 0.3;
-        this.compositeCtx.drawImage(this.tmpCanvas, 0, 0);
-        this.compositeCtx.globalAlpha = 1.0;
-        // Restore the dpr transform for anything after
-        this.compositeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-    } else {
-      this.strokeRenderer.renderStrokes(this.compositeCtx, visibleStrokes, transform, currentZoom);
+      this.limited = strokes.length < candidates.length;
+      strokes.reverse();
+      this.strokeRenderer.renderStrokes(hctx, strokes, (x, y) => this.config.viewportManager.geoToScreen(x, y) ?? { x: 0, y: 0 }, view.zoom);
+      this.snapshotKey = key;
+      this.snapshotView = view;
     }
-
-    this.compositeCtx.restore();
-
-    // Composite active canvas on top
-    if (this.activeCanvas && this.activeCanvas.width > 0 && this.activeCanvas.height > 0) {
-      this.compositeCtx.drawImage(this.activeCanvas, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    ctx.save();
+    ctx.globalAlpha = this.strokesTransparent ? 0.3 : 1;
+    if (canTransform && this.snapshotView) {
+      const anchor = this.config.viewportManager.geoToScreen(this.snapshotView.lng, this.snapshotView.lat);
+      const scale = 2 ** (view.zoom - this.snapshotView.zoom);
+      if (anchor) { ctx.translate(anchor.x * dpr, anchor.y * dpr); ctx.scale(scale, scale); ctx.translate(-width / 2, -height / 2); }
     }
-
+    ctx.drawImage(history, 0, 0);
+    ctx.restore();
+    if (this.activeCanvas?.width && this.activeCanvas.height) ctx.drawImage(this.activeCanvas, 0, 0);
   }
-
-  /** Handle window/container resize */
   resize(): void {
     this.overlay.resize();
-
-    if (this.activeCanvas && this.compositeCanvas) {
-      const parent = this.compositeCanvas.parentElement;
-      if (parent) {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = parent.getBoundingClientRect();
-
-        this.activeCanvas.width = rect.width * dpr;
-        this.activeCanvas.height = rect.height * dpr;
-        this.activeCanvas.style.width = `${rect.width}px`;
-        this.activeCanvas.style.height = `${rect.height}px`;
-        const ctx = this.activeCanvas.getContext('2d');
-        if (ctx) ctx.scale(dpr, dpr);
-      }
+    const canvas = this.activeCanvas;
+    const parent = this.compositeCanvas?.parentElement;
+    if (canvas && parent) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = parent.getBoundingClientRect();
+      canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`; canvas.style.height = `${rect.height}px`;
+      canvas.getContext('2d')?.scale(dpr, dpr);
     }
-
+    this.snapshotKey = '';
     this.requestRender();
   }
-
-  /** Clean up */
   dispose(): void {
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-    }
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.overlay.dispose();
-    this.compositeCanvas = null;
-    this.compositeCtx = null;
-    this.activeCanvas = null;
-    this.activeCtx = null;
-    this.tmpCanvas = null;
-    this.tmpCtx = null;
+    if (this.historyCanvas) { this.historyCanvas.width = 0; this.historyCanvas.height = 0; }
+    this.historyCanvas = null; this.activeCanvas = null; this.compositeCanvas = null;
   }
-
 }

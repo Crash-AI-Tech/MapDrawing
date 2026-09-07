@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { hashPassword } from '@/lib/auth/password';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 // Using custom generateId to avoid Edge runtime module resolution issues with lucia
 function generateId(length: number): string {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
         }
 
+        if (!await allowAuthAttempt('email', email, request)) return NextResponse.json({ error: 'Please try again shortly' }, { status: 429 });
         const { env } = getCloudflareContext();
 
         // Check if email already exists

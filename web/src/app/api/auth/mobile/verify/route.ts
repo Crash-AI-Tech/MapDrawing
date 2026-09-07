@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 function generateId(length: number): string {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const arr = new Uint8Array(length);
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
         }
 
         const { env } = getCloudflareContext();
+        if (!await allowAuthAttempt(body.action === 'resend' ? 'email' : 'verify', email, request)) return NextResponse.json({ error: 'Please try again shortly' }, { status: 429 });
 
         // Handle resend action
         if (body.action === 'resend') {
@@ -82,33 +84,6 @@ export async function POST(request: Request) {
         if (!code || code.length !== 6) {
             return NextResponse.json({ error: 'Invalid verification code' }, { status: 400 });
         }
-
-        const attemptOwner = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
-            .bind(email)
-            .first<{ id: string }>();
-        if (!attemptOwner) {
-            return NextResponse.json({ error: 'Invalid verification code' }, { status: 400 });
-        }
-
-        // Rate limit: max 5 verify attempts per email per 15 minutes
-        const attemptWindow = Date.now() - 15 * 60 * 1000;
-        const attempts = await env.DB.prepare(
-            `SELECT COUNT(*) as cnt FROM verification_codes
-             WHERE email = ? AND type = 'verify_attempt' AND expires_at > ?`
-        ).bind(email, attemptWindow).first<{ cnt: number }>();
-
-        if (attempts && attempts.cnt >= 5) {
-            return NextResponse.json(
-                { error: 'Too many attempts. Please wait 15 minutes.' },
-                { status: 429 }
-            );
-        }
-
-        // Record this attempt
-        await env.DB.prepare(
-            `INSERT INTO verification_codes (id, user_id, email, code, type, expires_at)
-             VALUES (?, ?, ?, '', 'verify_attempt', ?)`
-        ).bind(generateId(15), attemptOwner.id, email, Date.now() + 15 * 60 * 1000).run();
 
         const record = await env.DB.prepare(
             `SELECT id, user_id, expires_at

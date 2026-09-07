@@ -16,6 +16,11 @@ const contact = 'wenjian@wisebamboo.fun';
 const operatorZh = '深圳市玉竹智能有限公司（Shenzhen Yuzhu Intelligent Co., Ltd.）';
 const operatorEn = 'Shenzhen Yuzhu Intelligent Co., Ltd. (深圳市玉竹智能有限公司)';
 const operatorJa = 'Shenzhen Yuzhu Intelligent Co., Ltd.（深圳市玉竹智能有限公司）';
+const productMetricsDisclosure: Record<Lang, LegalSection> = {
+  zh: { title: '产品体验统计（2026 年 9 月 8 日新增）', paragraphs: ['我们记录进入地图、尝试工具、开始注册和分享的每日汇总次数、Web/iOS 平台及粗略来源分类；不在统计中保存 GPS、绘画坐标、作品内容、原始 IP 或广告标识符。', '登录用户的访问和成功创作按账号与日期记录，用于分析首次创作和回访。统计不用于广告或跨站跟踪。我们保留滚动 90 天的统计，在后续统计请求中清理过期记录；账号删除同时清除其关联活动。未登录的事件次数不代表独立访客人数。'] },
+  en: { title: 'Product experience metrics — added September 8, 2026', paragraphs: ['We count daily map opens, tool attempts, registration starts and shares, with Web/iOS platform and a broad source category. Metrics do not contain GPS, map coordinates, artwork, raw IP addresses or advertising identifiers.', 'For signed-in accounts, visits and successful creation are recorded by account and day to understand activation and return visits, not advertising or cross-site tracking. We keep a rolling 90-day window and clean up older records on subsequent metrics requests. Account deletion removes linked activity. Anonymous event counts are not unique visitors.'] },
+  ja: { title: '利用体験の統計（2026 年 9 月 8 日追加）', paragraphs: ['地図の閲覧、ツールの試用、登録開始、共有の日別合計、Web/iOS の区分、大まかな流入元を記録します。統計に GPS、地図座標、作品、元の IP、広告識別子は含めません。', 'ログイン中の閲覧と制作成功はアカウント・日単位で記録し、初回制作や再訪の改善に利用します。広告やサイト横断追跡には使いません。直近90日分を保持し、以降の統計要求で古い記録を削除します。アカウント削除で関連履歴も削除されます。匿名イベント数は訪問者数とは異なります。'] },
+};
 
 export const LEGAL_COPY: Record<'terms' | 'privacy', Record<Lang, LegalDocumentCopy>> = {
   terms: {
@@ -61,8 +66,9 @@ export const LEGAL_COPY: Record<'terms' | 'privacy', Record<Lang, LegalDocumentC
   },
   privacy: {
     zh: {
-      title: '隐私政策', updated: '生效日期：2026 年 7 月 20 日', summary: `${operatorZh} 是 DrawMaps 个人信息的处理者。我们仅收集运行共享地图、保护用户和履行法律义务所需的数据。`,
+      title: '隐私政策', updated: '生效日期：2026 年 9 月 8 日', summary: `${operatorZh} 是 DrawMaps 个人信息的处理者。我们仅收集运行共享地图、保护用户和履行法律义务所需的数据。`,
       sections: [
+        productMetricsDisclosure.zh,
         { title: '1. 我们收集的数据', paragraphs: ['账号数据：邮箱、用户名、密码的安全哈希、邮箱验证状态，或「通过 Apple 登录」的标识符与撤销凭据；你主动上传的头像。', '公开创作数据：绘画点与其地图坐标、笔刷外观、图钉坐标、颜色、留言、昵称和时间。', '安全与审核数据：会话标识符、限流计数、屏蔽关系、举报理由和处理记录。服务器可在请求处理、防滥用和安全日志中短期处理 IP 地址、设备/浏览器类型和请求时间。'] },
         { title: '2. 定位与跟踪', paragraphs: ['DrawMaps 不请求 iOS 设备定位权限，也不收集 GPS 定位。当你移动地图、绘画或放置图钉时，我们会保存你主动选择的地图坐标。', '我们不使用广告 SDK，不进行跨应用或跨网站跟踪，不出售个人数据。'] },
         { title: '3. 使用目的与法律基础', paragraphs: ['我们使用数据来创建账号、验证身份、同步作品、维持墨水、展示共享画布、处理举报、防止滥用、提供客服与履行法律义务。', '根据所在地法律，处理可基于履行与你的服务合同、我们保护服务的正当利益、履行法律义务，或你的同意。'] },
@@ -73,8 +79,9 @@ export const LEGAL_COPY: Record<'terms' | 'privacy', Record<Lang, LegalDocumentC
       ],
     },
     en: {
-      title: 'Privacy Policy', updated: 'Effective: July 20, 2026', summary: `${operatorEn} is responsible for personal data processed by DrawMaps. We collect only what is needed to operate the shared map, protect users, and meet legal obligations.`,
+      title: 'Privacy Policy', updated: 'Effective: September 8, 2026', summary: `${operatorEn} is responsible for personal data processed by DrawMaps. We collect only what is needed to operate the shared map, protect users, and meet legal obligations.`,
       sections: [
+        productMetricsDisclosure.en,
         { title: '1. Data we collect', paragraphs: ['Account data: email, display name, a securely hashed password, verification status, or a Sign in with Apple identifier and revocation credential; plus an avatar you choose to upload.', 'Public creation data: drawing points and map coordinates, brush appearance, pin coordinates, colors, messages, display name, and timestamps.', 'Safety and moderation data: session identifiers, rate-limit counters, block relationships, report reasons, and review records. Servers may briefly process IP address, device or browser type, and request time to handle requests, prevent abuse, and maintain security logs.'] },
         { title: '2. Location and tracking', paragraphs: ['DrawMaps does not request iOS device-location permission and does not collect GPS location. When you move the map, draw, or place a pin, we store the map coordinates you intentionally select.', 'We do not use advertising SDKs, track you across apps or websites, or sell personal data.'] },
         { title: '3. Purposes and legal bases', paragraphs: ['We use data to create accounts, verify identity, sync creations, maintain ink, display the shared canvas, review reports, prevent abuse, provide support, and comply with law.', 'Depending on applicable law, processing is based on performing our service contract with you, our legitimate interest in protecting the service, legal obligations, or your consent.'] },
@@ -85,8 +92,9 @@ export const LEGAL_COPY: Record<'terms' | 'privacy', Record<Lang, LegalDocumentC
       ],
     },
     ja: {
-      title: 'プライバシーポリシー', updated: '2026 年 7 月 20 日施行', summary: `${operatorJa} は DrawMaps で処理される個人データに責任を負います。共有地図の運営、利用者の保護、法的義務に必要なデータのみを取得します。`,
+      title: 'プライバシーポリシー', updated: '2026 年 9 月 8 日施行', summary: `${operatorJa} は DrawMaps で処理される個人データに責任を負います。共有地図の運営、利用者の保護、法的義務に必要なデータのみを取得します。`,
       sections: [
+        productMetricsDisclosure.ja,
         { title: '1. 取得するデータ', paragraphs: ['アカウント：メール、表示名、ハッシュ化されたパスワード、確認状態、または Apple ログイン識別子と取消用認証情報、任意のアバター。', '公開作品：描画点と地図座標、ブラシの外観、ピン座標、色、メッセージ、表示名、時刻。', '安全性と審査：セッション識別子、速度制限、ブロック関係、通報理由、審査記録。要求処理や不正防止のため IP アドレス、端末種別、時刻を短期処理する場合があります。'] },
         { title: '2. 位置情報とトラッキング', paragraphs: ['iOS の端末位置権限を求めず、GPS 位置を取得しません。地図を移動し、描画またはピンを置いた際に、意図的に選択した地図座標を保存します。', '広告 SDK、アプリやサイトを跨ぐ追跡、個人データの販売は行いません。'] },
         { title: '3. 利用目的', paragraphs: ['アカウント作成、本人確認、作品同期、インク管理、キャンバス表示、通報審査、不正防止、サポート、法的義務に利用します。', '処理は、契約の履行、サービス保護の正当な利益、法的義務、または同意に基づきます。'] },

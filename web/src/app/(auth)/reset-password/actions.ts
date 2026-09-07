@@ -7,6 +7,7 @@
 
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { hashPassword } from '@/lib/auth/password';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 import { generateId } from 'lucia';
 import {
   generateVerificationCode,
@@ -40,6 +41,7 @@ export async function requestPasswordReset(
 
   try {
     const { env } = getCloudflareContext();
+    if (!await allowAuthAttempt('email', email)) return { error: '请求过多，请稍后重试' };
 
     const user = await env.DB.prepare(
       'SELECT id FROM users WHERE email = ?'
@@ -128,6 +130,7 @@ export async function resetPassword(
 
   try {
     const { env } = getCloudflareContext();
+    if (!await allowAuthAttempt('verify', email)) return { error: '尝试次数过多，请等待 15 分钟后重试' };
 
     // 验证验证码
     const record = await env.DB.prepare(

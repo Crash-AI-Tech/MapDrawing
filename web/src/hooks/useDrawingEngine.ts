@@ -11,6 +11,7 @@ import { WebCanvasProvider } from '@/platform/web/WebCanvasProvider';
 import { MapLibreAdapter } from '@/platform/web/MapLibreAdapter';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useInkStore } from '@/stores/inkStore';
+import { useUIStore } from '@/stores/uiStore';
 import { MIN_DRAW_ZOOM } from '@/constants';
 import type { Map as MaplibreMap } from 'maplibre-gl';
 
@@ -98,6 +99,9 @@ export function useDrawingEngine(
 
       // 7) Wire engine events → Zustand store + pipeline
       engineUnsubscribeRef.current = engine.subscribe((event: EngineEvent) => {
+        if (event.type === 'stroke:end' || event.type === 'stroke:added' || event.type === 'stroke:deleted') {
+          useUIStore.getState().setHasPractice(engine.strokes.queryByUser('anonymous').length > 0);
+        }
         switch (event.type) {
           case 'render:request':
             pipeline.requestRender();
@@ -143,6 +147,7 @@ export function useDrawingEngine(
 
       // 8) Wire MapLibre move → viewport + re-render
       const onMapMove = () => {
+        pipeline.interacting = true;
         engine.viewport.update(adapter.getViewState());
         pipeline.requestRender();
 
@@ -153,10 +158,13 @@ export function useDrawingEngine(
         canvasProvider.setDrawingMode(canDraw);
       };
       const onMapResize = () => pipeline.resize();
+      const onMapMoveEnd = () => { pipeline.interacting = false; pipeline.requestRender(); };
       map.on('move', onMapMove);
+      map.on('moveend', onMapMoveEnd);
       map.on('resize', onMapResize);
       mapCleanupRef.current = () => {
         map.off('move', onMapMove);
+        map.off('moveend', onMapMoveEnd);
         map.off('resize', onMapResize);
       };
 

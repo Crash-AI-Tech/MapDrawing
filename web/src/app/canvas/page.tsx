@@ -8,22 +8,25 @@ import UserMenu from '@/components/auth/UserMenu';
 import AuthDialog from '@/components/auth/AuthDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/lib/i18n';
+import CreationGuide from '@/components/canvas/CreationGuide';
+import { trackEvent } from '@/lib/analytics';
 
 // MapCanvas uses MapLibre GL which requires window — lazy import with client-only guard
 const LazyMapCanvas = lazy(() => import('@/components/canvas/MapCanvas'));
 
 /**
  * Canvas page — main drawing interface.
- * Guests can view the map; auth dialog pops up when they try to draw.
+ * Guests can try drawing locally and choose to publish after signing in.
  */
 export default function CanvasPage() {
-  useAuth();
+  const { user, isLoading } = useAuth();
   const { t } = useI18n();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // Client-only guard: MapLibre GL needs window/document
   useEffect(() => setMounted(true), []);
+  useEffect(() => { if (!isLoading) trackEvent('canvas_open', user?.id ?? 'guest'); }, [isLoading, user?.id]);
 
   return (
     <ErrorBoundary>
@@ -38,6 +41,7 @@ export default function CanvasPage() {
         )}
 
         {/* Toolbar (left) — passes auth gate callback */}
+        <CreationGuide onLogin={() => setShowAuthDialog(true)} />
         <Toolbar onAuthRequired={() => setShowAuthDialog(true)} />
 
         {/* User menu (top-right) */}

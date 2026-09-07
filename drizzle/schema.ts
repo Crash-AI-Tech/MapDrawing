@@ -149,6 +149,22 @@ export const drawingTiles = sqliteTable('drawing_tiles', {
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
 }, (table) => [primaryKey({ columns: [table.z, table.x, table.y, table.drawingId] })]);
 
+export const tileVersions = sqliteTable('tile_versions', {
+  z: integer('z').notNull(), x: integer('x').notNull(), y: integer('y').notNull(),
+  revision: integer('revision').notNull().default(1),
+}, table => [primaryKey({ columns: [table.z, table.x, table.y] })]);
+
+export const productCounters = sqliteTable('product_counters', {
+  day: text('day').notNull(), event: text('event').notNull(),
+  platform: text('platform').notNull(), channel: text('channel').notNull(),
+  count: integer('count').notNull().default(1),
+}, table => [primaryKey({ columns: [table.day, table.event, table.platform, table.channel] })]);
+
+export const productActivity = sqliteTable('product_activity', {
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  day: text('day').notNull(), event: text('event').notNull(),
+}, table => [primaryKey({ columns: [table.userId, table.day, table.event] })]);
+
 // =====================
 // 举报/审核表
 // =====================

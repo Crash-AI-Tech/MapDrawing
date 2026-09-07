@@ -30,6 +30,7 @@ import { getI18nText, useI18n } from '@/lib/i18n';
 import { usePresence } from '@/hooks/usePresence';
 import { CursorOverlay } from '@/components/canvas/CursorOverlay';
 import { eraserToolCursor } from '@/platform/web/toolCursors';
+import { parseMapLocation, type PageCursor } from '@niubi/shared';
 
 /** Generate an SVG pin cursor data URI — small size (14x20) */
 function pinCursorSvg(color: string): string {
@@ -101,6 +102,8 @@ export default function MapCanvas() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const pinMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const pinRequestRef = useRef<AbortController | null>(null);
+  const [pinClusters, setPinClusters] = useState<Array<{ id: string; lng: number; lat: number; count: number }>>([]);
 
   const [mapReady, setMapReady] = useState(false);
   const [engine, setEngine] = useState<import('@/core/engine/DrawingEngine').DrawingEngine | null>(null);
@@ -164,34 +167,44 @@ export default function MapCanvas() {
   // 3) Viewport change → load strokes + pins
   const handleViewportChange = useCallback(
     async (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }, zoom: number) => {
+      pinRequestRef.current?.abort();
+      const controller = new AbortController();
+      pinRequestRef.current = controller;
       // Skip ALL data loading when zoomed out too far to prevent performance issues
       if (zoom < MIN_DATA_ZOOM) {
         setPins([]);
+        setPinClusters([]);
         return;
       }
 
       await loadViewport(bounds, zoom);
+      if (controller.signal.aborted) return;
 
       // Load pins when zoomed in enough
-      if (zoom >= MIN_PIN_ZOOM) {
+      if (zoom >= MIN_DATA_ZOOM) {
         try {
-          const qs = `minLat=${bounds.minLat}&maxLat=${bounds.maxLat}&minLng=${bounds.minLng}&maxLng=${bounds.maxLng}&zoom=${Math.floor(zoom)}`;
-          const res = await fetch(`/api/pins?${qs}`);
-          if (res.ok) {
-            const body: unknown = await res.json();
-            // API returns { mode, items, nextCursor } — extract pins array
-            if (Array.isArray(body)) {
-              setPins(body.filter(isMapPin));
-            } else if (body && typeof body === 'object' &&
-              Array.isArray((body as { items?: unknown }).items)) {
-              const pinItems = ((body as { items: unknown[] }).items).filter(isMapPin);
-              setPins(pinItems);
-            } else {
+          const qs = new URLSearchParams({ minLat: String(bounds.minLat), maxLat: String(bounds.maxLat), minLng: String(bounds.minLng), maxLng: String(bounds.maxLng), zoom: String(Math.floor(zoom)), limit: '200' });
+          const items: MapPin[] = [];
+          let cursor: PageCursor | null = null;
+          for (let page = 0; page < 5; page++) {
+            if (cursor) { qs.set('cursorCreatedAt', String(cursor.createdAt)); qs.set('cursorId', cursor.id); }
+            const res = await fetch(`/api/pins?${qs}`, { signal: controller.signal });
+            if (!res.ok) throw new Error(`Pins HTTP ${res.status}`);
+            const body = await res.json() as { mode: 'raw' | 'clustered'; items: unknown[]; nextCursor: PageCursor | null };
+            if (controller.signal.aborted) return;
+            if (body.mode === 'clustered') {
+              setPinClusters(body.items as Array<{ id: string; lng: number; lat: number; count: number }>);
               setPins([]);
+              return;
             }
+            items.push(...body.items.filter(isMapPin));
+            cursor = body.nextCursor;
+            if (!cursor) break;
           }
+          setPinClusters([]);
+          setPins(items);
         } catch (e) {
-          console.error('[MapCanvas] Failed to load pins:', e);
+          if (!controller.signal.aborted) console.error('[MapCanvas] Failed to load pins:', e);
         }
       } else {
         setPins([]);
@@ -205,12 +218,24 @@ export default function MapCanvas() {
     onViewportChange: handleViewportChange,
   });
 
+  useEffect(() => {
+    const refresh = () => {
+      const map = mapRef.current;
+      if (document.visibilityState !== 'visible' || !engine || !map || map.isMoving() || engine.isDrawing) return;
+      void handleViewportChange(engine.viewport.getBounds(), map.getZoom());
+    };
+    const timer = setInterval(refresh, 30_000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); pinRequestRef.current?.abort(); };
+  }, [engine, handleViewportChange]);
+
   // 4) Initialize MapLibre GL
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
     // Restore last viewport position from localStorage, fallback to defaults
-    const saved = getSavedViewport();
+    const linked = parseMapLocation(new URLSearchParams(window.location.search));
+    const saved = linked ? { center: [linked.lng, linked.lat] as [number, number], zoom: linked.zoom } : getSavedViewport();
     const initialCenter = saved?.center ?? MAP_DEFAULT_CENTER;
     const initialZoom = saved?.zoom ?? MAP_DEFAULT_ZOOM;
 
@@ -234,6 +259,7 @@ export default function MapCanvas() {
     // Persist viewport position on move
     map.on('moveend', () => {
       saveViewport(map.getCenter(), map.getZoom());
+      useUIStore.getState().setMapLocation({ ...map.getCenter(), zoom: map.getZoom() });
     });
 
     // Track zoom for UI hint
@@ -253,9 +279,26 @@ export default function MapCanvas() {
 
     map.on('load', () => {
       setMapReady(true);
+      useUIStore.getState().setMapLocation({ ...map.getCenter(), zoom: map.getZoom() });
     });
+    const zoomTo = (event: Event) => {
+      const zoom = Number((event as CustomEvent).detail);
+      if (Number.isFinite(zoom) && zoom >= 1 && zoom <= 22) map.easeTo({ zoom: Math.max(map.getZoom(), zoom), duration: 600 });
+    };
+    const visit = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      const target = parseMapLocation(new URLSearchParams(detail));
+      if (target) map.flyTo({ center: [target.lng, target.lat], zoom: target.zoom, duration: 1200 });
+    };
+    const publish = () => engineRef.current?.publishPractice();
+    window.addEventListener('map:zoom-to', zoomTo);
+    window.addEventListener('map:visit', visit);
+    window.addEventListener('map:publish-practice', publish);
 
     return () => {
+      window.removeEventListener('map:zoom-to', zoomTo);
+      window.removeEventListener('map:visit', visit);
+      window.removeEventListener('map:publish-practice', publish);
       destroy();
       map.remove();
       mapRef.current = null;
@@ -294,7 +337,16 @@ export default function MapCanvas() {
     pinMarkersRef.current.forEach((m) => m.remove());
     pinMarkersRef.current = [];
 
-    if (currentZoom < MIN_PIN_ZOOM) return;
+    if (currentZoom < MIN_DATA_ZOOM) return;
+
+    for (const cluster of pinClusters) {
+      const button = document.createElement('button');
+      button.className = 'liquid-glass rounded-full border border-white/70 px-3 py-2 text-sm font-bold text-violet-900 shadow-md';
+      button.textContent = String(cluster.count);
+      button.setAttribute('aria-label', `${getI18nText('menuPins')}: ${cluster.count}`);
+      button.addEventListener('click', () => map.easeTo({ center: [cluster.lng, cluster.lat], zoom: Math.min(22, Math.max(21, map.getZoom() + 2)) }));
+      pinMarkersRef.current.push(new maplibregl.Marker({ element: button }).setLngLat([cluster.lng, cluster.lat]).addTo(map));
+    }
 
     pins.forEach((pin) => {
       // Wrapper container
@@ -374,7 +426,7 @@ export default function MapCanvas() {
 
         const metaEl = document.createElement('div');
         metaEl.style.cssText = 'font-size:10px;color:#999;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;';
-        metaEl.innerHTML = `<span>${pin.userName || getI18nText('pinAnonymous')}</span><span>${timeAgo(pin.createdAt)}</span>`;
+        metaEl.textContent = `${pin.userName || getI18nText('pinAnonymous')} · ${timeAgo(pin.createdAt)}`;
         tooltip.appendChild(metaEl);
 
         if (user && pin.userId !== userId) {
@@ -450,7 +502,8 @@ export default function MapCanvas() {
         .addTo(map);
       pinMarkersRef.current.push(marker);
     });
-  }, [pins, currentZoom, user, userId, refreshBlocked, setSelectedPin]);
+    return () => { pinMarkersRef.current.forEach(marker => marker.remove()); pinMarkersRef.current = []; };
+  }, [pins, pinClusters, currentZoom, user, userId, refreshBlocked, setSelectedPin]);
 
   // 8) Handle pin placement
   useEffect(() => {

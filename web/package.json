@@ -10,7 +10,7 @@
     "preview": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare preview",
     "lint": "eslint .",
     "type-check": "next typegen && tsc --noEmit",
-    "db:migrate": "npx wrangler d1 migrations apply map-db --local",
+    "db:migrate": "npx wrangler d1 migrations apply map-db-v2 --local",
     "deploy": "node ../scripts/assert-d1-v2-target.mjs wrangler.toml && npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy",
     "deploy:staging": "node ../scripts/assert-d1-v2-target.mjs wrangler.staging.toml && npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy --config wrangler.staging.toml",
     "upload": "node ../scripts/assert-d1-v2-target.mjs wrangler.toml && npx opennextjs-cloudflare build && npx opennextjs-cloudflare upload",

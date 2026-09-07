@@ -317,6 +317,19 @@ export class DrawingEngine {
   }
 
   /** Delete a stroke by ID */
+  publishPractice(): void {
+    if (this.userId === 'anonymous') return;
+    const practice = this.strokes.queryByUser('anonymous');
+    for (const old of practice) {
+      this.strokes.remove(old.id);
+      const stroke = { ...old, id: uuidv7(), userId: this.userId, userName: this.userName, createdAt: Date.now() };
+      this.strokes.add(stroke);
+      this.emit({ type: 'stroke:end', stroke });
+    }
+    this.history.clear();
+    this.emit({ type: 'render:request' });
+  }
+
   deleteStroke(strokeId: string): StrokeData | null {
     const stroke = this.strokes.remove(strokeId);
     if (!stroke) return null;

@@ -4,6 +4,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { getBlockedUsers } from '@/lib/db/queries';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { validateCsrf } from '@/lib/csrf';
+import { activityStatement } from '@/lib/product-metrics';
 import { readJsonBody, RequestBodyError } from '@/lib/http/body';
 import { isInsufficientInkError, prepareInkConsumption } from '@/lib/ink/server';
 import {
@@ -54,6 +55,9 @@ export async function GET(request: Request) {
     const cursor = parseCursor(url.searchParams);
     const { env } = getCloudflareContext();
     const database = env.DB.withSession();
+    // Apply blocks before aggregation, not after clusters have hidden authors.
+    const identity = await validateSession(request).catch(() => null);
+    const viewerId = identity?.user.id ?? '';
 
     // Low zooms return clustered pins to avoid annotation explosion on mobile
     if (zoom < 21) {
@@ -75,11 +79,12 @@ export async function GET(request: Request) {
          FROM map_pins
          WHERE lat BETWEEN ?5 AND ?6
            AND lng BETWEEN ?7 AND ?8
+           AND NOT EXISTS (SELECT 1 FROM blocked_users b WHERE b.blocker_id = ?10 AND b.blocked_id = map_pins.user_id)
          GROUP BY gx, gy
          ORDER BY count DESC, created_at_ms DESC
          LIMIT ?9`
       )
-        .bind(minLng, cellLng, minLat, cellLat, minLat, maxLat, minLng, maxLng, clampedLimit)
+        .bind(minLng, cellLng, minLat, cellLat, minLat, maxLat, minLng, maxLng, clampedLimit, viewerId)
         .all<PinClusterRow>();
 
       const items = (result.results ?? []).map((row) => ({
@@ -221,6 +226,7 @@ export async function POST(request: Request) {
 
     const batchResults = await env.DB.batch([
       prepareInkConsumption(env.DB, result.user.id, PIN_INK_COST, nowSeconds),
+      activityStatement(env.DB, result.user.id, 'create'),
       env.DB.prepare(
         `INSERT INTO map_pins (
            id, user_id, user_name, lng, lat, message, color,

@@ -7,6 +7,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { validateSession } from '@/lib/auth/session';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { validateCsrf } from '@/lib/csrf';
+import { parseMapLocation, mapLocationQuery } from '@niubi/shared';
 
 export async function POST(request: Request) {
   try {
@@ -47,8 +48,11 @@ export async function POST(request: Request) {
     const key = `shares/${id}.${ext}`;
 
     const buffer = await file.arrayBuffer();
+    const locationField = formData.get('location');
+    const location = typeof locationField === 'string' ? parseMapLocation(new URLSearchParams(locationField)) : null;
     await env.BUCKET.put(key, buffer, {
       httpMetadata: { contentType: file.type },
+      customMetadata: { ownerId: result.user.id, ...(location ? { location: mapLocationQuery(location) } : {}) },
     });
 
     // Build the public share URL

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { hashPassword } from '@/lib/auth/password';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 
 /**
  * POST /api/auth/mobile/reset-password
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
         }
 
         const { env } = getCloudflareContext();
+        if (!await allowAuthAttempt('verify', email, request)) return NextResponse.json({ error: 'Please try again shortly' }, { status: 429 });
 
         // Verify code
         const record = await env.DB.prepare(

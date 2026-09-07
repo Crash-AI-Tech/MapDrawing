@@ -30,6 +30,8 @@ import {
   Dimensions,
   Alert,
   TouchableOpacity,
+  AppState,
+  Share,
   Image,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -48,10 +50,11 @@ import DrawingToolbar from '@/components/DrawingToolbar';
 import ZoomControls from '@/components/ZoomControls';
 import PinPlacer from '@/components/PinPlacer';
 import MapPinOverlay, { MapPinTooltip, type PinData } from '@/components/MapPinOverlay';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import CreationGuide from '@/components/CreationGuide';
+import { trackEvent } from '@/lib/analytics';
 import {
   fetchPins,
-  saveDrawings,
   fetchInk,
   createPin,
   fetchBlockedUsers,
@@ -71,6 +74,7 @@ import {
   DEFAULT_OPACITY,
   MAP_DEFAULT_CENTER,
   MAP_DEFAULT_ZOOM,
+  journeyText, parseMapLocation, mapLocationQuery, type SyncState,
   MIN_DRAW_ZOOM,
   MIN_PIN_ZOOM,
   MIN_DATA_ZOOM,
@@ -118,6 +122,11 @@ const MAX_POINTS_PER_STROKE = 1000;
 // ========================
 
 export default function MapScreen() {
+  const routeParams = useLocalSearchParams<{ lng?: string; lat?: string; zoom?: string }>();
+  const linkedLocation = parseMapLocation({ get: key => {
+    const value = (routeParams as Record<string, unknown>)[key];
+    return typeof value === 'string' ? value : null;
+  } });
   const { session, avatarVersion } = useMapSession();
   const {
     inkManagerRef,
@@ -136,8 +145,8 @@ export default function MapScreen() {
 
   // ===== Camera State =====
   const [cameraState, setCameraState] = useState<CameraState>({
-    center: MAP_DEFAULT_CENTER as [number, number],
-    zoom: MAP_DEFAULT_ZOOM,
+    center: linkedLocation ? [linkedLocation.lng, linkedLocation.lat] : MAP_DEFAULT_CENTER as [number, number],
+    zoom: linkedLocation?.zoom ?? MAP_DEFAULT_ZOOM,
     bearing: 0,
     pitch: 0,
   });
@@ -163,6 +172,8 @@ export default function MapScreen() {
 
   // ===== Reactive State =====
   const [mode, setMode] = useState<'hand' | 'draw' | 'pin'>('hand');
+  const [saveState, setSaveState] = useState<SyncState>('connected');
+  const [contentLimited, setContentLimited] = useState(false);
   const [strokesTransparent, setStrokesTransparent] = useState(false);
 
   // ===== Real-time Collaboration =====
@@ -177,6 +188,7 @@ export default function MapScreen() {
   // 2a. Init TileManager unconditionally (drawings API is public, no auth needed)
   useEffect(() => {
     tileManagerRef.current = new TileManager({});
+    return () => tileManagerRef.current?.cancelInFlight();
   }, []);
 
   // 2b. Init SyncManager (requires session)
@@ -185,6 +197,7 @@ export default function MapScreen() {
 
     const syncManager = new SyncManager({
       userId: session.userId,
+      token: session.token,
       onInkBalance: (serverInk) => inkManagerRef.current?.reconcile(serverInk),
       onStrokeRejected: (strokeId) => {
         strokesRef.current.delete(strokeId);
@@ -194,6 +207,7 @@ export default function MapScreen() {
       },
     });
     syncManagerRef.current = syncManager;
+    const stopState = syncManager.onStateChange(setSaveState);
     fetchInk()
       .then(({ ink: serverInk }) => inkManagerRef.current?.reconcile(serverInk))
       .catch(() => undefined);
@@ -202,6 +216,7 @@ export default function MapScreen() {
       .catch(() => undefined);
 
     return () => {
+      stopState();
       syncManager.dispose();
       if (syncManagerRef.current === syncManager) syncManagerRef.current = null;
     };
@@ -225,7 +240,8 @@ export default function MapScreen() {
 
   // Guarded mode setter: prompt login for draw/pin if not authenticated
   const handleModeChange = useCallback((newMode: 'hand' | 'draw' | 'pin') => {
-    if ((newMode === 'draw' || newMode === 'pin') && !session) {
+    if (newMode !== 'hand') trackEvent('tool_try');
+    if (newMode === 'pin' && !session) {
       Alert.alert(
         ts('signInRequired', lang),
         ts('signInToDrawOrPin', lang),
@@ -236,6 +252,7 @@ export default function MapScreen() {
       );
       return;
     }
+    if (newMode !== 'hand') cameraRef.current?.setCamera({ zoomLevel: Math.max(cameraZoomRef.current, newMode === 'draw' ? MIN_DRAW_ZOOM : MIN_PIN_ZOOM), animationDuration: 600 });
     setMode(newMode);
   }, [session, router, lang]);
 
@@ -244,6 +261,7 @@ export default function MapScreen() {
   const strokeLruRef = useRef<Map<string, number>>(new Map());
   const lruTickRef = useRef(0);
   const viewportLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewportControllerRef = useRef<AbortController | null>(null);
 
   // ===== Map Interaction State =====
   const [isMapInteracting, setIsMapInteracting] = useState(false);
@@ -294,6 +312,9 @@ export default function MapScreen() {
 
   // ===== Viewport loading: paginated fetch + TileRenderer update =====
   const loadViewport = useCallback(async () => {
+    viewportControllerRef.current?.abort();
+    const controller = new AbortController();
+    viewportControllerRef.current = controller;
     // Skip ALL data loading when zoomed out too far to prevent performance issues
     const zoom = cameraZoomRef.current;
     if (zoom < MIN_DATA_ZOOM) {
@@ -343,10 +364,20 @@ export default function MapScreen() {
           minLat: bounds.minLat, maxLat: bounds.maxLat,
           minLng: bounds.minLng, maxLng: bounds.maxLng
         });
+        if (controller.signal.aborted) return;
+        setContentLimited(tileManagerRef.current.truncated);
+        for (const id of tileManagerRef.current.takeRemovedIds()) {
+          if (syncManagerRef.current?.isPending(id)) continue;
+          strokesRef.current.delete(id);
+          tileRendererRef.current.removeStroke(id);
+          loadedStrokeIdsRef.current.delete(id);
+          newStrokesAdded = true;
+        }
 
         if (newStrokes.length > 0) {
           console.log(`[loadViewport] Got ${newStrokes.length} new strokes (total: ${strokesRef.current.size + newStrokes.length})`);
           for (const stroke of newStrokes) {
+            if (syncManagerRef.current?.isPending(stroke.id)) continue;
             if (Compliance.isBlocked(stroke.userId)) continue;
             if (!strokesRef.current.has(stroke.id)) newStrokesAdded = true;
             strokesRef.current.set(stroke.id, stroke);
@@ -388,11 +419,13 @@ export default function MapScreen() {
       // 方案 B: Skip pin fetching when zoomed out too far
       if (zoom >= MIN_PINS_FETCH_ZOOM) {
         const pinFirstPage = await fetchPins({
+          signal: controller.signal,
           minLat: bounds.minLat, maxLat: bounds.maxLat,
           minLng: bounds.minLng, maxLng: bounds.maxLng,
           zoom, limit: PINS_PAGE_SIZE,
         });
 
+        if (controller.signal.aborted) return;
         if (pinFirstPage.mode === 'clustered') {
           // At low zoom, clustered pins — show cluster markers as pins
           const clusters = pinFirstPage.items.filter(
@@ -418,10 +451,12 @@ export default function MapScreen() {
           );
           while (pinCursor && pinPageCount < PINS_MAX_PAGES) {
             const nextPage = await fetchPins({
+              signal: controller.signal,
               minLat: bounds.minLat, maxLat: bounds.maxLat,
               minLng: bounds.minLng, maxLng: bounds.maxLng,
               zoom, limit: PINS_PAGE_SIZE, cursor: pinCursor,
             });
+            if (controller.signal.aborted) return;
             rawPins.push(
               ...nextPage.items.filter((i): i is PinItem => i.type === 'pin')
             );
@@ -429,6 +464,8 @@ export default function MapScreen() {
             pinPageCount += 1;
           }
 
+          // Display the current snapshot, not old cache entries deleted remotely.
+          pinCacheRef.current.clear();
           rawPins.filter((pin) => !Compliance.isBlocked(pin.userId)).forEach((pin) => {
             pinCacheRef.current.set(pin.id, pin);
             touchPin(pin.id);
@@ -480,14 +517,20 @@ export default function MapScreen() {
 
   // Initial load
   useEffect(() => {
+    trackEvent('canvas_open');
     const timer = setTimeout(loadViewport, 500);
-    return () => clearTimeout(timer);
+    const refresh = setInterval(() => {
+      if (AppState.currentState === 'active' && !isMapInteractingRef.current && !currentPointsRef.current.length) void loadViewport();
+    }, 30_000);
+    const resume = AppState.addEventListener('change', state => { if (state === 'active') void loadViewport(); });
+    return () => { clearTimeout(timer); clearInterval(refresh); resume.remove(); viewportControllerRef.current?.abort(); };
   }, [loadViewport]);
 
   // Re-trigger viewport load when session becomes available
   // (the initial 500ms load may fire before auth completes)
   useEffect(() => {
     if (session && tileManagerRef.current) {
+      trackEvent('canvas_open', session.userId);
       loadViewport();
     }
   }, [session, loadViewport]);
@@ -512,7 +555,7 @@ export default function MapScreen() {
 
   // ===== Stable Snapshot for Interaction =====
   useEffect(() => {
-    if (!isMapInteracting && tilePicture) {
+    if (!isMapInteracting) {
       setStableSnapshot(tilePicture);
       stableSnapshotCameraRef.current = {
         center: [...cameraState.center] as [number, number],
@@ -597,8 +640,8 @@ export default function MapScreen() {
 
     const stroke: StrokeData = {
       id: generateId(),
-      userId: 'local',
-      userName: 'Local',
+      userId: session?.userId ?? 'anonymous',
+      userName: session?.userName ?? 'Guest',
       brushId: currentBrushRef.current,
       color: currentColorRef.current,
       opacity: currentOpacityRef.current,
@@ -619,21 +662,13 @@ export default function MapScreen() {
     // Broadcast & Persist (Dual Write)
     if (syncManagerRef.current) {
       syncManagerRef.current.broadcastStroke(stroke);
-    } else {
-      saveDrawings(stroke)
-        .then((response) => {
-          if (typeof response.ink === 'number') {
-            inkManagerRef.current?.reconcile(response.ink);
-          }
-        })
-        .catch((e) => console.warn('[saveDrawings] Failed:', e));
     }
 
     currentPointsRef.current = [];
     inkAccumulatorRef.current = 0;
     currentPathRef.current = null;
     setCurrentPath(null);
-  }, [bumpStrokeVersion, historyRef, inkManagerRef, tileRendererRef]);
+  }, [bumpStrokeVersion, historyRef, inkManagerRef, tileRendererRef, session]);
 
   // ===== Gesture handler =====
   const pan = Gesture.Pan()
@@ -732,9 +767,11 @@ export default function MapScreen() {
     if (cmd.type === 'ADD_STROKE') {
       strokesRef.current.delete(cmd.stroke.id);
       tileRendererRef.current.removeStroke(cmd.stroke.id);
+      if (cmd.stroke.userId !== 'anonymous') void syncManagerRef.current?.broadcastDelete(cmd.stroke.id);
     } else if (cmd.type === 'DELETE_STROKE') {
       strokesRef.current.set(cmd.stroke.id, cmd.stroke);
       tileRendererRef.current.addStroke(cmd.stroke);
+      if (cmd.stroke.userId !== 'anonymous') void syncManagerRef.current?.broadcastStroke(cmd.stroke);
     }
     bumpStrokeVersion();
   }, [bumpStrokeVersion, historyRef, tileRendererRef]);
@@ -746,9 +783,11 @@ export default function MapScreen() {
     if (cmd.type === 'ADD_STROKE') {
       strokesRef.current.set(cmd.stroke.id, cmd.stroke);
       tileRendererRef.current.addStroke(cmd.stroke);
+      if (cmd.stroke.userId !== 'anonymous') void syncManagerRef.current?.broadcastStroke(cmd.stroke);
     } else if (cmd.type === 'DELETE_STROKE') {
       strokesRef.current.delete(cmd.stroke.id);
       tileRendererRef.current.removeStroke(cmd.stroke.id);
+      if (cmd.stroke.userId !== 'anonymous') void syncManagerRef.current?.broadcastDelete(cmd.stroke.id);
     }
     bumpStrokeVersion();
   }, [bumpStrokeVersion, historyRef, tileRendererRef]);
@@ -990,8 +1029,8 @@ export default function MapScreen() {
         <MapLibreGL.Camera
           ref={cameraRef}
           defaultSettings={{
-            centerCoordinate: MAP_DEFAULT_CENTER,
-            zoomLevel: MAP_DEFAULT_ZOOM,
+            centerCoordinate: linkedLocation ? [linkedLocation.lng, linkedLocation.lat] : MAP_DEFAULT_CENTER,
+            zoomLevel: linkedLocation?.zoom ?? MAP_DEFAULT_ZOOM,
           }}
         />
 
@@ -999,8 +1038,12 @@ export default function MapScreen() {
         {/* Render unconditionally to avoid Fabric view recycling crashes */}
         {/* Pins - Native ShapeSource for stability */}
         <MapPinOverlay
-          pins={cameraState.zoom >= MIN_PIN_ZOOM ? visiblePins : []}
-          onPinPress={setSelectedPinId}
+          pins={cameraState.zoom >= MIN_DATA_ZOOM ? visiblePins : []}
+          onPinPress={id => {
+            const pin = visiblePins.find(p => p.id === id);
+            if (pin && !pin.userId) cameraRef.current?.setCamera({ centerCoordinate: [pin.lng, pin.lat], zoomLevel: Math.max(21, cameraState.zoom + 1), animationDuration: 500 });
+            else setSelectedPinId(id);
+          }}
         />
       </MapLibreGL.MapView>
 
@@ -1058,6 +1101,24 @@ export default function MapScreen() {
       />
 
       {/* ===== UI Overlays ===== */}
+      <CreationGuide lang={lang} authenticated={!!session} state={saveState} limited={contentLimited || tileRendererRef.current.limited}
+        hasPractice={[...strokesRef.current.values()].some(stroke => stroke.userId === 'anonymous')}
+        onStart={() => handleModeChange('draw')} onLogin={() => router.push('/login')}
+        onPublish={() => {
+          if (!session || !syncManagerRef.current) return;
+          for (const old of [...strokesRef.current.values()]) {
+            if (old.userId !== 'anonymous') continue;
+            strokesRef.current.delete(old.id); tileRendererRef.current.removeStroke(old.id);
+            const stroke = { ...old, id: generateId(), userId: session.userId, userName: session.userName, createdAt: Date.now() };
+            strokesRef.current.set(stroke.id, stroke); tileRendererRef.current.addStroke(stroke);
+            void syncManagerRef.current.broadcastStroke(stroke);
+          }
+          historyRef.current?.clear(); bumpStrokeVersion();
+        }}
+        onShare={() => {
+          const url = `${API_BASE_URL}/canvas?${mapLocationQuery({ lng: cameraState.center[0], lat: cameraState.center[1], zoom: cameraState.zoom })}&via=shared`;
+          void Share.share({ title: 'DrawMaps', message: `${journeyText('share', lang)} ${url}`, url }).then(result => { if (result.action === Share.sharedAction) trackEvent('share'); }).catch(() => undefined);
+        }} />
 
       {/* Zoom hint (draw mode) */}
       {mode === 'draw' && cameraState.zoom < MIN_DRAW_ZOOM && (

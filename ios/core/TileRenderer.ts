@@ -171,6 +171,7 @@ interface StrokeRenderData {
 // ========================
 
 export class TileRenderer {
+  limited = false;
   // Per-stroke render data cache
   private strokeCache = new Map<string, StrokeRenderData>();
 
@@ -267,7 +268,7 @@ export class TileRenderer {
 
     // Collect visible strokes from visible tiles
     const visibleTiles = this.getVisibleTiles(center, zoom, screenW, screenH);
-    if (visibleTiles.length === 0) return null;
+    if (visibleTiles.length === 0) { this.limited = false; return null; }
 
     // De-duplicate strokes across tiles
     const visibleStrokeIds = new Set<string>();
@@ -288,11 +289,18 @@ export class TileRenderer {
       if (zoom < rd.data.createdZoom - STROKE_HIDE_ZOOM_DIFF) continue;
       strokes.push(rd);
     }
-    if (strokes.length === 0) return null;
+    if (strokes.length === 0) { this.limited = false; return null; }
 
-    strokes.sort((a, b) =>
-      a.data.createdAt - b.data.createdAt || a.data.id.localeCompare(b.data.id)
-    );
+    strokes.sort((a, b) => b.data.createdAt - a.data.createdAt || b.data.id.localeCompare(a.data.id));
+    let pointBudget = 0;
+    let count = 0;
+    for (const stroke of strokes) {
+      if (count >= 3000 || pointBudget + stroke.data.points.length > 150_000) break;
+      pointBudget += stroke.data.points.length; count += 1;
+    }
+    this.limited = count < strokes.length;
+    strokes.splice(count);
+    strokes.reverse();
 
     // Render all visible strokes into a single picture
     const scale = Math.pow(2, zoom - BASE_ZOOM);

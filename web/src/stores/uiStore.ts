@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SyncState } from '@/core/types';
+import type { MapLocation } from '@niubi/shared';
 
 interface UIState {
   /** Whether the toolbar panel is expanded */
@@ -16,6 +17,12 @@ interface UIState {
   syncState: SyncState;
   /** Current map zoom level (shared for toolbar gating) */
   currentZoom: number;
+  contentLimited: boolean;
+  hasPractice: boolean;
+  setHasPractice: (value: boolean) => void;
+  mapLocation: MapLocation | null;
+  setMapLocation: (location: MapLocation) => void;
+  setContentLimited: (limited: boolean) => void;
 
   setToolbarExpanded: (expanded: boolean) => void;
   setColorPickerOpen: (open: boolean) => void;
@@ -35,6 +42,12 @@ export const useUIStore = create<UIState>((set) => ({
   toast: null,
   syncState: 'disconnected',
   currentZoom: 14,
+  contentLimited: false,
+  hasPractice: false,
+  setHasPractice: (hasPractice) => set({ hasPractice }),
+  mapLocation: null,
+  setMapLocation: (mapLocation) => set({ mapLocation }),
+  setContentLimited: (contentLimited) => set({ contentLimited }),
 
   setToolbarExpanded: (toolbarExpanded) => set({ toolbarExpanded }),
   setColorPickerOpen: (colorPickerOpen) => set({ colorPickerOpen }),

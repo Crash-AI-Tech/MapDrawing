@@ -2,6 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
+import { parseMapLocation, mapLocationQuery } from '@niubi/shared';
 
 // UUID v4 pattern
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -32,7 +33,9 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
   if (!obj) notFound();
 
   const ext = contentType === 'image/jpeg' ? 'jpg' : 'png';
-  const imageUrl = `/shares/${id}.${ext}`;
+  const imageUrl = `/api/files/shares/${id}.${ext}`;
+  const location = parseMapLocation(new URLSearchParams(obj.customMetadata?.location ?? ''));
+  const canvasUrl = location ? `/canvas?${mapLocationQuery(location)}&via=shared` : '/canvas?via=shared';
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
@@ -46,7 +49,7 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
         <div className="flex items-center justify-between border-t px-6 py-4">
           <p className="text-sm text-muted-foreground">{d.createdBy}</p>
           <Link
-            href="/canvas"
+            href={canvasUrl}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition-colors"
           >
             {d.openApp}

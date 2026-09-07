@@ -35,6 +35,12 @@ VALUES ('report-1', 'user-1', 'drawing-1', 'drawing', 'test');
 DELETE FROM users WHERE id = 'user-1';
 SQL
 
+tile_revision="$(sqlite3 "$database_file" 'SELECT revision FROM tile_versions WHERE z=14 AND x=0 AND y=0;')"
+if [ "$tile_revision" -ne 2 ]; then
+  printf '%s\n' 'Tile version did not change on cascading deletion.' >&2
+  exit 1
+fi
+
 cascade_rows="$(sqlite3 "$database_file" \
   'SELECT (SELECT COUNT(*) FROM drawings) + (SELECT COUNT(*) FROM drawing_tiles) + (SELECT COUNT(*) FROM map_pins) + (SELECT COUNT(*) FROM reports);')"
 if [ "$cascade_rows" -ne 0 ]; then

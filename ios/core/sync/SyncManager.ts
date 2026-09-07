@@ -1,162 +1,19 @@
+import { DurableWriter, shouldRetryHttpStatus, type StrokeData } from '@niubi/shared';
 import { OfflineQueue } from './OfflineQueue';
-import { ApiError, saveDrawings, deleteStroke } from '../../lib/api';
-import type { StrokeData, DrawEvent, SyncState } from '../types';
-import { shouldRetryHttpStatus } from '@niubi/shared';
+import { ApiError, apiFetch } from '../../lib/api';
 
-export type SyncStateListener = (state: SyncState) => void;
-
-interface SyncManagerConfig {
-    userId: string;
-    onInkBalance?: (ink: number) => void;
-    onStrokeRejected?: (strokeId: string) => void;
-}
-
-/**
- * SyncManager — Persistence manager for local strokes.
- * - Saves strokes to API (via fetch)
- * - Handles offline queuing (retry later)
- * - Tracks connectivity state and notifies listeners
- */
-export class SyncManager {
-    private offlineQueue: OfflineQueue;
-    private userId: string;
-    private state: SyncState = 'connected';
-    private stateListeners = new Set<SyncStateListener>();
-    private flushTimer: ReturnType<typeof setInterval> | null = null;
-    private isFlushing = false;
-    private onInkBalance?: (ink: number) => void;
-    private onStrokeRejected?: (strokeId: string) => void;
-
-    constructor(config: SyncManagerConfig) {
-        this.userId = config.userId;
-        this.offlineQueue = new OfflineQueue(config.userId);
-        this.onInkBalance = config.onInkBalance;
-        this.onStrokeRejected = config.onStrokeRejected;
-
-        // Simple retry mechanism
-        this.flushTimer = setInterval(() => {
-            this.flushOfflineQueue();
-        }, 10000);
-    }
-
-    /**
-     * Broadcast a locally created stroke.
-     * 1. Save to API (Persistence)
-     * 2. Enqueue if failed
-     */
-    async broadcastStroke(stroke: StrokeData): Promise<void> {
-        const event: DrawEvent = { type: 'STROKE_ADD', stroke };
-
-        try {
-            this.setState('connecting');
-            const response = await saveDrawings(stroke);
-            if (typeof response.ink === 'number') this.onInkBalance?.(response.ink);
-            this.setState('connected');
-        } catch (e) {
-            if (!this.shouldRetry(e)) {
-                this.onStrokeRejected?.(stroke.id);
-                this.setState(e instanceof ApiError && e.status === 401 ? 'error' : 'connected');
-                return;
-            }
-            console.warn('[SyncManager] Failed to save stroke, queuing:', e);
-            this.setState('disconnected');
-            await this.offlineQueue.enqueue(event);
-        }
-    }
-
-    /**
-     * Broadcast a local deletion.
-     */
-    async broadcastDelete(strokeId: string): Promise<void> {
-        const event: DrawEvent = {
-            type: 'STROKE_DELETE',
-            strokeId,
-            userId: this.userId,
-        };
-
-        try {
-            this.setState('connecting');
-            await deleteStroke(strokeId);
-            this.setState('connected');
-        } catch (e) {
-            if (!this.shouldRetry(e)) {
-                // A missing stroke is already deleted; other 4xx responses are permanent.
-                this.setState(e instanceof ApiError && e.status === 401 ? 'error' : 'connected');
-                return;
-            }
-            console.warn('[SyncManager] Failed to delete stroke, queuing:', e);
-            this.setState('disconnected');
-            await this.offlineQueue.enqueue(event);
-        }
-    }
-
-    getState(): SyncState {
-        return this.state;
-    }
-
-    onStateChange(listener: SyncStateListener): () => void {
-        this.stateListeners.add(listener);
-        listener(this.state);
-        return () => { this.stateListeners.delete(listener); };
-    }
-
-    dispose(): void {
-        if (this.flushTimer) {
-            clearInterval(this.flushTimer);
-            this.flushTimer = null;
-        }
-        this.stateListeners.clear();
-    }
-
-    private setState(newState: SyncState): void {
-        if (this.state !== newState) {
-            this.state = newState;
-            for (const listener of this.stateListeners) {
-                listener(newState);
-            }
-        }
-    }
-
-    private async flushOfflineQueue(): Promise<void> {
-        if (this.isFlushing) return;
-        this.isFlushing = true;
-
-        try {
-            const events = await this.offlineQueue.peek();
-            if (events.length === 0) return;
-            let processedCount = 0;
-            for (const event of events) {
-                try {
-                    if (event.type === 'STROKE_ADD' && event.stroke) {
-                        const response = await saveDrawings(event.stroke);
-                        if (typeof response.ink === 'number') this.onInkBalance?.(response.ink);
-                    } else if (event.type === 'STROKE_DELETE') {
-                        await deleteStroke(event.strokeId);
-                    }
-                    processedCount += 1;
-                } catch (e) {
-                    if (!this.shouldRetry(e)) {
-                        if (event.type === 'STROKE_ADD') {
-                            this.onStrokeRejected?.(event.stroke.id);
-                        }
-                        processedCount += 1;
-                        continue;
-                    }
-                    console.error('[SyncManager] Failed to flush offline event:', e);
-                    break;
-                }
-            }
-            if (processedCount > 0) {
-                await this.offlineQueue.removeProcessed(processedCount);
-            }
-            if (processedCount === events.length) this.setState('connected');
-        } finally {
-            this.isFlushing = false;
-        }
-    }
-
-    private shouldRetry(error: unknown): boolean {
-        if (!(error instanceof ApiError)) return true;
-        return shouldRetryHttpStatus(error.status);
-    }
+export class SyncManager extends DurableWriter {
+  constructor(private config: { userId: string; token: string; onInkBalance?: (ink: number) => void; onStrokeRejected?: (id: string) => void }) {
+    super({
+      queue: new OfflineQueue(config.userId),
+      save: strokes => apiFetch('/api/drawings', { method: 'POST', headers: { Authorization: `Bearer ${config.token}`, 'X-Map-User': config.userId }, body: JSON.stringify(strokes) }),
+      remove: async id => { try { await apiFetch(`/api/drawings/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${config.token}`, 'X-Map-User': config.userId } }); } catch (error) { if (!(error instanceof ApiError && error.status === 404)) throw error; } },
+      retryable: error => !(error instanceof ApiError) || shouldRetryHttpStatus(error.status),
+      authBlocked: error => error instanceof ApiError && (error.status === 401 || error.status === 403),
+      onInk: config.onInkBalance,
+      onRejected: config.onStrokeRejected,
+    });
+  }
+  broadcastStroke(stroke: StrokeData): Promise<void> { return this.enqueue({ type: 'STROKE_ADD', stroke }); }
+  broadcastDelete(strokeId: string): Promise<void> { return this.enqueue({ type: 'STROKE_DELETE', strokeId, userId: this.config.userId }); }
 }

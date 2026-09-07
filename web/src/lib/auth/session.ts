@@ -37,6 +37,8 @@ export async function validateSession(request?: Request) {
     if (!session) {
       return null;
     }
+    const expectedUser = request?.headers.get('x-map-user');
+    if (expectedUser && expectedUser !== user.id) return null;
 
     return { session, user };
   } catch (e) {

@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
 import { verifyUserCredentialsEdge } from '@/lib/auth/service';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 
 
 export async function POST(request: Request) {
     try {
         console.log('[DEBUG] Starting mobile login API');
         const body = await request.json() as { email?: string; password?: string };
-        const { email, password } = body;
+        const email = body.email?.trim().toLowerCase();
+        const password = body.password;
 
         if (!email || !password) {
             console.log('[DEBUG] Missing credentials');
@@ -17,6 +19,7 @@ export async function POST(request: Request) {
 
         console.log('[DEBUG] Getting Cloudflare Context');
         const { env } = getCloudflareContext();
+        if (!await allowAuthAttempt('login', email, request)) return NextResponse.json({ error: 'Please try again shortly' }, { status: 429 });
 
         console.log('[DEBUG] Verifying credentials via service');
         const user = await verifyUserCredentialsEdge(email, password, env);

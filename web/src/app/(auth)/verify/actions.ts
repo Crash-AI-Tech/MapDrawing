@@ -8,6 +8,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { createLucia } from '@/lib/auth/lucia';
 import { cookies } from 'next/headers';
 import { generateId } from 'lucia';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 import {
   generateVerificationCode,
   sendVerificationEmail,
@@ -38,27 +39,9 @@ export async function verifyEmail(
 
   try {
     const { env } = getCloudflareContext();
-    const attemptOwner = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
-      .bind(email)
-      .first<{ id: string }>();
-    if (!attemptOwner) return { error: '验证码错误' };
-
-    // Rate limit: max 5 verify attempts per email per 15 minutes
-    const attemptWindow = Date.now() - 15 * 60 * 1000;
-    const attempts = await env.DB.prepare(
-      `SELECT COUNT(*) as cnt FROM verification_codes
-       WHERE email = ? AND type = 'verify_attempt' AND expires_at > ?`
-    ).bind(email, attemptWindow).first<{ cnt: number }>();
-
-    if (attempts && attempts.cnt >= 5) {
+    if (!await allowAuthAttempt('verify', email)) {
       return { error: '尝试次数过多，请等待 15 分钟后重试' };
     }
-
-    // Record this attempt
-    await env.DB.prepare(
-      `INSERT INTO verification_codes (id, user_id, email, code, type, expires_at)
-       VALUES (?, ?, ?, '', 'verify_attempt', ?)`
-    ).bind(generateId(15), attemptOwner.id, email, Date.now() + 15 * 60 * 1000).run();
 
     // 查找有效验证码
     const record = await env.DB.prepare(
@@ -125,6 +108,7 @@ export async function resendVerificationCode(
 
   try {
     const { env } = getCloudflareContext();
+    if (!await allowAuthAttempt('email', email)) return { error: '请求过多，请稍后重试' };
 
     const user = await env.DB.prepare(
       'SELECT id FROM users WHERE email = ? AND email_verified = 0'

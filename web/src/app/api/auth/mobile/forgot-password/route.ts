@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { allowAuthAttempt } from '@/lib/auth/throttle';
 function generateId(length: number): string {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const arr = new Uint8Array(length);
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
         }
 
         const { env } = getCloudflareContext();
+        if (!await allowAuthAttempt('email', email, request)) return NextResponse.json({ error: 'Please try again shortly' }, { status: 429 });
 
         const user = await env.DB.prepare(
             'SELECT id FROM users WHERE email = ?'

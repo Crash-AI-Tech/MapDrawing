@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Mail, Lock, ArrowRight } from 'lucide-react';
 import type { Lang } from '@/lib/i18n';
+import { trackEvent } from '@/lib/analytics';
 
 interface RegisterFormProps {
   lang: Lang;
@@ -56,6 +57,7 @@ export default function RegisterForm({
 }: RegisterFormProps) {
   const [state, formAction, isPending] = useActionState<RegisterState | null, FormData>(register, null);
   const d = t[lang];
+  useEffect(() => trackEvent('signup_start'), []);
 
   // 注册成功后跳转到验证步骤
   useEffect(() => {

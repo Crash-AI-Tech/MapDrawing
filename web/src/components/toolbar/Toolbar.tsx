@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useI18n } from '@/lib/i18n';
-import { useEffect, useRef, useState } from 'react';
+import { trackEvent } from '@/lib/analytics';
 
 type ToolMode = 'hand' | 'draw' | 'pin';
 
@@ -62,23 +62,11 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   const placingPin = usePinStore((s) => s.placingPin);
   const setPlacingPin = usePinStore((s) => s.setPlacingPin);
   const currentZoom = useUIStore((s) => s.currentZoom);
-  const [zoomTooltip, setZoomTooltip] = useState<string | null>(null);
-  const zoomTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derive current tool mode
   const currentMode: ToolMode = placingPin ? 'pin' : drawingMode ? 'draw' : 'hand';
   const isEraser = activeBrushId === BRUSH_IDS.ERASER;
 
-  /** Show a temporary tooltip */
-  const flashTooltip = (msg: string) => {
-    if (zoomTooltipTimerRef.current) clearTimeout(zoomTooltipTimerRef.current);
-    setZoomTooltip(msg);
-    zoomTooltipTimerRef.current = setTimeout(() => setZoomTooltip(null), 3000);
-  };
-
-  useEffect(() => () => {
-    if (zoomTooltipTimerRef.current) clearTimeout(zoomTooltipTimerRef.current);
-  }, []);
 
   /** Gate an action behind auth */
   const requireAuth = (action: () => void) => {
@@ -91,14 +79,14 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
 
   /** Switch to a tool mode — the three modes are mutually exclusive */
   const switchMode = (mode: ToolMode) => {
+    if (mode !== 'hand') trackEvent('tool_try');
     if (mode === 'hand') {
       setDrawingMode(false);
       setPlacingPin(false);
     } else if (mode === 'draw') {
-      requireAuth(() => {
+      {
         if (currentZoom < MIN_DRAW_ZOOM) {
-          flashTooltip(t('zoomDrawHint', { zoom: MIN_DRAW_ZOOM, current: Math.floor(currentZoom) }));
-          return;
+          window.dispatchEvent(new CustomEvent('map:zoom-to', { detail: MIN_DRAW_ZOOM }));
         }
         // If already in draw mode, toggle pencil ↔ eraser
         if (currentMode === 'draw') {
@@ -109,12 +97,11 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
         }
         setDrawingMode(true);
         setPlacingPin(false);
-      });
+      }
     } else if (mode === 'pin') {
       requireAuth(() => {
         if (currentZoom < MIN_PIN_ZOOM) {
-          flashTooltip(t('zoomPinHint', { zoom: MIN_PIN_ZOOM, current: Math.floor(currentZoom) }));
-          return;
+          window.dispatchEvent(new CustomEvent('map:zoom-to', { detail: MIN_PIN_ZOOM }));
         }
         setDrawingMode(false);
         setPlacingPin(true);
@@ -125,13 +112,6 @@ export default function Toolbar({ onAuthRequired }: ToolbarProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
-        {/* Zoom tooltip */}
-        {zoomTooltip && (
-          <div className="absolute bottom-full z-50 mb-2 whitespace-nowrap rounded-full bg-yellow-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
-            {zoomTooltip}
-          </div>
-        )}
-
         {/* Ink is a separate floating status above the dock on both platforms. */}
         <InkBar />
 

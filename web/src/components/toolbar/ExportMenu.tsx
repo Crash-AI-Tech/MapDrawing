@@ -17,6 +17,8 @@ import {
   generateExportFilename,
 } from '@/lib/exportCanvas';
 import { useI18n } from '@/lib/i18n';
+import { useUIStore } from '@/stores/uiStore';
+import { mapLocationQuery } from '@niubi/shared';
 
 /**
  * ExportMenu — dropdown to export the current map+drawing view.
@@ -91,6 +93,8 @@ export default function ExportMenu({ variant = 'icon' }: ExportMenuProps) {
 
       const formData = new FormData();
       formData.append('file', blob, generateExportFilename('png'));
+      const location = useUIStore.getState().mapLocation;
+      if (location) formData.append('location', mapLocationQuery(location));
 
       const res = await fetch('/api/share', {
         method: 'POST',

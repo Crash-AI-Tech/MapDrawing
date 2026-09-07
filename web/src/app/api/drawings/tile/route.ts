@@ -36,10 +36,29 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { env } = getCloudflareContext();
+    const { env, ctx } = getCloudflareContext();
     const database = env.DB.withSession();
+    const version = await database.prepare('SELECT revision FROM tile_versions WHERE z = ? AND x = ? AND y = ?')
+      .bind(z, x, y).first<{ revision: number }>();
+    const revision = version?.revision ?? 0;
+    const etag = `W/"tile-v3-${z}-${x}-${y}-${revision}-${requestedLimit}-${cursorCreatedAt ?? 0}-${encodeURIComponent(cursorId ?? '')}"`;
+    const cacheHeaders = { ETag: etag, 'Cache-Control': 'public, max-age=0, must-revalidate' };
+    // Validate the cheap tile version before reading/decoding full point data.
+    if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: cacheHeaders });
+    const cache = typeof caches === 'undefined' ? undefined : (caches as unknown as { default?: Cache }).default;
+    const cacheUrl = new URL(request.url);
+    cacheUrl.searchParams.set('_revision', String(revision));
+    cacheUrl.searchParams.set('_schema', '3');
+    const cacheKey = new Request(cacheUrl.toString());
+    const cached = await cache?.match(cacheKey);
+    if (cached) {
+      const response = new Response(cached.body, cached);
+      response.headers.set('Cache-Control', cacheHeaders['Cache-Control']);
+      response.headers.set('X-Map-Cache', 'HIT');
+      return response;
+    }
     const pageSize = requestedLimit + 1;
-    let sql = `SELECT d.*
+    let sql = `SELECT d.id, d.created_at_ms, length(d.points) AS point_bytes
       FROM drawing_tiles dt
       JOIN drawings d ON d.id = dt.drawing_id
       WHERE dt.z = ?1 AND dt.x = ?2 AND dt.y = ?3`;
@@ -60,10 +79,19 @@ export async function GET(request: Request) {
 
     const result = await database.prepare(sql)
       .bind(...bindings)
-      .all<DrawingRow>();
+      .all<{ id: string; created_at_ms: number; point_bytes: number }>();
     const allRows = result.results ?? [];
-    const hasMore = allRows.length > requestedLimit;
-    const rows = hasMore ? allRows.slice(0, requestedLimit) : allRows;
+    const selected: string[] = [];
+    let bytes = 0;
+    for (const row of allRows.slice(0, requestedLimit)) {
+      if (selected.length && bytes + row.point_bytes > 512_000) break;
+      selected.push(row.id); bytes += row.point_bytes;
+    }
+    const hasMore = allRows.length > selected.length;
+    // Read point bodies only after applying a byte budget, not 500 huge strokes.
+    const rows = selected.length ? (await database.prepare(
+      `SELECT * FROM drawings WHERE id IN (${selected.map(() => '?').join(',')}) ORDER BY created_at_ms DESC, id DESC`
+    ).bind(...selected).all<DrawingRow>()).results ?? [] : [];
 
     const items = rows.map((row) => ({
       id: row.id,
@@ -92,29 +120,22 @@ export async function GET(request: Request) {
         }
       : null;
 
-    const firstId = rows[0]?.id ?? 'empty';
-    const lastId = last?.id ?? 'empty';
-    const etag = `W/"tile-${z}-${x}-${y}-${firstId}-${lastId}-${rows.length}"`;
-    if (request.headers.get('if-none-match') === etag) {
-      return new Response(null, {
-        status: 304,
-        headers: {
-          ETag: etag,
-          'x-d1-bookmark': database.getBookmark() ?? '',
-        },
-      });
-    }
-
-    return Response.json(
+    const response = Response.json(
       { items, nextCursor },
       {
         headers: {
-          ETag: etag,
+          ...cacheHeaders,
           'x-d1-bookmark': database.getBookmark() ?? '',
-          'Cache-Control': 'public, max-age=15, s-maxage=30, stale-while-revalidate=120',
+          'X-Map-Cache': 'MISS',
         },
       },
     );
+    if (cache) {
+      const stored = response.clone();
+      stored.headers.set('Cache-Control', 'public, max-age=86400');
+      ctx.waitUntil(cache.put(cacheKey, stored).catch(() => undefined));
+    }
+    return response;
   } catch (error) {
     console.error('[API /drawings/tile GET]:', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
