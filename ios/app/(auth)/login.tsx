@@ -142,6 +142,7 @@ export default function Login() {
                             textAlign="center"
                         />
                         <TouchableOpacity
+                            accessibilityRole="button"
                             style={[styles.button, loading && styles.buttonDisabled]}
                             onPress={handleVerify}
                             disabled={loading}
@@ -150,7 +151,7 @@ export default function Login() {
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity onPress={() => setStep('login')}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => setStep('login')}>
                         <Text style={styles.link}>{ts('backToLogin', lang)}</Text>
                     </TouchableOpacity>
                 </ScrollView>
@@ -169,6 +170,7 @@ export default function Login() {
                     <TextInput
                         style={styles.input}
                         placeholder={ts('email', lang)}
+                        accessibilityLabel={ts('email', lang)}
                         placeholderTextColor="#999"
                         value={email}
                         onChangeText={setEmail}
@@ -178,12 +180,14 @@ export default function Login() {
                     <TextInput
                         style={styles.input}
                         placeholder={ts('password', lang)}
+                        accessibilityLabel={ts('password', lang)}
                         placeholderTextColor="#999"
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry
                     />
                     <TouchableOpacity
+                        accessibilityRole="button"
                         style={[styles.button, loading && styles.buttonDisabled]}
                         onPress={handleEmailSignIn}
                         disabled={loading}
@@ -192,7 +196,7 @@ export default function Login() {
                     </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/(auth)/forgot-password')}>
                     <Text style={styles.link}>{ts('forgotPassword', lang)}</Text>
                 </TouchableOpacity>
 
@@ -210,13 +214,13 @@ export default function Login() {
                     onPress={handleAppleSignIn}
                 />
 
-                <TouchableOpacity style={styles.registerLink} onPress={() => router.push('/(auth)/register')}>
+                <TouchableOpacity accessibilityRole="button" style={styles.registerLink} onPress={() => router.push('/(auth)/register')}>
                     <Text style={styles.registerText}>
                         {ts('noAccount', lang)}<Text style={styles.registerHighlight}>{ts('signUp', lang)}</Text>
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.skipLink} onPress={() => router.replace('/')}>
+                <TouchableOpacity accessibilityRole="button" style={styles.skipLink} onPress={() => router.dismissTo('/')}>
                     <Text style={styles.skipText}>{ts('continueAsGuest', lang)}</Text>
                 </TouchableOpacity>
             </ScrollView>

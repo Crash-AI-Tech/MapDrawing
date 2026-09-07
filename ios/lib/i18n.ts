@@ -162,6 +162,7 @@ export const translations = {
   verify: { zh: '验证', en: 'Verify', ja: '確認' },
   verificationFailed: { zh: '验证失败', en: 'Verification Failed', ja: '確認に失敗しました' },
   invalidCode: { zh: '验证码无效', en: 'Invalid code', ja: '無効なコード' },
+  back: { zh: '返回', en: 'Back', ja: '戻る' },
   backToLogin: { zh: '返回登录', en: 'Back to Login', ja: 'ログインに戻る' },
 
   // ===== Register =====

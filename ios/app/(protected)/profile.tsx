@@ -181,7 +181,7 @@ export default function ProfileScreen() {
         <View style={styles.container}>
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
                 <View style={styles.navBar}>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={ts('back', lang)} style={styles.backButton} onPress={() => router.back()}>
                         <Ionicons name="chevron-back" size={24} color="#000" />
                     </TouchableOpacity>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#000' }}>
@@ -223,6 +223,8 @@ export default function ProfileScreen() {
                     <View style={styles.menuGroup}>
                         {menuItems.map((item, index) => (
                             <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel={item.title}
                                 key={item.title}
                                 style={[styles.menuItem, index < menuItems.length - 1 && styles.borderBottom]}
                                 onPress={item.onPress}
@@ -244,11 +246,12 @@ export default function ProfileScreen() {
                     </View>
 
                     <View style={styles.footerActions}>
-                        <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+                        <TouchableOpacity accessibilityRole="button" style={styles.logoutButton} onPress={signOut}>
                             <Text style={styles.logoutText}>{ts('logOut', lang)}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
+                            accessibilityRole="button"
                             style={styles.deleteButton}
                             onPress={handleDeleteAccount}
                             disabled={isDeleting}
