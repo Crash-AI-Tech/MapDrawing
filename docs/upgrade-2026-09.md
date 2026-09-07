@@ -17,7 +17,10 @@ Preserve the playful yellow landing page, shared pencil/eraser protocol and exis
 - [x] Share a map location, not just a generic canvas; simplify technical landing copy without replacing its visual identity.
 - [x] Verify shared contracts, database migrations, Web/iOS types and staging API smoke tests.
 - [ ] Verify Web and native iOS visual interaction, native build and production release gates.
-- [ ] Commit/push main, deploy production Web/backend, build/submit iOS 1.3.0 and record exact release status.
+- [x] Commit/push implementation to main (`b78cca1`).
+- [x] Deploy the updated Web/backend to the single staging environment and rerun API smoke tests.
+- [x] Queue iOS 1.3.0 build 29 through the normal EAS build workflow (no automatic submission).
+- [ ] Deploy production Web/backend after acceptance, complete native build validation, submit iOS and record exact App Store/TestFlight status.
 
 ## Validation gates
 
@@ -38,9 +41,11 @@ Recruit 20 non-team participants around one place/activity. Track successful fir
 - Production Web/OpenNext build passed. Initial sandbox build failed because Turbopack could not bind its compiler port; approved non-sandbox build succeeded.
 - Staging D1 migrations 0002/0003 applied successfully, preserving existing data.
 - Initial staging release `c379b098-f7e9-4d9d-ba08-6bc8c0bae0d2` passed authenticated API smoke tests: batched writes, partial duplicate retry, identity guard, ETag invalidation after deletion, pin clusters/raw pins, counters and account-linked statistics cleanup. The exact temporary account/content were removed afterward.
+- Final staging release `915c53cd-8a70-4653-8917-48c3f218502c` also passed the expanded smoke test, including the sixth verification attempt returning 429. URL: https://map-staging.privacy2privacy.workers.dev . R2 upload retries succeeded with `opennextjs-cloudflare deploy --config wrangler.staging.toml --cacheChunkSize 2`.
 - Browser control fails with a missing bundled `browser-service.mjs`; retry/reset did not fix it. Computer Use also reports native pipe startup failure. Alternative Playwright permission requested before visual testing.
 - iOS simulator skill requires permission to boot an unstarted simulator; all simulators were shutdown. Boot/test permission requested.
 - Expo token authentication succeeds; existing production iOS credentials/build history are reachable.
+- EAS build `1d2a90e2-ef9c-4c76-8e97-a173060e7ce0` was accepted for 1.3.0/build 29, using production API configuration and the existing managed signing credentials. Build status: https://expo.dev/accounts/nsaviour/projects/ios/builds/1d2a90e2-ef9c-4c76-8e97-a173060e7ce0 . No TestFlight upload or review submission has been requested yet.
 - The desktop Apple API key returned HTTP 401. Reading private key material from Expo was refused by the safety approval layer; no alternate extraction was attempted. App Store metadata/privacy/review operations remain gated on valid authorized credentials or a working signed-in browser.
 
 ### Known limits
