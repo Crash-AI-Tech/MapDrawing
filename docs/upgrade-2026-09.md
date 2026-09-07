@@ -16,12 +16,13 @@ Preserve the playful yellow landing page, shared pencil/eraser protocol and exis
 - [x] Improve first creation: guided zoom, useful entry points, localized save states and consistent controls.
 - [x] Share a map location, not just a generic canvas; simplify technical landing copy without replacing its visual identity.
 - [x] Verify shared contracts, database migrations, Web/iOS types and staging API smoke tests.
-- [ ] Verify Web and native iOS visual interaction, native build and production release gates.
+- [x] Verify Web and native iOS visual interaction and native builds on staging.
 - [x] Commit/push implementation to main (`b78cca1`).
 - [x] Deploy the updated Web/backend to the single staging environment and rerun API smoke tests.
 - [x] Queue iOS 1.3.0 build 29 through the normal EAS build workflow (no automatic submission).
 - [x] Deploy production Web/backend after acceptance and verify preserved data and read-only production smoke checks.
-- [ ] Complete final native login/save validation, submit iOS and record exact App Store/TestFlight status.
+- [x] Complete final native login/save validation and upload iOS to App Store Connect.
+- [x] Confirm TestFlight internal availability and submit the 1.3.0 App Store review (approval pending).
 
 ## Validation gates
 
@@ -76,7 +77,12 @@ Run `wrangler d1 execute map-db-v2 --remote --config web/wrangler.toml --file sc
 - Final production read-only checks: homepage, canvas, English terms, Chinese privacy, robots.txt, sitemap.xml and tile API all HTTP 200; tile conditional request HTTP 304; Playwright canvas has zero uncaught errors. Final database counts remain 13 accounts / 78 drawings / 9 pins.
 - Simulator build `0f48032a-81a8-4876-8d76-768a241aea9b` passed cold launch, safe-area layout, guest drawing, undo/redo and opening the native sharing sheet. For AXe gesture tests use a small sampling delta (10) and duration 2 seconds; coarse deltas can generate too few points for a stroke.
 - Added accessible button roles to login/profile and localized field/back labels; cancelling login now returns to the existing practice canvas. Final iOS source revision: `8eebc3f`. Simulator build `0ae4d5ee-663e-416f-95e5-f1de23d7b70a`; production 1.3.0/build 33: `d15f2f31-b5be-4748-90e2-489ce2d6d5be`. Earlier production builds 29/31 are superseded. Requests 30/32 failed before build creation; build numbers were not reset.
-- App Store privacy: added account-linked product interaction for analytics, without tracking. User ID analytics purpose also updated. Existing 1.2.0/build 28 is waiting for developer release; do not mistake it for this upgrade.
+- Final simulator acceptance: guest drawing at zoom 18, cancelling login without losing practice, login retaining the original canvas, explicit publication, authenticated drawing, persisted undo/redo (D1 counts 2 → 1 → 2), relaunch retaining authentication and profile count 2. Account deletion through the native confirmation dialog removed the exact test account and both drawings; D1 subsequently confirmed zero accounts/content for that fixture. iPad Pro 13-inch and iPhone 17 Pro Max also passed launch/layout and guest drawing checks.
+- App Store privacy: added account-linked product interaction for analytics, without tracking. User ID analytics purpose also updated. Cancelled the unreleased 1.2.0/build 28 entry and changed the editable draft to 1.3.0; existing live 1.1.0 remains available. Updated English (US/UK) and Simplified Chinese descriptions/release notes and configured automatic release after approval.
+- EAS production build 33 finished. Upload submission `3708a824-bea5-4a9e-b0b2-e8beefa98ce9` reports `FINISHED`. This confirms upload, not App Store approval or TestFlight processing completion. EAS rejected the optional changelog parameter as Enterprise-only; normal submission without it succeeded, with testing notes to be entered in App Store Connect.
+- App Store Connect subsequently reports build 33 processing complete, linked to the existing internal group Dev (avatar initials DE), with two invitations. Captured unmodified 1.3 screenshots on iPhone 17 Pro Max (1320×2868) and iPad Pro 13-inch (2064×2752); uploaded the new guide/drawing views and removed the old February screenshots from the editable 1.3 draft. Existing live release was not changed.
+- Final App Store status at September 8, approximately 02:30 CST: **1.3.0 / build 33 — Waiting for Review**. Apple confirms one submitted item; automatic release after approval is selected. TestFlight build detail confirms the Dev internal group with two testers; bilingual test instructions were saved. Existing review credentials were verified via the normal production mobile login endpoint (HTTP 200), without changing that account or creating content.
+- Updated screenshot sets for English (US), Simplified Chinese and English (UK), including old Chinese 6.3-inch overrides; inherited smaller-device screenshots use the new 6.9-inch set. App Store approval and physical-device/Apple Sign-In testing are not claimed complete. The simulator profile continues to use staging; the submitted production/TestFlight build uses https://map.wisebamboo.fun.
 
 ### Rollback
 
