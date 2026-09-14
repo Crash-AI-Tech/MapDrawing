@@ -30,7 +30,7 @@ import {
 import {
   BRUSH_IDS,
   STROKE_HIDE_ZOOM_DIFF,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 
 // ========================
 // Constants

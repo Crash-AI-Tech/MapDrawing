@@ -1,8 +1,8 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
-import { parseMapLocation, mapLocationQuery } from '@niubi/shared';
+import { parseMapLocation, mapLocationQuery } from '@mapdrawing/contracts';
+import { findStoredShare } from '@mapdrawing/server/storage/shares';
 
 // UUID v4 pattern
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,24 +17,16 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
 
   if (!UUID_RE.test(id)) notFound();
 
-  const { env } = getCloudflareContext();
   const hdrs = await headers();
   const acceptLang = hdrs.get('accept-language') ?? '';
   const lang = acceptLang.startsWith('zh') ? 'zh' : 'en';
   const d = t[lang];
 
-  // Try PNG first, then JPG
-  let obj = await env.BUCKET.get(`shares/${id}.png`);
-  let contentType = 'image/png';
-  if (!obj) {
-    obj = await env.BUCKET.get(`shares/${id}.jpg`);
-    contentType = 'image/jpeg';
-  }
-  if (!obj) notFound();
+  const share = await findStoredShare(id);
+  if (!share) notFound();
 
-  const ext = contentType === 'image/jpeg' ? 'jpg' : 'png';
-  const imageUrl = `/api/files/shares/${id}.${ext}`;
-  const location = parseMapLocation(new URLSearchParams(obj.customMetadata?.location ?? ''));
+  const imageUrl = `/api/files/shares/${id}.${share.extension}`;
+  const location = parseMapLocation(new URLSearchParams(share.location ?? ''));
   const canvasUrl = location ? `/canvas?${mapLocationQuery(location)}&via=shared` : '/canvas?via=shared';
 
   return (

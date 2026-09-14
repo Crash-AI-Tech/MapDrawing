@@ -3,7 +3,7 @@ import {
   parseOfflineQueue,
   OFFLINE_QUEUE_VERSION,
   type OfflineQueueItem,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 import { get, set, del } from 'idb-keyval';
 
 const STORE_PREFIX = 'map_offline_v2_';

@@ -1,4 +1,5 @@
 packages:
   - 'web'
   - 'ios'
-  - 'packages/*'
+  - 'server'
+  - 'server/packages/*'

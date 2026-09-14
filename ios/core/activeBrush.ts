@@ -1,4 +1,4 @@
-import { BRUSH_IDS } from '@niubi/shared';
+import { BRUSH_IDS } from '@mapdrawing/contracts';
 
 export type SkStrokeCap = 'butt' | 'round' | 'square';
 export type SkStrokeJoin = 'bevel' | 'miter' | 'round';

@@ -26,7 +26,7 @@ import {
   type BlockedUser,
   type BlockedUsersResponse,
   type UserProfileStats,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 
 /** Resolve avatar URL — prefix with /api/files for R2-stored paths */
 function resolveAvatarUrl(url: string | null | undefined): string | null {

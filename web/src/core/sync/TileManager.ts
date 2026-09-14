@@ -1,4 +1,4 @@
-import { ViewportTileLoader, type TilePage } from '@niubi/shared';
+import { ViewportTileLoader, type TilePage } from '@mapdrawing/contracts';
 
 export class TileManager extends ViewportTileLoader {
   constructor(config: { apiBaseUrl: string; zoomLevel?: number; cacheExpiration?: number }) {

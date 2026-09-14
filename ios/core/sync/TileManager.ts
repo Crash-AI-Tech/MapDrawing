@@ -1,4 +1,4 @@
-import { ViewportTileLoader } from '@niubi/shared';
+import { ViewportTileLoader } from '@mapdrawing/contracts';
 import { fetchDrawingTile } from '../../lib/api';
 
 export class TileManager extends ViewportTileLoader {

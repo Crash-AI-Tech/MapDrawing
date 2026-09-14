@@ -16,8 +16,8 @@ import type {
   SaveDrawingsResponse,
   TilePage,
   UserProfileStats,
-} from '@niubi/shared';
-export type { BlockedUser, PageCursor, UserProfileStats } from '@niubi/shared';
+} from '@mapdrawing/contracts';
+export type { BlockedUser, PageCursor, UserProfileStats } from '@mapdrawing/contracts';
 
 // ========================
 // Generic fetch wrapper

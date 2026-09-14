@@ -1,7 +1,7 @@
 import type { GeoBounds } from './stroke';
 
 // Re-export shared tile utilities
-export { getTileKey, latLngToTile, tileToBounds, tilesForBounds } from '@niubi/shared';
+export { getTileKey, latLngToTile, tileToBounds, tilesForBounds } from '@mapdrawing/contracts';
 
 /** Viewport state — represents what the user currently sees */
 export interface ViewState {

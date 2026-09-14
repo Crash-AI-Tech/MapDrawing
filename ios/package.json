@@ -4,12 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "start:staging": "EXPO_PUBLIC_API_ENV=staging expo start",
-    "start:production": "EXPO_PUBLIC_API_ENV=production expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "ios:staging": "EXPO_PUBLIC_API_ENV=staging expo run:ios",
-    "ios:production": "EXPO_PUBLIC_API_ENV=production expo run:ios",
     "web": "expo start --web",
     "lint": "EXPO_NO_TELEMETRY=1 expo lint",
     "type-check": "tsc --noEmit"
@@ -17,7 +13,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@maplibre/maplibre-react-native": "^10.4.2",
-    "@niubi/shared": "workspace:^",
+    "@mapdrawing/contracts": "workspace:^",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/slider": "5.0.1",
     "@react-navigation/bottom-tabs": "^7.4.0",

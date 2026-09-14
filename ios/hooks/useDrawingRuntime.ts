@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { MAX_INK, MAX_UNDO_STACK } from '@niubi/shared';
+import { MAX_INK, MAX_UNDO_STACK } from '@mapdrawing/contracts';
 import { HistoryManager, InkManager, TileRenderer } from '@/core';
 
 /** Lifecycle owner for the mutable drawing engine objects. */

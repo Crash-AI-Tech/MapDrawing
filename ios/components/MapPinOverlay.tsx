@@ -9,7 +9,7 @@ import {
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { Compliance } from '@/utils/compliance';
 import { getCurrentLang, tf, ts } from '@/lib/i18n';
-import { getPinVisibilityMode, MIN_VISIBLE_PIN_CLUSTER_COUNT } from '@niubi/shared';
+import { getPinVisibilityMode, MIN_VISIBLE_PIN_CLUSTER_COUNT } from '@mapdrawing/contracts';
 
 export interface PinData {
   id: string;

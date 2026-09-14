@@ -2,7 +2,7 @@
 // Drawing Tool Constants (Shared)
 // ========================
 
-export * from '@niubi/shared';
+export * from '@mapdrawing/contracts';
 
 // ========================
 // Environment Specific Constants

@@ -4,7 +4,7 @@ import {
     parseOfflineQueue,
     OFFLINE_QUEUE_VERSION,
     type OfflineQueueItem,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 
 const QUEUE_KEY_PREFIX = 'offline_queue_v2';
 

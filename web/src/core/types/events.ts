@@ -7,7 +7,7 @@ export type {
   CursorMoveEvent,
   SyncMessage,
   SyncState,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 
 /** Role in the drawing room */
 export type UserRole = 'drawer' | 'observer' | 'queued';

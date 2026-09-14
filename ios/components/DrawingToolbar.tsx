@@ -24,7 +24,7 @@ import {
   PanResponder,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { INK_REGEN_INTERVAL_SECONDS } from '@niubi/shared';
+import { INK_REGEN_INTERVAL_SECONDS } from '@mapdrawing/contracts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Feather,
@@ -38,7 +38,7 @@ import {
   MAX_BRUSH_SIZE,
   MIN_OPACITY,
   OPACITY_STEP,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLang, ts } from '@/lib/i18n';
 import { PlatformGlassView } from '@/components/ui/PlatformGlassView';

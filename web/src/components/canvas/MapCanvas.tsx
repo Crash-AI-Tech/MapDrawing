@@ -33,7 +33,7 @@ import { getI18nText, useI18n } from '@/lib/i18n';
 import { usePresence } from '@/hooks/usePresence';
 import { CursorOverlay } from '@/components/canvas/CursorOverlay';
 import { eraserToolCursor } from '@/platform/web/toolCursors';
-import { parseMapLocation, type PageCursor } from '@niubi/shared';
+import { parseMapLocation, type PageCursor } from '@mapdrawing/contracts';
 
 /** Generate an SVG pin cursor data URI — small size (14x20) */
 function pinCursorSvg(color: string): string {

@@ -19,7 +19,7 @@ import {
   calculateInkSegmentCost,
   clampInk,
   regenerateInk,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 
 const INK_STORAGE_KEY = 'niubi-ink-state';
 

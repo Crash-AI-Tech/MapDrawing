@@ -1,4 +1,4 @@
-import { DurableWriter, shouldRetryHttpStatus, type SyncState } from '@niubi/shared';
+import { DurableWriter, shouldRetryHttpStatus, type SyncState } from '@mapdrawing/contracts';
 import { OfflineQueue } from './OfflineQueue';
 import type { DrawingEngine } from '../engine/DrawingEngine';
 

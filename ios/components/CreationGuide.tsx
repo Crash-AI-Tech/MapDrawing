@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { journeyText, type AppLanguage, type SyncState } from '@niubi/shared';
+import { journeyText, type AppLanguage, type SyncState } from '@mapdrawing/contracts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlatformGlassView } from './ui/PlatformGlassView';
 

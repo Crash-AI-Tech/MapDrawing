@@ -5,11 +5,13 @@ import path from 'node:path';
 // @opennextjs/cloudflare 开发环境本地绑定模拟
 import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
 
-if (process.env.NODE_ENV === 'development') {
-  initOpenNextCloudflareForDev();
-}
-
 const projectRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+
+if (process.env.NODE_ENV === 'development') {
+  initOpenNextCloudflareForDev({
+    configPath: path.join(projectRoot, 'server/cloudflare/wrangler.toml'),
+  });
+}
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -20,8 +22,8 @@ const nextConfig: NextConfig = {
     root: projectRoot,
   },
 
-  // Transpile shared packages
-  transpilePackages: ['@niubi/shared'],
+  // Compile the repository-owned packages together with the Next.js app.
+  transpilePackages: ['@mapdrawing/contracts', '@mapdrawing/server'],
 
   images: {
     // R2 自定义域名 (生产环境替换)

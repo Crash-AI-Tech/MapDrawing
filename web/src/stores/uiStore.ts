@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { SyncState } from '@/core/types';
-import type { MapLocation } from '@niubi/shared';
+import type { MapLocation } from '@mapdrawing/contracts';
 
 interface UIState {
   /** Whether the toolbar panel is expanded */

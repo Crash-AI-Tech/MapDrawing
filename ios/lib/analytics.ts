@@ -1,4 +1,4 @@
-import type { ProductEvent } from '@niubi/shared';
+import type { ProductEvent } from '@mapdrawing/contracts';
 import { apiFetch } from './api';
 const sent = new Set<string>();
 export function trackEvent(event: ProductEvent, identity = 'guest'): void {

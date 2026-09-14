@@ -1,25 +1,20 @@
 {
-    "name": "niubiagent-monorepo",
+    "name": "mapdrawing-monorepo",
     "private": true,
     "scripts": {
         "dev": "pnpm --filter web dev",
         "build": "pnpm --filter web build",
         "deploy": "pnpm --filter web deploy",
-        "type-check": "pnpm --filter @niubi/shared type-check && pnpm --filter web type-check && pnpm --filter ios type-check",
+        "type-check": "pnpm --filter @mapdrawing/contracts type-check && pnpm --filter @mapdrawing/server type-check && pnpm --filter web type-check && pnpm --filter ios type-check",
         "lint": "pnpm --filter web lint && pnpm --filter ios lint",
-        "db:check": "sh scripts/check-migrations.sh",
-        "db:migrate:v2": "node scripts/migrate-d1-v2.mjs",
-        "test": "pnpm --filter @niubi/shared test",
-        "check": "pnpm db:check && pnpm test && pnpm type-check && pnpm lint"
+        "boundaries:check": "node server/scripts/check-boundaries.mjs",
+        "db:check": "sh server/scripts/check-migrations.sh",
+        "db:migrate": "pnpm --filter @mapdrawing/server db:migrate:local",
+        "test": "pnpm --filter @mapdrawing/contracts test",
+        "check": "pnpm boundaries:check && pnpm db:check && pnpm test && pnpm type-check && pnpm lint"
     },
     "packageManager": "pnpm@9.0.0",
     "engines": {
         "node": ">=20.9 <25"
-    },
-    "dependencies": {
-        "drizzle-orm": "^0.38.0"
-    },
-    "devDependencies": {
-        "drizzle-kit": "^0.30.0"
     }
 }

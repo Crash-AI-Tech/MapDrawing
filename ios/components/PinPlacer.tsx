@@ -17,7 +17,7 @@ import {
   Platform,
   PanResponder,
 } from 'react-native';
-import { PIN_COLORS, PIN_MAX_MESSAGE_LENGTH, PIN_INK_COST } from '@niubi/shared';
+import { PIN_COLORS, PIN_MAX_MESSAGE_LENGTH, PIN_INK_COST } from '@mapdrawing/contracts';
 import { useLang, ts, tf } from '@/lib/i18n';
 
 // ---------- HSV ↔ Hex helpers ----------

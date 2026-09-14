@@ -18,7 +18,7 @@ import {
 } from '@/lib/exportCanvas';
 import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/uiStore';
-import { mapLocationQuery } from '@niubi/shared';
+import { mapLocationQuery } from '@mapdrawing/contracts';
 
 /**
  * ExportMenu — dropdown to export the current map+drawing view.

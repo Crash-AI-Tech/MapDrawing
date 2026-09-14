@@ -2,7 +2,7 @@
  * Web compliance utilities — Report & Block User.
  * Server-authoritative report and block operations.
  */
-import type { BlockedUsersResponse } from '@niubi/shared';
+import type { BlockedUsersResponse } from '@mapdrawing/contracts';
 import { getI18nText } from '@/lib/i18n';
 
 export const Compliance = {

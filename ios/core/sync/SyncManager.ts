@@ -1,4 +1,4 @@
-import { DurableWriter, shouldRetryHttpStatus, type StrokeData } from '@niubi/shared';
+import { DurableWriter, shouldRetryHttpStatus, type StrokeData } from '@mapdrawing/contracts';
 import { OfflineQueue } from './OfflineQueue';
 import { ApiError, apiFetch } from '../../lib/api';
 

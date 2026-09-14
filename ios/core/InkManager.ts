@@ -13,7 +13,7 @@ import {
   INK_REGEN_INTERVAL_MS,
   calculateInkSegmentCost,
   clampInk,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 
 export class InkManager {
   private ink = MAX_INK;

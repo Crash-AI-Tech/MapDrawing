@@ -1,5 +1,5 @@
 // Re-export shared types as single source of truth
-export type { StrokePoint, GeoBounds, StrokeData } from '@niubi/shared';
+export type { StrokePoint, GeoBounds, StrokeData } from '@mapdrawing/contracts';
 
 /** Brush configuration passed to brush methods */
 export interface BrushConfig {

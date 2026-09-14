@@ -1,4 +1,4 @@
-import type { ProductEvent } from '@niubi/shared';
+import type { ProductEvent } from '@mapdrawing/contracts';
 const sent = new Set<string>();
 export function trackEvent(event: ProductEvent, identity = 'guest'): void {
   if (typeof window === 'undefined' || navigator.doNotTrack === '1') return;

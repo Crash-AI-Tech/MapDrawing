@@ -83,7 +83,7 @@ import {
   MIN_DATA_ZOOM,
   PIN_INK_COST,
   STROKE_HIDE_ZOOM_DIFF,
-} from '@niubi/shared';
+} from '@mapdrawing/contracts';
 import {
   MercatorProjection,
   generateId,

@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { useCallback } from 'react';
-import type { AppLanguage } from '@niubi/shared';
+import type { AppLanguage } from '@mapdrawing/contracts';
 
 export type Lang = AppLanguage;
 

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { ArrowUpRight, Check, Compass, Pencil, Share2, X } from 'lucide-react';
-import { journeyText, mapLocationQuery } from '@niubi/shared';
+import { journeyText, mapLocationQuery } from '@mapdrawing/contracts';
 import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
