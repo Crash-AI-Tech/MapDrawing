@@ -25,7 +25,7 @@ Wrangler emulates D1, R2 and KV locally; Docker is not required.
 ## Production
 
 ```bash
-pnpm deploy
+pnpm deploy:production
 ```
 
 The release guard accepts only Worker `map` bound to D1 `map-db-v2`. Secrets remain in Cloudflare and are never committed.

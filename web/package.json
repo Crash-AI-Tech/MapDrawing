@@ -10,7 +10,7 @@
     "preview": "pnpm cloudflare:build && opennextjs-cloudflare preview --config ../server/cloudflare/wrangler.toml",
     "lint": "eslint .",
     "type-check": "next typegen && tsc --noEmit",
-    "deploy": "node ../server/scripts/assert-production-target.mjs ../server/cloudflare/wrangler.toml && pnpm cloudflare:build && opennextjs-cloudflare deploy --config ../server/cloudflare/wrangler.toml",
+    "deploy:production": "node ../server/scripts/assert-production-target.mjs ../server/cloudflare/wrangler.toml && pnpm cloudflare:build && opennextjs-cloudflare deploy --config ../server/cloudflare/wrangler.toml",
     "upload": "node ../server/scripts/assert-production-target.mjs ../server/cloudflare/wrangler.toml && pnpm cloudflare:build && opennextjs-cloudflare upload --config ../server/cloudflare/wrangler.toml"
   },
   "dependencies": {

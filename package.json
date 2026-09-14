@@ -4,7 +4,7 @@
     "scripts": {
         "dev": "pnpm --filter web dev",
         "build": "pnpm --filter web build",
-        "deploy": "pnpm --filter web deploy",
+        "deploy:production": "pnpm --filter web run deploy:production",
         "type-check": "pnpm --filter @mapdrawing/contracts type-check && pnpm --filter @mapdrawing/server type-check && pnpm --filter web type-check && pnpm --filter ios type-check",
         "lint": "pnpm --filter web lint && pnpm --filter ios lint",
         "boundaries:check": "node server/scripts/check-boundaries.mjs",

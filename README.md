@@ -45,7 +45,7 @@ Without an override, every iOS/EAS profile connects to the sole production servi
 MapDrawing has one Cloudflare environment and one release command:
 
 ```bash
-pnpm deploy
+pnpm deploy:production
 ```
 
 The command builds the OpenNext application and deploys Worker `map` using `server/cloudflare/wrangler.toml`. The Web frontend and service are separate source packages but remain one atomic Worker deployment, preserving same-origin authentication and avoiding CORS or split-release failures.
