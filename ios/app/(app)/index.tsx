@@ -61,7 +61,6 @@ import {
   createPin,
   fetchBlockedUsers,
   type MapPin,
-  type PinCluster,
   type PinItem,
 } from '@/lib/api';
 import { Compliance } from '@/utils/compliance';
@@ -79,7 +78,6 @@ import {
   journeyText, parseMapLocation, mapLocationQuery, type SyncState,
   MIN_DRAW_ZOOM,
   MIN_PIN_ZOOM,
-  MIN_PIN_OVERVIEW_ZOOM,
   MIN_DATA_ZOOM,
   PIN_INK_COST,
   STROKE_HIDE_ZOOM_DIFF,
@@ -419,9 +417,8 @@ export default function MapScreen() {
       if (newStrokesAdded) bumpStrokeVersion();
 
 
-      // --- Load Pins (paginated/clustered) ---
-      // 方案 B: Skip pin fetching when zoomed out too far
-      if (zoom >= MIN_PIN_OVERVIEW_ZOOM) {
+      // --- Load Pins (scheme A: street-level detail only) ---
+      if (zoom >= MIN_PIN_ZOOM) {
         const pinFirstPage = await fetchPins({
           signal: controller.signal,
           minLat: bounds.minLat, maxLat: bounds.maxLat,
@@ -430,86 +427,66 @@ export default function MapScreen() {
         });
 
         if (controller.signal.aborted) return;
-        if (pinFirstPage.mode === 'clustered') {
-          // At low zoom, clustered pins — show cluster markers as pins
-          const clusters = pinFirstPage.items.filter(
-            (item): item is PinCluster => item.type === 'cluster'
-          );
-          setVisiblePins(
-            clusters.map((c) => ({
-              id: c.id,
-              userId: '',
-              userName: '',
-              lng: c.lng,
-              lat: c.lat,
-              message: tf('pinsCount', lang)(c.count),
-              color: '#1d4ed8',
-              createdAt: 0,
-              clusterCount: c.count,
-            }))
-          );
-        } else {
-          let pinCursor = pinFirstPage.nextCursor;
-          let pinPageCount = 1;
-          const rawPins: PinItem[] = pinFirstPage.items.filter(
-            (item): item is PinItem => item.type === 'pin'
-          );
-          while (pinCursor && pinPageCount < PINS_MAX_PAGES) {
-            const nextPage = await fetchPins({
-              signal: controller.signal,
-              minLat: bounds.minLat, maxLat: bounds.maxLat,
-              minLng: bounds.minLng, maxLng: bounds.maxLng,
-              zoom, limit: PINS_PAGE_SIZE, cursor: pinCursor,
-            });
-            if (controller.signal.aborted) return;
-            rawPins.push(
-              ...nextPage.items.filter((i): i is PinItem => i.type === 'pin')
-            );
-            pinCursor = nextPage.nextCursor;
-            pinPageCount += 1;
-          }
-
-          // Display the current snapshot, not old cache entries deleted remotely.
-          pinCacheRef.current.clear();
-          rawPins.filter((pin) => !Compliance.isBlocked(pin.userId)).forEach((pin) => {
-            pinCacheRef.current.set(pin.id, pin);
-            touchPin(pin.id);
+        let pinCursor = pinFirstPage.nextCursor;
+        let pinPageCount = 1;
+        const rawPins: PinItem[] = pinFirstPage.items.filter(
+          (item): item is PinItem => item.type === 'pin'
+        );
+        while (pinCursor && pinPageCount < PINS_MAX_PAGES) {
+          const nextPage = await fetchPins({
+            signal: controller.signal,
+            minLat: bounds.minLat, maxLat: bounds.maxLat,
+            minLng: bounds.minLng, maxLng: bounds.maxLng,
+            zoom, limit: PINS_PAGE_SIZE, cursor: pinCursor,
           });
+          if (controller.signal.aborted) return;
+          rawPins.push(
+            ...nextPage.items.filter((i): i is PinItem => i.type === 'pin')
+          );
+          pinCursor = nextPage.nextCursor;
+          pinPageCount += 1;
+        }
 
-          const filteredPins = Array.from(pinCacheRef.current.values()).filter(
-            (pin) =>
+        // Display the current snapshot, not old cache entries deleted remotely.
+        pinCacheRef.current.clear();
+        rawPins.filter((pin) => !Compliance.isBlocked(pin.userId)).forEach((pin) => {
+          pinCacheRef.current.set(pin.id, pin);
+          touchPin(pin.id);
+        });
+
+        const filteredPins = Array.from(pinCacheRef.current.values()).filter(
+          (pin) =>
+            pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
+            pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
+        );
+
+        setVisiblePins(
+          filteredPins.map((pin) => ({
+            id: pin.id,
+            userId: pin.userId,
+            userName: pin.userName ?? '',
+            lng: pin.lng,
+            lat: pin.lat,
+            message: pin.message ?? '',
+            color: pin.color ?? '#E63946',
+            createdAt: pin.createdAt,
+          }))
+        );
+
+        // Pin LRU Eviction
+        if (pinCacheRef.current.size > PINS_MAX_CACHE) {
+          const pinCandidates = Array.from(pinLruRef.current.entries())
+            .sort((a, b) => a[1] - b[1]);
+          for (const [pinId] of pinCandidates) {
+            if (pinCacheRef.current.size <= PINS_MAX_CACHE) break;
+            const pin = pinCacheRef.current.get(pinId);
+            if (!pin) continue;
+            if (
               pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
               pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
-          );
-
-          setVisiblePins(
-            filteredPins.map((pin) => ({
-              id: pin.id,
-              userId: pin.userId,
-              userName: pin.userName ?? '',
-              lng: pin.lng,
-              lat: pin.lat,
-              message: pin.message ?? '',
-              color: pin.color ?? '#E63946',
-              createdAt: pin.createdAt,
-            }))
-          );
-
-          // Pin LRU Eviction
-          if (pinCacheRef.current.size > PINS_MAX_CACHE) {
-            const pinCandidates = Array.from(pinLruRef.current.entries())
-              .sort((a, b) => a[1] - b[1]);
-            for (const [pinId] of pinCandidates) {
-              if (pinCacheRef.current.size <= PINS_MAX_CACHE) break;
-              const pin = pinCacheRef.current.get(pinId);
-              if (!pin) continue;
-              if (
-                pin.lng >= expandedBounds.minLng && pin.lng <= expandedBounds.maxLng &&
-                pin.lat >= expandedBounds.minLat && pin.lat <= expandedBounds.maxLat
-              ) continue;
-              pinCacheRef.current.delete(pinId);
-              pinLruRef.current.delete(pinId);
-            }
+            ) continue;
+            pinCacheRef.current.delete(pinId);
+            pinLruRef.current.delete(pinId);
           }
         }
       } else {
@@ -520,7 +497,7 @@ export default function MapScreen() {
         console.warn('[loadViewport] Failed:', e);
       }
     }
-  }, [bumpStrokeVersion, lang, tileRendererRef]);
+  }, [bumpStrokeVersion, tileRendererRef]);
 
   // Initial load
   useEffect(() => {
@@ -1047,12 +1024,10 @@ export default function MapScreen() {
         {/* Render unconditionally to avoid Fabric view recycling crashes */}
         {/* Pins - Native ShapeSource for stability */}
         <MapPinOverlay
-          pins={cameraState.zoom >= MIN_PIN_OVERVIEW_ZOOM ? visiblePins : []}
+          pins={cameraState.zoom >= MIN_PIN_ZOOM ? visiblePins : []}
           zoom={cameraState.zoom}
           onPinPress={id => {
-            const pin = visiblePins.find(p => p.id === id);
-            if (pin && !pin.userId) cameraRef.current?.setCamera({ centerCoordinate: [pin.lng, pin.lat], zoomLevel: Math.max(21, cameraState.zoom + 1), animationDuration: 500 });
-            else setSelectedPinId(id);
+            setSelectedPinId(id);
           }}
         />
       </MapLibreGL.MapView>

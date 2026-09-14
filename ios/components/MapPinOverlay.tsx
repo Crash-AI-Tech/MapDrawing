@@ -9,7 +9,7 @@ import {
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { Compliance } from '@/utils/compliance';
 import { getCurrentLang, tf, ts } from '@/lib/i18n';
-import { getPinVisibilityMode, MIN_VISIBLE_PIN_CLUSTER_COUNT } from '@mapdrawing/contracts';
+import { MIN_PIN_ZOOM } from '@mapdrawing/contracts';
 
 export interface PinData {
   id: string;
@@ -20,7 +20,6 @@ export interface PinData {
   message: string;
   color: string;
   createdAt: number;
-  clusterCount?: number;
 }
 
 interface MapPinOverlayProps {
@@ -125,30 +124,20 @@ export function MapPinTooltip({
  * Only responsible for the dots (ShapeSource).
  */
 export default function MapPinOverlay({ pins, zoom, onPinPress }: MapPinOverlayProps) {
-  const pinVisibility = getPinVisibilityMode(zoom);
-
   // Convert pins to GeoJSON FeatureCollection
   const shape = useMemo(() => {
-    if (!pins || pins.length === 0) {
+    if (zoom < MIN_PIN_ZOOM || !pins || pins.length === 0) {
       return { type: 'FeatureCollection', features: [] };
     }
 
     const features = pins.map((pin) => {
-      const aggregate = typeof pin.clusterCount === 'number';
-      const showCount = aggregate && pinVisibility === 'cluster' &&
-        pin.clusterCount! >= MIN_VISIBLE_PIN_CLUSTER_COUNT;
-      const markerKind = aggregate
-        ? pinVisibility === 'overview' ? 'overview' : showCount ? 'cluster' : 'single'
-        : 'pin';
-
       return {
         type: 'Feature',
         id: pin.id,
         properties: {
           id: pin.id,
           color: pin.color,
-          markerKind,
-          label: aggregate ? showCount ? String(pin.clusterCount) : '' : truncate(pin.message, 10),
+          label: truncate(pin.message, 10),
         },
         geometry: {
           type: 'Point',
@@ -161,7 +150,7 @@ export default function MapPinOverlay({ pins, zoom, onPinPress }: MapPinOverlayP
       type: 'FeatureCollection',
       features,
     };
-  }, [pins, pinVisibility]);
+  }, [pins, zoom]);
 
   const handleLayerPress = useCallback(
     (e: any) => {
@@ -183,30 +172,16 @@ export default function MapPinOverlay({ pins, zoom, onPinPress }: MapPinOverlayP
       <MapLibreGL.CircleLayer
         id="pins-layer"
         style={{
-          circleRadius: ['match', ['get', 'markerKind'], 'overview', 4, 'single', 5, 'cluster', 12, 8],
-          circleColor: ['match', ['get', 'markerKind'], 'pin', ['get', 'color'], '#7c3aed'],
-          circleOpacity: ['match', ['get', 'markerKind'], 'overview', 0.28, 'single', 0.5, 'cluster', 0.84, 1],
-          circleStrokeWidth: ['match', ['get', 'markerKind'], 'overview', 0, 'single', 1, 2],
+          circleRadius: 8,
+          circleColor: ['get', 'color'],
+          circleOpacity: 1,
+          circleStrokeWidth: 2,
           circleStrokeColor: '#ffffff',
           circlePitchAlignment: 'map',
         }}
       />
       <MapLibreGL.SymbolLayer
-        id="pin-cluster-label"
-        filter={['==', ['get', 'markerKind'], 'cluster']}
-        style={{
-          textField: ['get', 'label'],
-          textFont: ['Noto Sans Regular'],
-          textSize: 11,
-          textColor: '#ffffff',
-          textAllowOverlap: false,
-          textIgnorePlacement: false,
-        }}
-      />
-      {/* Full labels appear only after the server switches to individual pins. */}
-      <MapLibreGL.SymbolLayer
         id="pins-label"
-        filter={['==', ['get', 'markerKind'], 'pin']}
         style={{
           textField: ['get', 'label'],
           textFont: ['Noto Sans Regular'],

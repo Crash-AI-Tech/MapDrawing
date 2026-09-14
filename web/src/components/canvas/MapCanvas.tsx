@@ -11,11 +11,8 @@ import {
   MAP_STYLE_URL,
   MIN_DRAW_ZOOM,
   MIN_PIN_ZOOM,
-  MIN_PIN_OVERVIEW_ZOOM,
-  MIN_VISIBLE_PIN_CLUSTER_COUNT,
   MIN_DATA_ZOOM,
   PIN_INK_COST,
-  getPinVisibilityMode,
 } from '@/constants';
 import { useDrawingEngine } from '@/hooks/useDrawingEngine';
 import { useSync } from '@/hooks/useSync';
@@ -106,7 +103,6 @@ export default function MapCanvas() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const pinMarkersRef = useRef<maplibregl.Marker[]>([]);
   const pinRequestRef = useRef<AbortController | null>(null);
-  const [pinClusters, setPinClusters] = useState<Array<{ id: string; lng: number; lat: number; count: number }>>([]);
 
   const [mapReady, setMapReady] = useState(false);
   const [engine, setEngine] = useState<import('@/core/engine/DrawingEngine').DrawingEngine | null>(null);
@@ -176,15 +172,15 @@ export default function MapCanvas() {
       // Skip ALL data loading when zoomed out too far to prevent performance issues
       if (zoom < MIN_DATA_ZOOM) {
         setPins([]);
-        setPinClusters([]);
+        setSelectedPin(null);
         return;
       }
 
       await loadViewport(bounds, zoom);
       if (controller.signal.aborted) return;
 
-      // Pin activity starts later than drawings so the regional map stays quiet.
-      if (zoom >= MIN_PIN_OVERVIEW_ZOOM) {
+      // Scheme A: pins do not exist visually or on the network until street level.
+      if (zoom >= MIN_PIN_ZOOM) {
         try {
           const qs = new URLSearchParams({ minLat: String(bounds.minLat), maxLat: String(bounds.maxLat), minLng: String(bounds.minLng), maxLng: String(bounds.maxLng), zoom: String(Math.floor(zoom)), limit: '200' });
           const items: MapPin[] = [];
@@ -193,28 +189,22 @@ export default function MapCanvas() {
             if (cursor) { qs.set('cursorCreatedAt', String(cursor.createdAt)); qs.set('cursorId', cursor.id); }
             const res = await fetch(`/api/pins?${qs}`, { signal: controller.signal });
             if (!res.ok) throw new Error(`Pins HTTP ${res.status}`);
-            const body = await res.json() as { mode: 'raw' | 'clustered'; items: unknown[]; nextCursor: PageCursor | null };
+            const body = await res.json() as { mode: 'raw'; items: unknown[]; nextCursor: PageCursor | null };
             if (controller.signal.aborted) return;
-            if (body.mode === 'clustered') {
-              setPinClusters(body.items as Array<{ id: string; lng: number; lat: number; count: number }>);
-              setPins([]);
-              return;
-            }
             items.push(...body.items.filter(isMapPin));
             cursor = body.nextCursor;
             if (!cursor) break;
           }
-          setPinClusters([]);
           setPins(items);
         } catch (e) {
           if (!controller.signal.aborted) console.error('[MapCanvas] Failed to load pins:', e);
         }
       } else {
         setPins([]);
-        setPinClusters([]);
+        setSelectedPin(null);
       }
     },
-    [loadViewport, setPins]
+    [loadViewport, setPins, setSelectedPin]
   );
 
   useViewport({
@@ -343,34 +333,9 @@ export default function MapCanvas() {
     pinMarkersRef.current.forEach((m) => m.remove());
     pinMarkersRef.current = [];
 
-    const pinVisibility = getPinVisibilityMode(currentZoom);
-    if (pinVisibility === 'hidden') return;
+    if (currentZoom < MIN_PIN_ZOOM) return;
 
-    for (const cluster of pinClusters) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'group flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600';
-      button.dataset.pinPresentation = pinVisibility;
-      button.dataset.pinCount = String(cluster.count);
-
-      const visual = document.createElement('span');
-      const showCount = pinVisibility === 'cluster' && cluster.count >= MIN_VISIBLE_PIN_CLUSTER_COUNT;
-      if (showCount) {
-        visual.className = 'liquid-glass flex h-7 min-w-7 items-center justify-center rounded-full border border-white/70 px-2 text-xs font-semibold text-violet-700 shadow-sm transition-transform group-hover:scale-105';
-        visual.textContent = String(cluster.count);
-      } else if (pinVisibility === 'overview') {
-        visual.className = 'h-2 w-2 rounded-full bg-violet-600/30 ring-1 ring-white/70 transition-transform group-hover:scale-150';
-      } else {
-        visual.className = 'h-2.5 w-2.5 rounded-full bg-violet-600/50 ring-1 ring-white/80 shadow-sm transition-transform group-hover:scale-125';
-      }
-      visual.setAttribute('aria-hidden', 'true');
-      button.appendChild(visual);
-      button.setAttribute('aria-label', `${getI18nText('menuPins')}: ${cluster.count}`);
-      button.addEventListener('click', () => map.easeTo({ center: [cluster.lng, cluster.lat], zoom: Math.min(22, Math.max(21, map.getZoom() + 2)) }));
-      pinMarkersRef.current.push(new maplibregl.Marker({ element: button }).setLngLat([cluster.lng, cluster.lat]).addTo(map));
-    }
-
-    if (pinVisibility === 'detail') pins.forEach((pin) => {
+    pins.forEach((pin) => {
       // Wrapper container
       const wrapper = document.createElement('div');
       wrapper.style.position = 'relative';
@@ -525,7 +490,7 @@ export default function MapCanvas() {
       pinMarkersRef.current.push(marker);
     });
     return () => { pinMarkersRef.current.forEach(marker => marker.remove()); pinMarkersRef.current = []; };
-  }, [pins, pinClusters, currentZoom, user, userId, refreshBlocked, setSelectedPin]);
+  }, [pins, currentZoom, user, userId, refreshBlocked, setSelectedPin]);
 
   // 8) Handle pin placement
   useEffect(() => {

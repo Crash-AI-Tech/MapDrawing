@@ -122,14 +122,6 @@ export interface MapPin {
   ink?: number;
 }
 
-export interface PinCluster {
-  type: 'cluster';
-  id: string;
-  lng: number;
-  lat: number;
-  count: number;
-}
-
 export interface PinItem extends MapPin {
   type: 'pin';
 }
@@ -215,8 +207,8 @@ export async function fetchPins(
     signal?: AbortSignal;
   }
 ): Promise<{
-  mode: 'raw' | 'clustered';
-  items: Array<PinItem | PinCluster>;
+  mode: 'raw';
+  items: PinItem[];
   nextCursor: PageCursor | null;
 }> {
   const qs = new URLSearchParams({

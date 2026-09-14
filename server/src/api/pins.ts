@@ -7,7 +7,7 @@ import { validateCsrf } from '@mapdrawing/server/http/csrf';
 import { activityStatement } from '@mapdrawing/server/product-metrics';
 import { readJsonBody, RequestBodyError } from '@mapdrawing/server/http/body';
 import { isInsufficientInkError, prepareInkConsumption } from '@mapdrawing/server/ink';
-import { MIN_PIN_CLUSTER_ZOOM, MIN_PIN_DETAIL_ZOOM } from '@mapdrawing/contracts';
+import { MIN_PIN_ZOOM } from '@mapdrawing/contracts';
 import {
   parseCursor,
   parseInteger,
@@ -17,15 +17,6 @@ import {
 
 const MAX_PIN_REQUEST_BYTES = 16 * 1024;
 const PIN_INK_COST = 50;
-
-interface PinClusterRow {
-  gx: number;
-  gy: number;
-  count: number;
-  lng: number;
-  lat: number;
-  created_at_ms: number;
-}
 
 interface PinRow {
   id: string;
@@ -52,55 +43,17 @@ export async function GET(request: Request) {
     if (!Number.isFinite(zoom) || zoom < 0 || zoom > 24) {
       throw new QueryValidationError('zoom must be between 0 and 24');
     }
+
+    // Scheme A: a zoomed-out map has no pin presence at all. Return before
+    // opening a D1 session so low-zoom requests cannot create database load.
+    if (zoom < MIN_PIN_ZOOM) {
+      return Response.json({ mode: 'raw' as const, items: [], nextCursor: null });
+    }
+
     const limit = parseInteger(url.searchParams, 'limit', 200, 1, 500);
     const cursor = parseCursor(url.searchParams);
     const { env } = getCloudflareContext();
     const database = env.DB.withSession();
-    // Apply blocks before aggregation, not after clusters have hidden authors.
-    const identity = await validateSession(request).catch(() => null);
-    const viewerId = identity?.user.id ?? '';
-
-    // Low zooms return clustered pins to avoid annotation explosion on mobile
-    if (zoom < MIN_PIN_DETAIL_ZOOM) {
-      const clampedLimit = Math.max(10, Math.min(limit, 300));
-      const latSpan = Math.max(maxLat - minLat, 0.0001);
-      const lngSpan = Math.max(maxLng - minLng, 0.0001);
-      const gridSize = zoom >= MIN_PIN_CLUSTER_ZOOM ? 32 : 24;
-      const cellLat = latSpan / gridSize;
-      const cellLng = lngSpan / gridSize;
-
-      const result = await database.prepare(
-        `SELECT
-            CAST((lng - ?1) / ?2 AS INTEGER) AS gx,
-            CAST((lat - ?3) / ?4 AS INTEGER) AS gy,
-            COUNT(*) AS count,
-            AVG(lng) AS lng,
-            AVG(lat) AS lat,
-            MAX(created_at_ms) AS created_at_ms
-         FROM map_pins
-         WHERE lat BETWEEN ?5 AND ?6
-           AND lng BETWEEN ?7 AND ?8
-           AND NOT EXISTS (SELECT 1 FROM blocked_users b WHERE b.blocker_id = ?10 AND b.blocked_id = map_pins.user_id)
-         GROUP BY gx, gy
-         ORDER BY count DESC, created_at_ms DESC
-         LIMIT ?9`
-      )
-        .bind(minLng, cellLng, minLat, cellLat, minLat, maxLat, minLng, maxLng, clampedLimit, viewerId)
-        .all<PinClusterRow>();
-
-      const items = (result.results ?? []).map((row) => ({
-        type: 'cluster' as const,
-        id: `cluster-${row.gx}-${row.gy}`,
-        lng: Number(row.lng),
-        lat: Number(row.lat),
-        count: Number(row.count),
-      }));
-
-      return Response.json(
-        { mode: 'clustered' as const, items, nextCursor: null },
-        { headers: { 'x-d1-bookmark': database.getBookmark() ?? '' } },
-      );
-    }
 
     const clampedLimit = Math.max(10, Math.min(limit, 500));
     const pageSize = clampedLimit + 1;

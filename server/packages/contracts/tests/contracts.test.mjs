@@ -13,9 +13,6 @@ const {
   tileKeysForBounds,
   parseTileKey,
   dedupeById,
-  getPinVisibilityMode,
-  MIN_VISIBLE_PIN_CLUSTER_COUNT,
-  MIN_PIN_DETAIL_ZOOM,
   MIN_PIN_ZOOM,
 } = shared;
 
@@ -42,16 +39,8 @@ test('only server-supported brushes are exposed', () => {
   assert.equal(isSupportedBrushId('spray'), false);
 });
 
-test('pin visibility progressively reveals activity, clusters, and details', () => {
-  assert.equal(getPinVisibilityMode(Number.NaN), 'hidden');
-  assert.equal(getPinVisibilityMode(13.99), 'hidden');
-  assert.equal(getPinVisibilityMode(14), 'overview');
-  assert.equal(getPinVisibilityMode(17.99), 'overview');
-  assert.equal(getPinVisibilityMode(18), 'cluster');
-  assert.equal(getPinVisibilityMode(20.99), 'cluster');
-  assert.equal(getPinVisibilityMode(21), 'detail');
-  assert.equal(MIN_VISIBLE_PIN_CLUSTER_COUNT, 2);
-  assert.equal(MIN_PIN_ZOOM, MIN_PIN_DETAIL_ZOOM);
+test('pins use one street-level visibility and creation threshold', () => {
+  assert.equal(MIN_PIN_ZOOM, 21);
 });
 
 test('HTTP retry classification is identical across clients', () => {
