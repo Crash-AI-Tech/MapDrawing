@@ -79,6 +79,7 @@ import {
   journeyText, parseMapLocation, mapLocationQuery, type SyncState,
   MIN_DRAW_ZOOM,
   MIN_PIN_ZOOM,
+  MIN_PIN_OVERVIEW_ZOOM,
   MIN_DATA_ZOOM,
   PIN_INK_COST,
   STROKE_HIDE_ZOOM_DIFF,
@@ -115,7 +116,6 @@ const PINS_MAX_PAGES = 4;
 const PINS_MAX_CACHE = 600;
 const CAMERA_UPDATE_THROTTLE_MS = 16;
 const INTERACTION_SETTLE_MS = 120;
-const MIN_PINS_FETCH_ZOOM = 8; // Don't fetch pins when zoomed out below this
 const MIN_POINT_DISTANCE_PX = 1;
 const MAX_POINTS_PER_STROKE = 1000;
 
@@ -321,6 +321,7 @@ export default function MapScreen() {
     // Skip ALL data loading when zoomed out too far to prevent performance issues
     const zoom = cameraZoomRef.current;
     if (zoom < MIN_DATA_ZOOM) {
+      setVisiblePins([]);
       return;
     }
 
@@ -420,7 +421,7 @@ export default function MapScreen() {
 
       // --- Load Pins (paginated/clustered) ---
       // 方案 B: Skip pin fetching when zoomed out too far
-      if (zoom >= MIN_PINS_FETCH_ZOOM) {
+      if (zoom >= MIN_PIN_OVERVIEW_ZOOM) {
         const pinFirstPage = await fetchPins({
           signal: controller.signal,
           minLat: bounds.minLat, maxLat: bounds.maxLat,
@@ -444,6 +445,7 @@ export default function MapScreen() {
               message: tf('pinsCount', lang)(c.count),
               color: '#1d4ed8',
               createdAt: 0,
+              clusterCount: c.count,
             }))
           );
         } else {
@@ -510,7 +512,9 @@ export default function MapScreen() {
             }
           }
         }
-      } // end MIN_PINS_FETCH_ZOOM guard
+      } else {
+        setVisiblePins([]);
+      }
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
         console.warn('[loadViewport] Failed:', e);
@@ -1043,7 +1047,8 @@ export default function MapScreen() {
         {/* Render unconditionally to avoid Fabric view recycling crashes */}
         {/* Pins - Native ShapeSource for stability */}
         <MapPinOverlay
-          pins={cameraState.zoom >= MIN_DATA_ZOOM ? visiblePins : []}
+          pins={cameraState.zoom >= MIN_PIN_OVERVIEW_ZOOM ? visiblePins : []}
+          zoom={cameraState.zoom}
           onPinPress={id => {
             const pin = visiblePins.find(p => p.id === id);
             if (pin && !pin.userId) cameraRef.current?.setCamera({ centerCoordinate: [pin.lng, pin.lat], zoomLevel: Math.max(21, cameraState.zoom + 1), animationDuration: 500 });

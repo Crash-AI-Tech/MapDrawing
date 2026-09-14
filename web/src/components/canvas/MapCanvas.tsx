@@ -11,8 +11,11 @@ import {
   MAP_STYLE_URL,
   MIN_DRAW_ZOOM,
   MIN_PIN_ZOOM,
+  MIN_PIN_OVERVIEW_ZOOM,
+  MIN_VISIBLE_PIN_CLUSTER_COUNT,
   MIN_DATA_ZOOM,
   PIN_INK_COST,
+  getPinVisibilityMode,
 } from '@/constants';
 import { useDrawingEngine } from '@/hooks/useDrawingEngine';
 import { useSync } from '@/hooks/useSync';
@@ -180,8 +183,8 @@ export default function MapCanvas() {
       await loadViewport(bounds, zoom);
       if (controller.signal.aborted) return;
 
-      // Load pins when zoomed in enough
-      if (zoom >= MIN_DATA_ZOOM) {
+      // Pin activity starts later than drawings so the regional map stays quiet.
+      if (zoom >= MIN_PIN_OVERVIEW_ZOOM) {
         try {
           const qs = new URLSearchParams({ minLat: String(bounds.minLat), maxLat: String(bounds.maxLat), minLng: String(bounds.minLng), maxLng: String(bounds.maxLng), zoom: String(Math.floor(zoom)), limit: '200' });
           const items: MapPin[] = [];
@@ -208,6 +211,7 @@ export default function MapCanvas() {
         }
       } else {
         setPins([]);
+        setPinClusters([]);
       }
     },
     [loadViewport, setPins]
@@ -255,6 +259,8 @@ export default function MapCanvas() {
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
 
     mapRef.current = map;
+    setCurrentZoom(initialZoom);
+    setCurrentZoomGlobal(initialZoom);
 
     // Persist viewport position on move
     map.on('moveend', () => {
@@ -337,18 +343,34 @@ export default function MapCanvas() {
     pinMarkersRef.current.forEach((m) => m.remove());
     pinMarkersRef.current = [];
 
-    if (currentZoom < MIN_DATA_ZOOM) return;
+    const pinVisibility = getPinVisibilityMode(currentZoom);
+    if (pinVisibility === 'hidden') return;
 
     for (const cluster of pinClusters) {
       const button = document.createElement('button');
-      button.className = 'liquid-glass rounded-full border border-white/70 px-3 py-2 text-sm font-bold text-violet-900 shadow-md';
-      button.textContent = String(cluster.count);
+      button.type = 'button';
+      button.className = 'group flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600';
+      button.dataset.pinPresentation = pinVisibility;
+      button.dataset.pinCount = String(cluster.count);
+
+      const visual = document.createElement('span');
+      const showCount = pinVisibility === 'cluster' && cluster.count >= MIN_VISIBLE_PIN_CLUSTER_COUNT;
+      if (showCount) {
+        visual.className = 'liquid-glass flex h-7 min-w-7 items-center justify-center rounded-full border border-white/70 px-2 text-xs font-semibold text-violet-700 shadow-sm transition-transform group-hover:scale-105';
+        visual.textContent = String(cluster.count);
+      } else if (pinVisibility === 'overview') {
+        visual.className = 'h-2 w-2 rounded-full bg-violet-600/30 ring-1 ring-white/70 transition-transform group-hover:scale-150';
+      } else {
+        visual.className = 'h-2.5 w-2.5 rounded-full bg-violet-600/50 ring-1 ring-white/80 shadow-sm transition-transform group-hover:scale-125';
+      }
+      visual.setAttribute('aria-hidden', 'true');
+      button.appendChild(visual);
       button.setAttribute('aria-label', `${getI18nText('menuPins')}: ${cluster.count}`);
       button.addEventListener('click', () => map.easeTo({ center: [cluster.lng, cluster.lat], zoom: Math.min(22, Math.max(21, map.getZoom() + 2)) }));
       pinMarkersRef.current.push(new maplibregl.Marker({ element: button }).setLngLat([cluster.lng, cluster.lat]).addTo(map));
     }
 
-    pins.forEach((pin) => {
+    if (pinVisibility === 'detail') pins.forEach((pin) => {
       // Wrapper container
       const wrapper = document.createElement('div');
       wrapper.style.position = 'relative';

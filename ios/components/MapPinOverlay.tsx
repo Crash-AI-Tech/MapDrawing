@@ -9,6 +9,7 @@ import {
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { Compliance } from '@/utils/compliance';
 import { getCurrentLang, tf, ts } from '@/lib/i18n';
+import { getPinVisibilityMode, MIN_VISIBLE_PIN_CLUSTER_COUNT } from '@niubi/shared';
 
 export interface PinData {
   id: string;
@@ -19,10 +20,12 @@ export interface PinData {
   message: string;
   color: string;
   createdAt: number;
+  clusterCount?: number;
 }
 
 interface MapPinOverlayProps {
   pins: PinData[];
+  zoom: number;
   onPinPress: (pinId: string) => void;
 }
 
@@ -121,32 +124,44 @@ export function MapPinTooltip({
  * MapPinOverlay - Renders INSIDE the MapView.
  * Only responsible for the dots (ShapeSource).
  */
-export default function MapPinOverlay({ pins, onPinPress }: MapPinOverlayProps) {
+export default function MapPinOverlay({ pins, zoom, onPinPress }: MapPinOverlayProps) {
+  const pinVisibility = getPinVisibilityMode(zoom);
+
   // Convert pins to GeoJSON FeatureCollection
   const shape = useMemo(() => {
     if (!pins || pins.length === 0) {
       return { type: 'FeatureCollection', features: [] };
     }
 
-    const features = pins.map((pin) => ({
-      type: 'Feature',
-      id: pin.id,
-      properties: {
+    const features = pins.map((pin) => {
+      const aggregate = typeof pin.clusterCount === 'number';
+      const showCount = aggregate && pinVisibility === 'cluster' &&
+        pin.clusterCount! >= MIN_VISIBLE_PIN_CLUSTER_COUNT;
+      const markerKind = aggregate
+        ? pinVisibility === 'overview' ? 'overview' : showCount ? 'cluster' : 'single'
+        : 'pin';
+
+      return {
+        type: 'Feature',
         id: pin.id,
-        color: pin.color,
-        message: truncate(pin.message, 10), // Short message for label
-      },
-      geometry: {
-        type: 'Point',
-        coordinates: [pin.lng, pin.lat],
-      },
-    }));
+        properties: {
+          id: pin.id,
+          color: pin.color,
+          markerKind,
+          label: aggregate ? showCount ? String(pin.clusterCount) : '' : truncate(pin.message, 10),
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [pin.lng, pin.lat],
+        },
+      };
+    });
 
     return {
       type: 'FeatureCollection',
       features,
     };
-  }, [pins]);
+  }, [pins, pinVisibility]);
 
   const handleLayerPress = useCallback(
     (e: any) => {
@@ -168,19 +183,33 @@ export default function MapPinOverlay({ pins, onPinPress }: MapPinOverlayProps) 
       <MapLibreGL.CircleLayer
         id="pins-layer"
         style={{
-          circleRadius: 8,
-          circleColor: ['get', 'color'],
-          circleStrokeWidth: 2,
+          circleRadius: ['match', ['get', 'markerKind'], 'overview', 4, 'single', 5, 'cluster', 12, 8],
+          circleColor: ['match', ['get', 'markerKind'], 'pin', ['get', 'color'], '#7c3aed'],
+          circleOpacity: ['match', ['get', 'markerKind'], 'overview', 0.28, 'single', 0.5, 'cluster', 0.84, 1],
+          circleStrokeWidth: ['match', ['get', 'markerKind'], 'overview', 0, 'single', 1, 2],
           circleStrokeColor: '#ffffff',
           circlePitchAlignment: 'map',
         }}
       />
-      {/* Label Layer - uses Noto Sans Regular to avoid 404 */}
+      <MapLibreGL.SymbolLayer
+        id="pin-cluster-label"
+        filter={['==', ['get', 'markerKind'], 'cluster']}
+        style={{
+          textField: ['get', 'label'],
+          textFont: ['Noto Sans Regular'],
+          textSize: 11,
+          textColor: '#ffffff',
+          textAllowOverlap: false,
+          textIgnorePlacement: false,
+        }}
+      />
+      {/* Full labels appear only after the server switches to individual pins. */}
       <MapLibreGL.SymbolLayer
         id="pins-label"
+        filter={['==', ['get', 'markerKind'], 'pin']}
         style={{
-          textField: ['get', 'message'],
-          textFont: ['Noto Sans Regular'], // Explicitly set supported font
+          textField: ['get', 'label'],
+          textFont: ['Noto Sans Regular'],
           textSize: 11,
           textOffset: [0, -2], // Above the dot
           textColor: '#333',

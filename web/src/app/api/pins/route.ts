@@ -7,6 +7,7 @@ import { validateCsrf } from '@/lib/csrf';
 import { activityStatement } from '@/lib/product-metrics';
 import { readJsonBody, RequestBodyError } from '@/lib/http/body';
 import { isInsufficientInkError, prepareInkConsumption } from '@/lib/ink/server';
+import { MIN_PIN_CLUSTER_ZOOM, MIN_PIN_DETAIL_ZOOM } from '@niubi/shared';
 import {
   parseCursor,
   parseInteger,
@@ -60,11 +61,11 @@ export async function GET(request: Request) {
     const viewerId = identity?.user.id ?? '';
 
     // Low zooms return clustered pins to avoid annotation explosion on mobile
-    if (zoom < 21) {
+    if (zoom < MIN_PIN_DETAIL_ZOOM) {
       const clampedLimit = Math.max(10, Math.min(limit, 300));
       const latSpan = Math.max(maxLat - minLat, 0.0001);
       const lngSpan = Math.max(maxLng - minLng, 0.0001);
-      const gridSize = zoom >= 20 ? 32 : 24;
+      const gridSize = zoom >= MIN_PIN_CLUSTER_ZOOM ? 32 : 24;
       const cellLat = latSpan / gridSize;
       const cellLng = lngSpan / gridSize;
 

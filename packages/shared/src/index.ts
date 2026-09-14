@@ -126,11 +126,33 @@ export const MIN_DRAW_ZOOM = 18;
 /** How many zoom levels below createdZoom before a stroke is hidden */
 export const STROKE_HIDE_ZOOM_DIFF = 3;
 
-/** Minimum zoom level to show map pins */
-export const MIN_PIN_ZOOM = 20;
+/** First zoom where aggregated pin activity is requested and shown. */
+export const MIN_PIN_OVERVIEW_ZOOM = 14;
 
-/** Minimum zoom level to load ANY data (strokes + pins) from the database.
- *  Below this zoom, only the bare map is displayed to prevent performance issues. */
+/** First zoom where multi-pin aggregates show a numeric count. */
+export const MIN_PIN_CLUSTER_ZOOM = 18;
+
+/** First zoom where the API and clients show complete individual pins. */
+export const MIN_PIN_DETAIL_ZOOM = 21;
+
+/** Pin creation happens at the same local-detail zoom used by existing pins. */
+export const MIN_PIN_ZOOM = MIN_PIN_DETAIL_ZOOM;
+
+/** A numeric aggregate is useful only when it represents multiple pins. */
+export const MIN_VISIBLE_PIN_CLUSTER_COUNT = 2;
+
+export type PinVisibilityMode = 'hidden' | 'overview' | 'cluster' | 'detail';
+
+/** Cross-platform progressive disclosure contract for historical pins. */
+export function getPinVisibilityMode(zoom: number): PinVisibilityMode {
+    if (!Number.isFinite(zoom)) return 'hidden';
+    if (zoom < MIN_PIN_OVERVIEW_ZOOM) return 'hidden';
+    if (zoom < MIN_PIN_CLUSTER_ZOOM) return 'overview';
+    if (zoom < MIN_PIN_DETAIL_ZOOM) return 'cluster';
+    return 'detail';
+}
+
+/** Minimum zoom level to load drawing data from the database. */
 export const MIN_DATA_ZOOM = 11;
 
 /** Ink cost to place a map pin */
