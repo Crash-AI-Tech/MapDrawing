@@ -36,7 +36,7 @@ export default function CreationGuide({ onLogin }: { onLogin: () => void }) {
       trackEvent('share'); setCopied(true);
     } catch { /* Dismissing the share sheet is not an error. */ }
   };
-  return <aside className="pointer-events-none absolute left-3 top-20 z-20 max-w-[min(320px,calc(100vw-24px))] sm:left-5" aria-label={text('title')}>
+  return <aside className="pointer-events-none absolute right-4 top-[4.5rem] z-20 max-h-[calc(100dvh-11.5rem)] w-[min(20rem,calc(100vw-4.5rem))] overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={text('title')}>
     {open ? <section className="pointer-events-auto rounded-3xl border border-white/80 bg-amber-50/95 p-5 shadow-lg backdrop-blur-md">
       <div className="flex items-start justify-between gap-4">
         <span className="rounded-full bg-amber-200 px-3 py-1 text-[11px] font-bold tracking-wide text-amber-950">YOUR WORLD, YOUR CANVAS</span>
